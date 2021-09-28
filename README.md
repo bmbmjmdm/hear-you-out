@@ -1,4 +1,4 @@
-Mission: try to get people to understand and influence each other
+Mission: Try to get people to understand and influence each other
 
 Main Ideas:
 1. Ask philosophical and political questions to a diverse audience and share answers amongst users

@@ -1,0 +1,7 @@
+venv/
+.env
+.deta/
+__pycache__/
+
+*~
+*#*

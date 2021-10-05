@@ -1,0 +1,6 @@
+deta
+python-dotenv
+typing
+fastapi
+pydantic
+

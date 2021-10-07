@@ -1,10 +1,12 @@
 import os
 
+from math import sqrt
 from typing import List
 from random import choice
-from deta import Deta, Drive, Base
 from pydantic import BaseModel
 from dotenv import load_dotenv
+from deta import Deta, Drive, Base
+from discord_webhook import DiscordWebhook
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import  PlainTextResponse
 
@@ -16,8 +18,9 @@ from fastapi.responses import  PlainTextResponse
 if os.environ.get('DETA_RUNTIME') is None:
     load_dotenv(override=True)
 
-secret_key = os.environ.get('DETA_PROJECT_KEY')
-deta = Deta(secret_key)
+Secret_key = os.environ.get('DETA_PROJECT_KEY')
+Discord_flag_url = os.environ.get('DISCORD_FLAG_WEBHOOK') # TODO error if not set unless overridden
+deta = Deta(Secret_key)
 drive = Drive("voice-answers") # access to your drive
 questions_db = Base('questions')
 answers_db = Base('answers')
@@ -27,7 +30,7 @@ app = FastAPI()  # must be app
 # {question_uuid, text, category}
 
 # answerTable - inherit BaseModel? TODO
-# {key = answer_uuid, question_uuid, num_flags, is_banned, num_agrees, num_disagrees, num_listens}
+# {key = answer_uuid, question_uuid, num_flags, is_banned, was_banned, num_agrees, num_disagrees, num_listens}
 
 class QuestionModel(BaseModel):
     uuid: str
@@ -42,11 +45,19 @@ class AnswerListen(BaseModel):
     audio_data: bytes
     answer_uuid: str # TODO
 
+class AnswerTable(BaseModel):
+    key: str # TODO uuid; # answer_uuid
+    question_uuid: str # TODO
+    num_flags: int = 0
+    is_banned: Bool = False
+    was_banned: Bool = False
+    num_agrees: int = 0
+    num_disagrees: int = 0
+    num_listens: int = 0
+
 # utility
 def gen_uuid():
     return 'asdf' #uuid.uuid4()
-def name4drive(q, a):
-    return f"{q}.{a}"
 
 # handle all exceptions thrown in code below with a 500 http response
 @app.exception_handler(Exception)
@@ -64,6 +75,11 @@ async def get_question():
     # get today's question...how? from drive? from base? from internet endpoint? from file?/src
     # - think i want to go with base (need them anwyay). and can dev separate micro to insert Qs to it! or separate endpoint, with special auth?
     # - cron job to delete old files 30min after question change (if they are on a schedule)
+
+    # 
+    
+    # read store of questions every invocation
+    # compare the entry with the given datetime 
     questions = [
         "What is one idea, novel or otherwise, that you'd like more people to hear about?",
         "What does class warfare look like in your opinion?",
@@ -79,16 +95,18 @@ async def submit_answer(ans: AnswerSubmission):
     answer_uuid = gen_uuid()
     data = ans.audio_data
 
+    # store audio in drive, then bookkeep in base
     # check if error, try generating new uuid once, and if still error, give up
     drive.put(answer_uuid, data, content_type='application/octet-stream')
     # TODO if drive is full, need to return an error
     # TODO how to test this?
     
-    # bookkeep in base, then put audio blob in drive
+    # bookkeep in base
     # TODO use pydantic model for this to default all to right values
     answers_db.insert({"question_uuid": question_uuid,
                        "num_flags": 0,
                        "is_banned": False,
+                       "was_banned": False,
                        "num_agrees": 0,
                        "num_disagrees": 0,
                        "num_listens": 0
@@ -96,14 +114,31 @@ async def submit_answer(ans: AnswerSubmission):
 
     return {'id': answer_uuid}
 
-def calculate_popularity(num_agrees, num_disagrees, num_listens):
+# wilson score confidence interval for binomial distributions
+# any value in also taking into account people who didn't vote?
+# TODO need to add continuity correction bc n will often be small (< 40)
+def calculate_wilson(p, n, z = 1.96):
+    denominator = 1 + z**2/n
+    centre_adjusted_probability = p + z*z / (2*n)
+    adjusted_standard_deviation = sqrt((p*(1 - p) + z*z / (4*n)) / n)
+    
+    lower_bound = (centre_adjusted_probability - z*adjusted_standard_deviation) / denominator
+    upper_bound = (centre_adjusted_probability + z*adjusted_standard_deviation) / denominator
+    return (lower_bound, upper_bound)
+
+# returns negative for unpopular, 0 for controversial, positive for popular
+def calculate_popularity(num_agrees, num_disagrees):
+    # if there are a lot more of agrees than disagrees, it is popular
+    # if there are relatively the same amount, it's controversial
+
+    wilson_score_lower, wilson_score_higher = calculate_wilson(num_agrees, num_disagrees)
     return 0
 
 # given all items from the db,
 # skip past the ones for a different a question
 # skip past the ones we've already seen
 # categorize popularity
-def filter_answers_from_db(items):
+def filter_answers_from_db(items, question_uuid, seen_answer_uuids):
     pop = unpop = contro = []
     for item in items:
         if item.question_uuid is not question_uuid:
@@ -113,7 +148,7 @@ def filter_answers_from_db(items):
         if item.is_banned:
             continue
 
-        # negative is unpop, 0 is controv/unknown, 1 is pop
+        # negative is unpop, 0 is controv/unknown, positive is pop
         popularity = calculate_popularity(item.num_agrees,
                                           item.num_disagrees,
                                           item.num_listens)
@@ -131,7 +166,6 @@ def filter_answers_from_db(items):
         # TODO check for emptiness here? to prevent typeerror unpacking None
         return pop, unpop, contro
         
-        
 @app.post("/getAnswer", response_model=AnswerListen)
 async def get_answer(question_uuid: str, seen_answer_uuids: List[str]):
     # filter through all answers in DB once.
@@ -140,30 +174,36 @@ async def get_answer(question_uuid: str, seen_answer_uuids: List[str]):
     #   filter logic in the same place.
     # categorize into popular, controversial, unpopular during the single pass
     res = answers_db.fetch()
-    pop, unpop, contro = filter_answers_from_db(res.items)
+    pop, unpop, contro = filter_answers_from_db(res.items, question_uuid, seen_answer_uuids)
     while res.last: # TODO when will this be too slow?
         res = answers_db.fetch(last=res.last)
-        pop2, unpop2, contro2 = filter_answers_from_db(res.items)
+        pop2, unpop2, contro2 = filter_answers_from_db(res.items, question_uuid, seen_answer_uuids)
         pop += pop2
         unpop += unpop2
         contro += contro2
-        # (alternative to this code duplication was a less intuitive zip,
-        #   and I am optimizing for clarity)
         
     # want even distribution of answers across popularity spectrum.
-    cat = choice(range(3)) # 0, 1, 2
-    if cat == 0:
-        a = choice(pop)
-    elif cat == 1:
-        a = choice(unpop)
-    elif cat == 2:
-        a = choice(contro)
-    else:
-        raise HTTPException("wat", 500)
+    # calculate distribution thus far from seen answers
+    # TODO what if answers are flipfloppy?
+    distribution = {}
+    for answer_uuid in seen_answer_uuids:
+        pass
+        # map -1, 0, 1, to distinct dict elements. will this work as is?
+        #distribution["dist"+calculate_popularity()}"
+
+    # cat = choice(range(3)) # 0, 1, 2
+    # if cat == 0:
+    #     a = choice(pop)
+    # elif cat == 1:
+    #     a = choice(unpop)
+    # elif cat == 2:
+    #     a = choice(contro)
+    # else:
+    #     raise HTTPException("wat", 500)
     
     # get the selected answer
     answer_uuid = a.answer_uuid
-    audio_data = drive.get(answer_uuid)
+    audio_data_stream = drive.get(answer_uuid)
 
     # update selected answer's num_listen
     answers_db.update({"num_listens": users.util.increment(1)}, answer_uuid)
@@ -172,14 +212,35 @@ async def get_answer(question_uuid: str, seen_answer_uuids: List[str]):
             "answer_uuid": answer_uuid}
 
 @app.post("/flagAnswer")
-async def flag_answer(answer_uuid: str):
+async def flag_answer(answer_uuid: str): # TODO uuid
     # check what value it is at. if at a threshold, flag it as needing moderation (won't be sent to users anymore), and ping us somehow
-    # TODO
+    # set threshold to 1 for now? so we minimized spread of badness. and scale up when it makes sense with number reports and num users
 
-    # increment update in DB otherwise
+    # DON'T bother with num_flags since we are just banning after first flag for now
+    # answers_db.update(key=answer_uuid,
+    #                  updates={num_flags: users.util.increment(1)})
     answers_db.update(key=answer_uuid,
-              updates={num_flags: users.util.increment(1)})
+                      updates={is_banned: True})
+    
+    answer_row = answers_db.get(key=answer_uuid)
+    if answer_row['num_flags'] >= 0: # 0 means the first time it has been flagged
+        if answer_row['was_banned']: # we have already approved it
+            return # TODO return what? should FE know that this was already approved? maybe to inform user?
+        webhook = DiscordWebhook(url=Discord_flag_url, username="Flagged Answer")
+        audio_data_stream = drive.get(answer_uuid)
+        webhook.add_file(file=audio_data_stream.read(), filename=f"{answer_uuid}.mp3") # will this work?
+        # include a link to a micro endpoint to unban this file. TODO
+        #response = webhook.execute() # TODO error check
+
+    # TODO return success
     pass
+
+@app.post("/unbanAnswer")
+async def unban_answer(answer_uuid: str): # TODO uuid
+    #answers_db.update(key=answer_uuid,
+    #                  updates={is_banned: False,
+    #                           was_banned: True}) # this means it can't get banned again
+    pass # need auth for this request. via micro api keys? look at fastapi docs too TODO
 
 @app.post("/rateAnswer")
 async def rate_answer(answer_uuid: str, agreement: bool):

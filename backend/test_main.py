@@ -36,6 +36,7 @@ def test_no_questions_available():
 # - - client has binary data, and server db is updated num_listens
 # - - with and without a seen_before list
 # - - test distribution from each category? and seeing randomness from within each category
+# - - - test for round robin delivery, 1 from each category
 # - question not found error
 
 

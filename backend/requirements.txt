@@ -1,6 +1,7 @@
 deta
-python-dotenv
 typing
 fastapi
 pydantic
+python-dotenv
+discord_webhook
 

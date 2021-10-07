@@ -3,61 +3,77 @@ import React from 'react';
 import {
   StyleSheet,
   View,
-  Text,
+  Image,
   TouchableHighlight
 } from 'react-native';
 import Shadow from './Shadow'
+import Speaker from './Speaker.png'
+import Skip from './Skip.png'
+import X from './X.png'
+import Check from './Check.png'
 
 const BottomButtons = ({theme}) => {
-  const color = {
-    backgroundColor: theme == "question" ? "#FFADBB" : "#ABFFB8"
-  }
-
-  const pressedColor = theme == "question" ? "#94636b" : "#598560"
-
-  const [firstButtonPressed, setFirstButtonPressed] = React.useState(false)
-  const [secondButtonpressed, setSecondButtonpressed] = React.useState(false)
-  const [thirdButtonPressed, setThirdButtonPressed] = React.useState(false)
-
-  // break these 3 buttons up into seperate components since they seem to be having performance issues?
   return (
     <View style={styles.container}>
-      <Shadow radius={100} disabled={firstButtonPressed}>
-        <TouchableHighlight
-          onPressIn={() => setFirstButtonPressed(true)}
-          onPressOut={() => setFirstButtonPressed(false)}
-          underlayColor={pressedColor}
-          activeOpacity={1}
-          style={[styles.bigCircle, color]}
-        >
-          <View/>
-        </TouchableHighlight>
-      </Shadow>
-      <Shadow radius={60} disabled={secondButtonpressed}>
-        <TouchableHighlight
-          onPressIn={() => setSecondButtonpressed(true)}
-          onPressOut={() => setSecondButtonpressed(false)}
-          underlayColor={'#918a64'}
-          activeOpacity={1}
-          style={styles.littleCircle}
-        >
-        <View/>
-        </TouchableHighlight>
-      </Shadow>
-      <Shadow radius={100} disabled={thirdButtonPressed}>
-        <TouchableHighlight
-          onPressIn={() => setThirdButtonPressed(true)}
-          onPressOut={() => setThirdButtonPressed(false)}
-          underlayColor={pressedColor}
-          activeOpacity={1}
-          style={[styles.bigCircle, color]}
-        >
-        <View/>
-        </TouchableHighlight>
-      </Shadow>
+      <Button theme={theme} name={'x'} />
+      <Button theme={theme} name={'misc'} />
+      <Button theme={theme} name={'check'} />
     </View>
   )
 };
+
+const Button = ({name, theme}) => {
+  const bgColor = theme == "question" ? "#FFADBB" : "#ABFFB8"
+  const pressedColor = theme == "question" ? "#94636b" : "#598560"
+  const [pressed, setPressed] = React.useState(false)
+  let radius;
+  let style;
+  let underlay;
+  let image;
+  let imageSize;
+
+  if (name === "check") {
+    radius = 100
+    underlay = pressedColor
+    style = [styles.bigCircle, {backgroundColor: pressed ? underlay : bgColor}, pressed ? styles.depth : {}]
+    image = Check
+    imageSize = 55
+  }
+  else if (name === "x") {
+    radius = 100
+    underlay = pressedColor
+    style = [styles.bigCircle, {backgroundColor: pressed ? underlay : bgColor}, pressed ? styles.depth : {}]
+    image = X
+    imageSize = 50
+  }
+  else {
+    radius = 60
+    underlay = '#918a64'
+    style = [styles.littleCircle, pressed ? {backgroundColor: underlay} : {}, pressed ? styles.depthSmall : {}]
+    image = theme == "question" ? Speaker : Skip;
+    imageSize = 40
+  }
+
+  return (
+    <Shadow radius={radius} disabled={pressed}>
+      <TouchableHighlight
+        onPressIn={() => setPressed(true)}
+        onPressOut={() => setTimeout(() => setPressed(false), 100)}
+        underlayColor={underlay}
+        activeOpacity={1}
+        style={style}
+      >
+        <Image
+          source={image}
+          style={{
+            width: imageSize,
+            height: imageSize
+          }}
+        />
+      </TouchableHighlight>
+    </Shadow>
+  )
+}
 
 
 const styles = StyleSheet.create({
@@ -81,7 +97,15 @@ const styles = StyleSheet.create({
     width: 60,
     alignItems: 'center',
     justifyContent: 'center'
-  }
+  },
+  depth: {
+    marginTop: 3,
+    marginLeft: 3
+  },
+  depthSmall: {
+    marginTop: 2,
+    marginLeft: 2
+  },
 });
 
 export default BottomButtons;

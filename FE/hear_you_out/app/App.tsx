@@ -44,6 +44,3 @@ const styles = StyleSheet.create({
 });
 
 export default App;
-
-// hold onto this
-// <LinearGradient style={styles.container} colors={['rgba(255,0,138,0.25)', 'rgba(255,181,38,0.25)']}>

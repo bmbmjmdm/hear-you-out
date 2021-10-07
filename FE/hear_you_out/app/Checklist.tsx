@@ -19,15 +19,24 @@ const Checklist = ({type}) => {
 };
 
 const CheckItem = ({text}) => {
+  const [val, setVal] = React.useState(false)
+
   return (
     <View style={styles.checkItem}>
-      <CheckBox 
+      <CheckBox
+        value={val}
+        onValueChange={setVal}
         tintColors={{
-          true: "#9a9a9a"
+          true: "#575757"
         }}
-        onFillColor={"#9a9a9a"}
+        onFillColor={"#575757"}
       />
-      <Text style={styles.text}>{text}</Text>
+      <Text
+        style={styles.text}
+        onPress={() => setVal(!val)}
+      >
+        {text}
+      </Text>
     </View>
   )
 }

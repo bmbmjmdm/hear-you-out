@@ -3,6 +3,7 @@ import React from 'react';
 // https://github.com/react-native-radial-gradient/react-native-radial-gradient
 import RadialGradient from 'react-native-radial-gradient';
 
+// TODO for some reason the background doesnt show dark enough for some reason unless I change the values here while the app is running o.O
 const Shadow = ({
   radius,
   style = {},
@@ -29,7 +30,7 @@ const Shadow = ({
       ]}
       stops={[
         0,
-        0.80,
+        0.8,
         1
       ]}
       center={[

@@ -21,22 +21,17 @@ if os.environ.get('DETA_RUNTIME') is None:
 Secret_key = os.environ.get('DETA_PROJECT_KEY')
 Discord_flag_url = os.environ.get('DISCORD_FLAG_WEBHOOK') # TODO error if not set unless overridden
 deta = Deta(Secret_key)
-drive = Drive("voice-answers") # access to your drive
+#drive = Drive("voice-answers")
+drive = Drive("hear you out data store")
 questions_db = Base('questions')
 answers_db = Base('answers')
 app = FastAPI()  # must be app
 
-# questionTable - inherit BaseModel? TODO
-# {question_uuid, text, category}
-
-# answerTable - inherit BaseModel? TODO
-# {key = answer_uuid, question_uuid, num_flags, is_banned, was_banned, num_agrees, num_disagrees, num_listens}
-
 class QuestionModel(BaseModel):
-    uuid: str
+    key: str
     q: str
     category: str
-    
+
 class AnswerSubmission(BaseModel):
     audio_data: bytes
     question_uuid: str # uuid.UUID
@@ -60,6 +55,7 @@ def gen_uuid():
     return 'asdf' #uuid.uuid4()
 
 # handle all exceptions thrown in code below with a 500 http response
+# todo test what happens when this isn't here
 @app.exception_handler(Exception)
 async def validation_exception_handler(request, exc):
     print(str(exc))
@@ -102,16 +98,9 @@ async def submit_answer(ans: AnswerSubmission):
     # TODO how to test this?
     
     # bookkeep in base
-    # TODO use pydantic model for this to default all to right values
-    answers_db.insert({"question_uuid": question_uuid,
-                       "num_flags": 0,
-                       "is_banned": False,
-                       "was_banned": False,
-                       "num_agrees": 0,
-                       "num_disagrees": 0,
-                       "num_listens": 0
-                       }, answer_uuid)
-
+    schema_defaults = AnswerTable.dict()
+    schema_defaults["question_uuid"] = question_uuid
+    answers_db.insert(schema_defaults)
     return {'id': answer_uuid}
 
 # wilson score confidence interval for binomial distributions
@@ -212,7 +201,7 @@ async def get_answer(question_uuid: str, seen_answer_uuids: List[str]):
             "answer_uuid": answer_uuid}
 
 @app.post("/flagAnswer")
-async def flag_answer(answer_uuid: str): # TODO uuid
+async def flag_answer(answer_uuid: str):
     # check what value it is at. if at a threshold, flag it as needing moderation (won't be sent to users anymore), and ping us somehow
     # set threshold to 1 for now? so we minimized spread of badness. and scale up when it makes sense with number reports and num users
 

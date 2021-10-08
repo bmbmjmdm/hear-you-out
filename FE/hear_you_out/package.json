@@ -1,5 +1,5 @@
 {
-  "name": "test1",
+  "name": "hear_you_out",
   "version": "0.0.1",
   "private": true,
   "scripts": {
@@ -13,9 +13,12 @@
     "@react-native-community/checkbox": "^0.5.8",
     "react": "16.13.1",
     "react-native": "0.63.0",
+    "react-native-audio-recorder-player": "^3.2.0",
     "react-native-deck-swiper": "^2.0.5",
     "react-native-linear-gradient": "^2.5.6",
-    "react-native-radial-gradient": "^1.0.9"
+    "react-native-permissions": "^3.0.5",
+    "react-native-radial-gradient": "^1.0.9",
+    "react-native-uuid": "^2.0.1"
   },
   "devDependencies": {
     "@babel/core": "^7.8.4",

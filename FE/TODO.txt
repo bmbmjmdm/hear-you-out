@@ -1,0 +1,6 @@
+Also, add swift bridging header if you haven't created one for swift compatibility.
+https://stackoverflow.com/questions/31716413/xcode-not-automatically-creating-bridging-header
+
+
+useFrameworks! issues (or permissions issues for ios):
+https://github.com/zoontek/react-native-permissions

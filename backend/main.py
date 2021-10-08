@@ -19,10 +19,9 @@ if os.environ.get('DETA_RUNTIME') is None:
     load_dotenv(override=True)
 
 Secret_key = os.environ.get('DETA_PROJECT_KEY')
-Discord_flag_url = os.environ.get('DISCORD_FLAG_WEBHOOK') # TODO error if not set unless overridden
+Discord_flag_url = os.environ.get('DISCORD_FLAG_WEBHOOK') # todo error if not set unless overridden
 deta = Deta(Secret_key)
-#drive = Drive("voice-answers")
-drive = Drive("hear you out data store")
+drive = Drive("hyo")
 questions_db = Base('questions')
 answers_db = Base('answers')
 app = FastAPI()  # must be app
@@ -40,12 +39,12 @@ class AnswerListen(BaseModel):
     audio_data: bytes
     answer_uuid: str # TODO
 
-class AnswerTable(BaseModel):
+class AnswerTableSchema(BaseModel):
     key: str # TODO uuid; # answer_uuid
     question_uuid: str # TODO
     num_flags: int = 0
-    is_banned: Bool = False
-    was_banned: Bool = False
+    is_banned: bool = False
+    was_banned: bool = False
     num_agrees: int = 0
     num_disagrees: int = 0
     num_listens: int = 0
@@ -61,7 +60,7 @@ async def validation_exception_handler(request, exc):
     print(str(exc))
     return PlainTextResponse("uh oh, something unexpected happened", status_code=500)
 
-# TODO turn off caching per docs?
+# todo turn off caching per docs?
 @app.get("/")
 async def root():
     return {'hey': 'world'}
@@ -71,7 +70,9 @@ async def get_question():
     # get today's question...how? from drive? from base? from internet endpoint? from file?/src
     # - think i want to go with base (need them anwyay). and can dev separate micro to insert Qs to it! or separate endpoint, with special auth?
     # - cron job to delete old files 30min after question change (if they are on a schedule)
-
+    # TO
+    question_list = drive.get('list of questions')
+    
     # 
     
     # read store of questions every invocation
@@ -83,25 +84,27 @@ async def get_question():
     ]
     q = choice(questions)
     
-    return {"q": q, "uuid": "1", "category": "?"}
+    return {"q": q, "key": "1", "category": "?"}
 
 @app.post("/submitAnswer")
 async def submit_answer(ans: AnswerSubmission):
-    question_uuid = ans.question_uuid
     answer_uuid = gen_uuid()
+    question_uuid = ans.question_uuid
     data = ans.audio_data
 
     # store audio in drive, then bookkeep in base
-    # check if error, try generating new uuid once, and if still error, give up
-    drive.put(answer_uuid, data, content_type='application/octet-stream')
-    # TODO if drive is full, need to return an error
-    # TODO how to test this?
+    try:
+        drive.put(answer_uuid, data, content_type='application/octet-stream')
+    except Exception(e):
+        print(e) # i think visor will capture this in the logs?
+        raise HTTPException("error storing answer in drive", 500)
+    # TODO how to test drive being full error? maybe uncommonly run use case to fill it up? can test the exact byte limit
+    # TODO test for duplicate filename error
     
     # bookkeep in base
-    schema_defaults = AnswerTable.dict()
-    schema_defaults["question_uuid"] = question_uuid
-    answers_db.insert(schema_defaults)
-    return {'id': answer_uuid}
+    new_row = AnswerTableSchema(key=answer_uuid, question_uuid=question_uuid)
+    answers_db.insert(new_row.dict())
+    return {'answer id': answer_uuid}
 
 # wilson score confidence interval for binomial distributions
 # any value in also taking into account people who didn't vote?

@@ -100,7 +100,7 @@ const Question = () => {
     if (playing) {
       await recorder.stopPlayer()
     }
-    // TODO you cannot playback the recorder while it is paused. figure out a way around this, maybe by cloning the file or something?
+    // TODO you cannot playback the recorder while it is paused. figure out a way around this, maybe by cloning the file? maybe by breaking up the file into multiple files that we play consecutively?
     setPlaying(true)
     await recorder.startPlayer()
     setLock(false)

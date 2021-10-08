@@ -1,5 +1,4 @@
 deta
-typing
 fastapi
 pydantic
 python-dotenv

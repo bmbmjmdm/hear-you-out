@@ -4,11 +4,15 @@ from math import sqrt
 from typing import List
 from random import choice
 from pydantic import BaseModel
-from dotenv import load_dotenv
 from deta import Deta, Drive, Base
 from discord_webhook import DiscordWebhook
 from fastapi import FastAPI, HTTPException
 from fastapi.responses import  PlainTextResponse
+
+try: # to accommodate deta
+    from dotenv import load_dotenv
+except:
+    pass
 
 #from fastapi import FastAPI, File, UploadFile
 #from fastapi.responses import HTMLResponse, StreamingResponse
@@ -19,6 +23,7 @@ if os.environ.get('DETA_RUNTIME') is None:
     load_dotenv(override=True)
 
 Secret_key = os.environ.get('DETA_PROJECT_KEY')
+# TODO update micro env with deta update -e .env
 Discord_flag_url = os.environ.get('DISCORD_FLAG_WEBHOOK') # todo error if not set unless overridden
 deta = Deta(Secret_key)
 drive = Drive("hyo")

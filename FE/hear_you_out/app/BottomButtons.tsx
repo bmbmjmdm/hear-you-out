@@ -12,17 +12,18 @@ import Skip from './Skip.png'
 import X from './X.png'
 import Check from './Check.png'
 
-const BottomButtons = ({theme}) => {
+const BottomButtons = ({theme, disabled, xPressed, miscPressed, checkPressed}) => {
   return (
     <View style={styles.container}>
-      <Button theme={theme} name={'x'} />
-      <Button theme={theme} name={'misc'} />
-      <Button theme={theme} name={'check'} />
+      <Button theme={theme} name={'x'} onPress={xPressed} disabled={disabled} />
+      <Button theme={theme} name={'misc'} onPress={miscPressed} disabled={disabled} />
+      <Button theme={theme} name={'check'} onPress={checkPressed} disabled={disabled} />
     </View>
   )
 };
 
-const Button = ({name, theme}) => {
+// TODO disabled styles
+const Button = ({name, theme, onPress, disabled}) => {
   const bgColor = theme == "question" ? "#FFADBB" : "#ABFFB8"
   const pressedColor = theme == "question" ? "#94636b" : "#598560"
   const [pressed, setPressed] = React.useState(false)
@@ -62,6 +63,7 @@ const Button = ({name, theme}) => {
         underlayColor={underlay}
         activeOpacity={1}
         style={style}
+        onPress={() => { if (!disabled) onPress() }}
       >
         <Image
           source={image}

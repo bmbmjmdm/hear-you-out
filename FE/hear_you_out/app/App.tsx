@@ -6,14 +6,47 @@ import {
   ScrollView,
   View,
   Text,
+  Platform,
 } from 'react-native';
 
 // https://www.npmjs.com/package/react-native-deck-swiper
 import Swiper from 'react-native-deck-swiper'
 import Question from './Question'
 import Answer from './Answer'
+import PermissionsAndroid from 'react-native-permissions';
 
 const App = () => {
+  React.useEffect(() => {
+    const asyncFun = async () => {
+      console.log(Platform)
+      if (Platform.OS === 'android') {
+        try {
+          const grants = await PermissionsAndroid.requestMultiple([
+            PermissionsAndroid.PERMISSIONS.ANDROID.WRITE_EXTERNAL_STORAGE,
+            PermissionsAndroid.PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE,
+            PermissionsAndroid.PERMISSIONS.ANDROID.RECORD_AUDIO,
+          ]);
+      
+          if (
+            grants['android.permission.WRITE_EXTERNAL_STORAGE'] ===
+              PermissionsAndroid.RESULTS.GRANTED &&
+            grants['android.permission.READ_EXTERNAL_STORAGE'] ===
+              PermissionsAndroid.RESULTS.GRANTED &&
+            grants['android.permission.RECORD_AUDIO'] ===
+              PermissionsAndroid.RESULTS.GRANTED
+          ) {
+            console.log('Permissions granted');
+          } else {
+            console.log('All required permissions not granted');
+          }
+        } catch (err) {
+          console.warn(err);
+        }
+      }
+    }
+    asyncFun()
+  })
+
   return (
       <Swiper
           cards={['Question', 'Answer', 'Question', 'Answer', 'Question', 'Answer', 'Question', 'Answer', 'Question', 'Answer', 'Question', 'Answer']}

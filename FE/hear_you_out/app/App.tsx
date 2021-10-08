@@ -58,8 +58,8 @@ const App = () => {
                 return <Answer />
               }
           }}
-          onSwiped={(cardIndex) => {console.log(cardIndex)}}
-          onSwipedAll={() => {console.log('onSwipedAll')}}
+          onSwiped={(cardIndex) => {}}
+          onSwipedAll={() => {}}
           cardIndex={0}
           backgroundColor={'rgba(0,0,0,0)'}
           stackSize={2}

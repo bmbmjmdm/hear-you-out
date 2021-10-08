@@ -5,7 +5,8 @@ import {
   View,
   Text,
   Image,
-  TouchableOpacity
+  TouchableOpacity,
+  Platform
 } from 'react-native';
 // https://github.com/react-native-linear-gradient/react-native-linear-gradient
 import LinearGradient from 'react-native-linear-gradient';
@@ -14,6 +15,7 @@ import Shadow from './Shadow'
 import Checklist from './Checklist'
 import BottomButtons from './BottomButtons'
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
+import RNFS from 'react-native-fs'
 
 const Question = () => {
   const recorder = React.useRef(new AudioRecorderPlayer()).current
@@ -23,8 +25,9 @@ const Question = () => {
   const [lock, setLock] = React.useState(false)
   const [checked, setChecked] = React.useState(false)
   const [checklist, setChecklist] = React.useState(false)
-  
-
+  const extention = Platform.OS === 'android' ? ".mp4" : ".m4a"
+  const filePath = RNFS.CachesDirectoryPath + '/' + "HearYouOutTempRecord" + extention
+  const copyPath = RNFS.CachesDirectoryPath + '/' + "HearYouOutTempCopy" + extention
   // TODO test all this
 
   const recordPressed = async () => {
@@ -45,7 +48,7 @@ const Question = () => {
       else {
         setStarted(true)
         // the first member of files is the current file location
-        await recorder.startRecorder()
+        await recorder.startRecorder(filePath)
       }
     }
     setLock(false)
@@ -100,20 +103,22 @@ const Question = () => {
     if (playing) {
       await recorder.stopPlayer()
     }
-    // TODO you cannot playback the recorder while it is paused. figure out a way around this, maybe by cloning the file? maybe by breaking up the file into multiple files that we play consecutively?
+    // TODO you cannot playback the recorder while it is paused. figure out a way around this, maybe by breaking up the file into multiple files that we play consecutively?
+    //https://github.com/h2non/audioconcat
     setPlaying(true)
-    await recorder.startPlayer()
+    await recorder.startPlayer(copyPath)
     setLock(false)
   }
 
   const deleteCurrentFile = async () => {
     if (lock) return
     setLock(true)
-    // TODO
-    /*
-    Default path for android uri is {cacheDir}/sound.mp4.
-    Default path for ios uri is {cacheDir}/sound.m4a.
-    */
+    try {
+      await RNFS.unlink(filePath)
+    }
+    catch (e) {
+      console.log("delete failed")
+    }
     setLock(false)
   }
 

@@ -19,15 +19,22 @@ import RNFS from 'react-native-fs'
 
 const Question = () => {
   const recorder = React.useRef(new AudioRecorderPlayer()).current
+  // whether we started a recording
   const [started, setStarted] = React.useState(false)
+  // whether we are currently recording
   const [recording, setRecording] = React.useState(false)
+  // whether we are playing back what we've recorded so far
   const [playing, setPlaying] = React.useState(false)
+  // each time we playback, we need to stop our recording, playback, and then start a new one when the user continues recording (we're not allowed to playback while paused)
+  const [needsNewFile, setNeedsNewFile] = React.useState(false)
+  // if we stop a recording that isnt the original file, concat it with the original file 
+  const [needsConcat, setNeedsConcat] = React.useState(0)
   const [lock, setLock] = React.useState(false)
   const [checked, setChecked] = React.useState(false)
   const [checklist, setChecklist] = React.useState(false)
   const extention = Platform.OS === 'android' ? ".mp4" : ".m4a"
-  const filePath = RNFS.CachesDirectoryPath + '/' + "HearYouOutTempRecord" + extention
-  const copyPath = RNFS.CachesDirectoryPath + '/' + "HearYouOutTempCopy" + extention
+  const originalFile = RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention
+  const additionalFile = RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordAdditional" + extention
   // TODO test all this
 
   const recordPressed = async () => {
@@ -41,14 +48,23 @@ const Question = () => {
       }
       // set recording
       setRecording(true)
-      // choose whether to resume or start
+      // we've started already
       if (started) {
-        await recorder.resumeRecorder()
+        // we've played back and need to start a new file to concat
+        if (needsNewFile) {
+          setNeedsNewFile(false)
+          setNeedsConcat(true)
+          await recorder.startRecorder(additionalFile)
+        }
+        // we can simply unpause
+        else {
+          await recorder.resumeRecorder()
+        }
       }
+      // we havent started, create the original file and start
       else {
         setStarted(true)
-        // the first member of files is the current file location
-        await recorder.startRecorder(filePath)
+        await recorder.startRecorder(originalFile)
       }
     }
     setLock(false)
@@ -75,7 +91,7 @@ const Question = () => {
       setPlaying(false)
     }
     setStarted(false)
-    await recorder.stopRecorder()
+    await stopRecorderAndConcat()
     await deleteCurrentFile()
     setLock(false)
   }
@@ -84,9 +100,10 @@ const Question = () => {
     if (lock) return
     setLock(true)
     if (playing) await recorder.stopPlaying()
-    await recorder.stopRecorder()
+    await stopRecorderAndConcat()
     // TODO await SUBMIT THE LAST ONE
     // TODO move on from this screen
+    // see recorder docs regarding rn-fetch-blob if you have trouble uploading file
     // until these 2 TODOs are done, always swipe the current question card away after pressing submit button
     await deleteCurrentFile()
     // we dont even care about cleaning up the states because we're gonna move on from this screen
@@ -103,10 +120,10 @@ const Question = () => {
     if (playing) {
       await recorder.stopPlayer()
     }
-    // TODO you cannot playback the recorder while it is paused. figure out a way around this, maybe by breaking up the file into multiple files that we play consecutively?
-    //https://github.com/h2non/audioconcat
     setPlaying(true)
-    await recorder.startPlayer(copyPath)
+    setNeedsNewFile(true)
+    await stopRecorderAndConcat()
+    await recorder.startPlayer(originalFile)
     setLock(false)
   }
 
@@ -114,12 +131,24 @@ const Question = () => {
     if (lock) return
     setLock(true)
     try {
-      await RNFS.unlink(filePath)
+      await RNFS.unlink(originalFile)
     }
     catch (e) {
       console.log("delete failed")
     }
     setLock(false)
+  }
+
+  // concat original file + additional file => original file
+  const stopRecorderAndConcat = async () => {
+    await recorder.stopRecorder()
+    if (needsConcat) {
+      // TODO concat
+      // https://www.npmjs.com/package/react-native-ffmpeg
+      // see 2.3 Packages to see about enabling mp3
+      // https://stackoverflow.com/questions/61340868/appending-two-audiofiles-react-native
+      setNeedsConcat(false)
+    }
   }
 
   return (

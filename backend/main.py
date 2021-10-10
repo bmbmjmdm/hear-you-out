@@ -97,19 +97,20 @@ async def submit_answer(ans: AnswerSubmission):
     answer_uuid = gen_uuid()
     question_uuid = ans.question_uuid
     data = ans.audio_data
-
+    print("1")
     # store audio in drive, then bookkeep in base
     try:
         drive.put(answer_uuid, data, content_type='application/octet-stream')
     except Exception(e):
-        print(e) # i think visor will capture this in the logs?
+        print(f"~~~~~~~~~~~~~\n\n\n\n!!!!!!!!!!!!!!\n{e}") # i think visor will capture this in the logs?
         raise HTTPException("error storing answer in drive", 500)
-    # TODO how to test drive being full error? maybe uncommonly run use case to fill it up? can test the exact byte limit
+    # TODOhow to test drive being full error? maybe uncommonly run use case to fill it up? can test the exact byte limit
     # TODO test for duplicate filename error
-    
+    print(2)
     # bookkeep in base
     new_row = AnswerTableSchema(key=answer_uuid, question_uuid=question_uuid)
     answers_db.insert(new_row.dict())
+    print(new_row)
     return {'answer id': answer_uuid}
 
 # wilson score confidence interval for binomial distributions
@@ -129,27 +130,29 @@ def calculate_popularity(num_agrees, num_disagrees):
     # if there are a lot more of agrees than disagrees, it is popular
     # if there are relatively the same amount, it's controversial
 
-    wilson_score_lower, wilson_score_higher = calculate_wilson(num_agrees, num_disagrees)
+    # +2 so we don't div by 0, and bc i think it was a good improvement at the extremes (like cont. corr. (todo?)
+    #wilson_score_lower, wilson_score_higher = calculate_wilson(num_agrees+2, num_disagrees+2)
     return 0
 
 # given all items from the db,
 # skip past the ones for a different a question
 # skip past the ones we've already seen
+# skip past the banned ones
 # categorize popularity
-def filter_answers_from_db(items: List[AnswerTableSchema], question_uuid: str, seen_answer_uuids: str):
+def filter_answers_from_db(items: List[AnswerTableSchema], question_uuid: str, seen_answer_uuids: List[str]):
     pop = unpop = contro = []
     for item in items:
         if item.question_uuid is not question_uuid:
             continue
-        if item.answer_uuid in seen_answer_uuids:
+        if item.key in seen_answer_uuids:
             continue
         if item.is_banned:
             continue
 
         # negative is unpop, 0 is controv/unknown, positive is pop
         popularity = calculate_popularity(item.num_agrees,
-                                          item.num_disagrees,
-                                          item.num_listens)
+                                          item.num_disagrees)
+                                          #item.num_listens)
         
         if popularity < 0:
             unpop.append(item)
@@ -177,11 +180,11 @@ async def get_answer(question_uuid: str, seen_answer_uuids: List[str]):
     if res.count == 0:
         return PlainTextResponse("no answers found", status_code=500)
 
-    List[AnswerTableSchema]: answers_items = res.items
+    answers_items = [AnswerTableSchema(**item) for item in res.items]
     pop, unpop, contro = filter_answers_from_db(answers_items, question_uuid, seen_answer_uuids)
     while res.last: # TODO when will this be too slow?
         res = answers_db.fetch(last=res.last)
-        pop2, unpop2, contro2 = filter_answers_from_db(res.items, question_uuid, seen_answer_uuids)
+        pop2, unpop2, contro2 = filter_answers_from_db(answers_items, question_uuid, seen_answer_uuids)
         pop += pop2
         unpop += unpop2
         contro += contro2
@@ -206,14 +209,14 @@ async def get_answer(question_uuid: str, seen_answer_uuids: List[str]):
     #     raise HTTPException("wat", 500)
     
     # get the selected answer
-    answer_uuid = a.answer_uuid
-    audio_data_stream = drive.get(answer_uuid)
+    answer_uuid = a.key
+    audio_data = drive.get(answer_uuid).read()
 
     # update selected answer's num_listen
     # could catch exception here, but i think it makes sense to just abort if this update fails
     answers_db.update({"num_listens": answers_db.util.increment(1)}, answer_uuid)
     
-    return {"audio_data": audio_data_stream.read(),
+    return {"audio_data": audio_data,
             "answer_uuid": answer_uuid}
 
 @app.post("/flagAnswer")
@@ -225,25 +228,24 @@ async def flag_answer(answer_uuid: str):
                       updates={'num_flags': answers_db.util.increment(1)})
 
     # after noting the flag, if we have already explicitly approved this, then do nothing more
+    answer_row = answers_db.get(key=answer_uuid)
     if answer_row['was_banned']:
         # todo maybe if it keeps getting flagged after we approved it, send a different message?
-        return # could potentially let user know; not sure if there is value
+        return PlainTextResponse("answer flagged", status_code=200)# could potentially let user know; not sure if there is value
 
     # for now, lets ban after the first flag, to limit the spread of badness
-    answer_row = answers_db.get(key=answer_uuid)
     if answer_row['num_flags'] >= 0: # 0 means the first time it has been flagged
-        answers_db.update(key=answer_uuid, updates={is_banned: True})
+        answers_db.update(key=answer_uuid, updates={'is_banned': True})
         webhook = DiscordWebhook(url=Discord_flag_url, username="Flagged Answer")
         audio_data_stream = drive.get(answer_uuid)
         webhook.add_file(file=audio_data_stream.read(), filename=f"{answer_uuid}.mp3") # will this work?
         # include a link to a micro endpoint to unban this file. TODO
         response = webhook.execute() # TODO error check
-
-    pass # return success
+    return PlainTextResponse("answer flagged", status_code=200)
 
 @app.post("/unbanAnswer")
 async def unban_answer(answer_uuid: str):
-    #answers_db.update(key=answer_uuid,
+    #answers_db.update(key=answer_uui,d
     #                  updates={is_banned: False,
     #                           was_banned: True}) # this means it can't get banned again
     pass # need auth for this request. via micro api keys? look at fastapi docs too TODO
@@ -257,4 +259,4 @@ async def rate_answer(answer_uuid: str, agreement: bool):
     else:
         answers_db.update(key=answer_uuid,
                           updates={"num_disagrees": answers_db.util.increment(1)})
-    pass
+    return PlainTextResponse("rating recorded", status_code=200)

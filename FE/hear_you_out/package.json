@@ -15,6 +15,8 @@
     "react-native": "0.63.0",
     "react-native-audio-recorder-player": "^3.2.0",
     "react-native-deck-swiper": "^2.0.5",
+    "react-native-ffmpeg": "^0.5.2",
+    "react-native-fs": "^2.18.0",
     "react-native-linear-gradient": "^2.5.6",
     "react-native-permissions": "^3.0.5",
     "react-native-radial-gradient": "^1.0.9",

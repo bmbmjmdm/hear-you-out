@@ -1,8 +1,9 @@
 import os
+#import uuid # temp solution in place
 
 from math import sqrt
 from typing import List
-from random import choice
+from random import uniform, choice
 from pydantic import BaseModel
 from deta import Deta, Drive, Base
 from discord_webhook import DiscordWebhook
@@ -16,7 +17,6 @@ except:
 
 #from fastapi import FastAPI, File, UploadFile
 #from fastapi.responses import HTMLResponse, StreamingResponse
-#import uuid
 
 # load local env if we're running locally
 if os.environ.get('DETA_RUNTIME') is None:
@@ -55,8 +55,9 @@ class AnswerTableSchema(BaseModel):
     num_listens: int = 0
 
 # utility
-def gen_uuid():
-    return 'asdf' #uuid.uuid4()
+def gen_uuid(): # TODO
+    good_enough = uniform(0, 100) # from random
+    return f"{good_enough}"
 
 # handle all exceptions thrown in code below with a 500 http response
 # todo test what happens when this isn't here
@@ -75,19 +76,19 @@ async def get_question():
     # get today's question...how? from drive? from base? from internet endpoint? from file?/src
     # - think i want to go with base (need them anwyay). and can dev separate micro to insert Qs to it! or separate endpoint, with special auth?
     # - cron job to delete old files 30min after question change (if they are on a schedule)
-    # TO
-    question_list = drive.get('list of questions')
-    
-    # 
-    
+
+    # TODO yaml instead of newline separated, so we can store datetimes and category
+    question_list_stream = drive.get('list of questions')
+    if question_list_stream is None:
+        return PlainTextResponse("what's a question, really?", status_code=500)
+
+    questions = question_list_stream.read().decode().strip().splitlines() # strip to remove trailing newline
     # read store of questions every invocation
-    # compare the entry with the given datetime 
-    questions = [
-        "What is one idea, novel or otherwise, that you'd like more people to hear about?",
-        "What does class warfare look like in your opinion?",
-        
-    ]
+    # compare the entry with the given datetime TODO
     q = choice(questions)
+
+    # TODO keep track of questions asked so far
+    # questions_db.insert()
     
     return {"q": q, "key": "1", "category": "?"}
 
@@ -135,7 +136,7 @@ def calculate_popularity(num_agrees, num_disagrees):
 # skip past the ones for a different a question
 # skip past the ones we've already seen
 # categorize popularity
-def filter_answers_from_db(items, question_uuid, seen_answer_uuids):
+def filter_answers_from_db(items: List[AnswerTableSchema], question_uuid: str, seen_answer_uuids: str):
     pop = unpop = contro = []
     for item in items:
         if item.question_uuid is not question_uuid:
@@ -170,8 +171,14 @@ async def get_answer(question_uuid: str, seen_answer_uuids: List[str]):
     # not bothering writing a query for fetch cuz it feels btter to have all
     #   filter logic in the same place.
     # categorize into popular, controversial, unpopular during the single pass
+    print(1)
     res = answers_db.fetch()
-    pop, unpop, contro = filter_answers_from_db(res.items, question_uuid, seen_answer_uuids)
+    print(res)
+    if res.count == 0:
+        return PlainTextResponse("no answers found", status_code=500)
+
+    List[AnswerTableSchema]: answers_items = res.items
+    pop, unpop, contro = filter_answers_from_db(answers_items, question_uuid, seen_answer_uuids)
     while res.last: # TODO when will this be too slow?
         res = answers_db.fetch(last=res.last)
         pop2, unpop2, contro2 = filter_answers_from_db(res.items, question_uuid, seen_answer_uuids)
@@ -179,15 +186,15 @@ async def get_answer(question_uuid: str, seen_answer_uuids: List[str]):
         unpop += unpop2
         contro += contro2
         
-    # want even distribution of answers across popularity spectrum.
-    # calculate distribution thus far from seen answers
-    # TODO what if answers are flipfloppy?
+    # calculate distribution thus far from seen answers, since we want to take that into account.
+
     distribution = {}
     for answer_uuid in seen_answer_uuids:
         pass
         # map -1, 0, 1, to distinct dict elements. will this work as is?
         #distribution["dist"+calculate_popularity()}"
 
+    a = choice(pop+unpop+contro)
     # cat = choice(range(3)) # 0, 1, 2
     # if cat == 0:
     #     a = choice(pop)
@@ -203,9 +210,10 @@ async def get_answer(question_uuid: str, seen_answer_uuids: List[str]):
     audio_data_stream = drive.get(answer_uuid)
 
     # update selected answer's num_listen
-    answers_db.update({"num_listens": users.util.increment(1)}, answer_uuid)
+    # could catch exception here, but i think it makes sense to just abort if this update fails
+    answers_db.update({"num_listens": answers_db.util.increment(1)}, answer_uuid)
     
-    return {"audio_data": audio_data,
+    return {"audio_data": audio_data_stream.read(),
             "answer_uuid": answer_uuid}
 
 @app.post("/flagAnswer")
@@ -213,27 +221,28 @@ async def flag_answer(answer_uuid: str):
     # check what value it is at. if at a threshold, flag it as needing moderation (won't be sent to users anymore), and ping us somehow
     # set threshold to 1 for now? so we minimized spread of badness. and scale up when it makes sense with number reports and num users
 
-    # DON'T bother with num_flags since we are just banning after first flag for now
-    # answers_db.update(key=answer_uuid,
-    #                  updates={num_flags: users.util.increment(1)})
     answers_db.update(key=answer_uuid,
-                      updates={is_banned: True})
-    
+                      updates={'num_flags': answers_db.util.increment(1)})
+
+    # after noting the flag, if we have already explicitly approved this, then do nothing more
+    if answer_row['was_banned']:
+        # todo maybe if it keeps getting flagged after we approved it, send a different message?
+        return # could potentially let user know; not sure if there is value
+
+    # for now, lets ban after the first flag, to limit the spread of badness
     answer_row = answers_db.get(key=answer_uuid)
     if answer_row['num_flags'] >= 0: # 0 means the first time it has been flagged
-        if answer_row['was_banned']: # we have already approved it
-            return # TODO return what? should FE know that this was already approved? maybe to inform user?
+        answers_db.update(key=answer_uuid, updates={is_banned: True})
         webhook = DiscordWebhook(url=Discord_flag_url, username="Flagged Answer")
         audio_data_stream = drive.get(answer_uuid)
         webhook.add_file(file=audio_data_stream.read(), filename=f"{answer_uuid}.mp3") # will this work?
         # include a link to a micro endpoint to unban this file. TODO
-        #response = webhook.execute() # TODO error check
+        response = webhook.execute() # TODO error check
 
-    # TODO return success
-    pass
+    pass # return success
 
 @app.post("/unbanAnswer")
-async def unban_answer(answer_uuid: str): # TODO uuid
+async def unban_answer(answer_uuid: str):
     #answers_db.update(key=answer_uuid,
     #                  updates={is_banned: False,
     #                           was_banned: True}) # this means it can't get banned again
@@ -244,8 +253,8 @@ async def rate_answer(answer_uuid: str, agreement: bool):
     # TODO do i need to supply their current value if i'm not modifying them?
     if agreement:
         answers_db.update(key=answer_uuid,
-                  updates={"num_agrees": users.util.increment(1)})
+                          updates={"num_agrees": answers_db.util.increment(1)})
     else:
         answers_db.update(key=answer_uuid,
-                  updates={"num_disagrees": users.util.increment(1)})
+                          updates={"num_disagrees": answers_db.util.increment(1)})
     pass

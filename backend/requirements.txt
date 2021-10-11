@@ -1,5 +1,6 @@
 deta
 fastapi
+secrets
 pydantic
 python-dotenv
 discord_webhook

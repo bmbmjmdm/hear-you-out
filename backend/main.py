@@ -1,4 +1,5 @@
 import os
+import secrets
 #import uuid # temp solution in place
 
 from math import sqrt
@@ -49,6 +50,7 @@ class AnswerTableSchema(BaseModel):
     question_uuid: str # TODO
     num_flags: int = 0
     is_banned: bool = False
+    unban_token: str = ""
     was_banned: bool = False
     num_agrees: int = 0
     num_disagrees: int = 0
@@ -56,7 +58,8 @@ class AnswerTableSchema(BaseModel):
 
 # utility
 def gen_uuid(): # TODO
-    good_enough = uniform(0, 100) # from random
+    good_enough = str(uniform(0, 100)) # from random
+    good_enough = good_enough.replace(".","") # remove the dot
     return f"{good_enough}"
 
 # handle all exceptions thrown in code below with a 500 http response
@@ -97,16 +100,17 @@ async def submit_answer(ans: AnswerSubmission):
     answer_uuid = gen_uuid()
     question_uuid = ans.question_uuid
     data = ans.audio_data
-    print("1")
+    # TODO put upper limit on amount of data?
+    
     # store audio in drive, then bookkeep in base
     try:
         drive.put(answer_uuid, data, content_type='application/octet-stream')
     except Exception(e):
         print(f"~~~~~~~~~~~~~\n\n\n\n!!!!!!!!!!!!!!\n{e}") # i think visor will capture this in the logs?
-        raise HTTPException("error storing answer in drive", 500)
+        return PlainTextResponse("error storing answer in drive", status_code=500)
     # TODOhow to test drive being full error? maybe uncommonly run use case to fill it up? can test the exact byte limit
     # TODO test for duplicate filename error
-    print(2)
+
     # bookkeep in base
     new_row = AnswerTableSchema(key=answer_uuid, question_uuid=question_uuid)
     answers_db.insert(new_row.dict())
@@ -136,15 +140,13 @@ def calculate_popularity(num_agrees, num_disagrees):
 
 # given all items from the db,
 # skip past the ones for a different a question
-# skip past the ones we've already seen
+# track the ones we've already seen
 # skip past the banned ones
 # categorize popularity
 def filter_answers_from_db(items: List[AnswerTableSchema], question_uuid: str, seen_answer_uuids: List[str]):
-    pop = unpop = contro = []
+    pop = unpop = contro = seen_pop = seen_unpop = seen_contro = []
     for item in items:
         if item.question_uuid is not question_uuid:
-            continue
-        if item.key in seen_answer_uuids:
             continue
         if item.is_banned:
             continue
@@ -155,17 +157,25 @@ def filter_answers_from_db(items: List[AnswerTableSchema], question_uuid: str, s
                                           #item.num_listens)
         
         if popularity < 0:
-            unpop.append(item)
+            if item.key in seen_answer_uuids:
+                seen_unpop.append(item)
+            else:
+                unpop.append(item)
         elif popularity == 0:
-            contro.append(item)
+            if item.key in seen_answer_uuids:
+                seen_contro.append(item)
+            else:
+                contro.append(item)
         elif popularity > 0:
-            pop.append(item)
+            if item.key in seen_answer_uuids:
+                seen_pop.append(item)
+            else:
+                pop.append(item)
         else:
-            # TODO throw exception? or skip?
-            pass
+            return PlainTextResponse("popularity invalid", status_code=500)
 
-        # TODO check for emptiness here? to prevent typeerror unpacking None
-        return pop, unpop, contro
+    # TODO check for emptiness here? to prevent typeerror unpacking None
+    return pop, unpop, contro, seen_pop, seen_unpop, seen_contro
         
 @app.post("/getAnswer", response_model=AnswerListen)
 async def get_answer(question_uuid: str, seen_answer_uuids: List[str]):
@@ -174,26 +184,38 @@ async def get_answer(question_uuid: str, seen_answer_uuids: List[str]):
     # not bothering writing a query for fetch cuz it feels btter to have all
     #   filter logic in the same place.
     # categorize into popular, controversial, unpopular during the single pass
-    print(1)
     res = answers_db.fetch()
     print(res)
     if res.count == 0:
         return PlainTextResponse("no answers found", status_code=500)
 
     answers_items = [AnswerTableSchema(**item) for item in res.items]
-    pop, unpop, contro = filter_answers_from_db(answers_items, question_uuid, seen_answer_uuids)
-    while res.last: # TODO when will this be too slow?
+    pop, unpop, contro, seen_pop, seen_unpop, seen_contro = filter_answers_from_db(answers_items, question_uuid, seen_answer_uuids)
+    while res.last: # Todo when will this be too slow?
+        # TODO ought to unit test this inner logic
         res = answers_db.fetch(last=res.last)
-        pop2, unpop2, contro2 = filter_answers_from_db(answers_items, question_uuid, seen_answer_uuids)
+        pop2, unpop2, contro2, seen_pop2, seen_unpop2, seen_contro2 = filter_answers_from_db(answers_items, question_uuid, seen_answer_uuids)
         pop += pop2
         unpop += unpop2
         contro += contro2
+        seen_pop += seen_pop2
+        seen_unpop += seen_unpop2
+        seen_contro += seen_contro2
         
     # calculate distribution thus far from seen answers, since we want to take that into account.
-
-    distribution = {}
-    for answer_uuid in seen_answer_uuids:
-        pass
+    # TODO finish this
+    # TODO take into account empty arrays...
+    # num_seen_pop = len(seen_pop)
+    # num_seen_unpop = len(seen_unpop)
+    # num_seen_contro = len(seen_contro)
+    # if num_seen_pop < num_seen_unpop:
+    #     if num_seen_pop < num_seen_contro:
+    #         a = choice(pop)
+    #     elif num_seen_contro < num_seen_unpop:
+    #         a = choice(contro)
+    #     else:
+    #         a = choice(unpop)
+    # elif num_seen_
         # map -1, 0, 1, to distinct dict elements. will this work as is?
         #distribution["dist"+calculate_popularity()}"
 
@@ -206,7 +228,7 @@ async def get_answer(question_uuid: str, seen_answer_uuids: List[str]):
     # elif cat == 2:
     #     a = choice(contro)
     # else:
-    #     raise HTTPException("wat", 500)
+    #     return PlainTextResponse("wat", status_code=500)
     
     # get the selected answer
     answer_uuid = a.key
@@ -235,21 +257,33 @@ async def flag_answer(answer_uuid: str):
 
     # for now, lets ban after the first flag, to limit the spread of badness
     if answer_row['num_flags'] >= 0: # 0 means the first time it has been flagged
-        answers_db.update(key=answer_uuid, updates={'is_banned': True})
-        webhook = DiscordWebhook(url=Discord_flag_url, username="Flagged Answer")
+        # we are banning it, so generate a security token for an unban magic link
+        unban_token = secrets.token_urlsafe(32)
+        answers_db.update(key=answer_uuid, updates={'is_banned': True, 'unban_token': unban_token})
+        webhook = DiscordWebhook(url=Discord_flag_url, username="Flagged Answer",
+                                 content=f"Unban this: https://hearyouout.deta.dev/unbanAnswer/{answer_uuid}/{unban_token}")
         audio_data_stream = drive.get(answer_uuid)
         webhook.add_file(file=audio_data_stream.read(), filename=f"{answer_uuid}.mp3") # will this work?
-        # include a link to a micro endpoint to unban this file. TODO
         response = webhook.execute() # TODO error check
     return PlainTextResponse("answer flagged", status_code=200)
 
-@app.post("/unbanAnswer")
-async def unban_answer(answer_uuid: str):
-    #answers_db.update(key=answer_uui,d
-    #                  updates={is_banned: False,
-    #                           was_banned: True}) # this means it can't get banned again
-    pass # need auth for this request. via micro api keys? look at fastapi docs too TODO
+# 32 byte tokens is prob enough to deter people from trying to brute force it?
+@app.get("/unbanAnswer/{answer_uuid}/{unban_token}")
+async def unban_answer(answer_uuid: str, unban_token: str):
+    # using magic link sent to discord as auth
+    stored_token = answers_db.get(key=answer_uuid)['unban_token']
+    if unban_token == stored_token:
+        answers_db.update(key=answer_uuid,
+                          updates={'is_banned': False,
+                                   'was_banned': True}) # this means it can't get banned again
+        
+    # we return this regardless of the correct unban token
+    return PlainTextResponse("answer unbanned", status_code=200)
 
+# todo is there anything stopping random people from hitting this endpoint unfairly? i don't think so.
+# doesn't seem terrribly hard to add user id and magic links for all of them. turn above into dependency injection.
+# can probably wait til after MVP...?
+# would be cool if the security nonce gen and lookup and be pre/post hooks for these path executions
 @app.post("/rateAnswer")
 async def rate_answer(answer_uuid: str, agreement: bool):
     # TODO do i need to supply their current value if i'm not modifying them?

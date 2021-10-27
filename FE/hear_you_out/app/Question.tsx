@@ -16,6 +16,7 @@ import Checklist from './Checklist'
 import BottomButtons from './BottomButtons'
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import RNFS from 'react-native-fs'
+import { RNFFmpeg } from 'react-native-ffmpeg';
 
 const Question = () => {
   const recorder = React.useRef(new AudioRecorderPlayer()).current
@@ -35,7 +36,25 @@ const Question = () => {
   const extention = Platform.OS === 'android' ? ".mp4" : ".m4a"
   const originalFile = RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention
   const additionalFile = RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordAdditional" + extention
-  // TODO test all this
+  const concatFile = RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordConcated" + extention
+  const fileList = RNFS.CachesDirectoryPath + '/' + "fileList.txt"
+  // we make a text file with our audio file paths listed for later concatenation
+  React.useEffect(() => {
+    const asyncFun = async () => {
+      const filePaths = [originalFile, additionalFile]
+      var fileContent = ''
+      filePaths.forEach(path => {
+        fileContent += `file '${path}'\n`
+      });
+      try {
+        await RNFS.writeFile(fileList, fileContent, 'utf8')
+      } catch (error) {
+      }
+    }
+    asyncFun()
+  }, [])
+
+  // TODO error handling on all these
 
   const recordPressed = async () => {
     if (lock) return
@@ -138,15 +157,20 @@ const Question = () => {
     }
     setLock(false)
   }
-
+  
+// TODO
+// https://www.npmjs.com/package/react-native-ffmpeg
+// see 2.3.2 iOS to see about enabling m4a on iOS
   // concat original file + additional file => original file
   const stopRecorderAndConcat = async () => {
     await recorder.stopRecorder()
     if (needsConcat) {
-      // TODO concat
-      // https://www.npmjs.com/package/react-native-ffmpeg
-      // see 2.3 Packages to see about enabling mp3
-      // https://stackoverflow.com/questions/61340868/appending-two-audiofiles-react-native
+      // concat
+      await RNFFmpeg.execute(`-f concat -safe 0 -i ${fileList} -c copy ${concatFile}`).then(result => console.log(`FFmpeg process exited with rc=${result}.`));
+      // delete old files and rename the new one appropriately
+      await RNFS.unlink(originalFile)
+      await RNFS.unlink(additionalFile)
+      await RNFS.moveFile(concatFile, originalFile)
       setNeedsConcat(false)
     }
   }

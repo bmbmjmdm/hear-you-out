@@ -57,40 +57,42 @@ const Question = () => {
   // TODO error handling on all these
 
   const recordPressed = async () => {
-    if (lock) return
+    if (lock || recording) return
     setLock(true)
-    if (!recording) {
-      // stop playing
-      if (playing) {
-        await recorder.stopPlayer()
-        setPlaying(false)
+    // stop playing
+    if (playing) {
+      await recorder.stopPlayer()
+      setPlaying(false)
+    }
+    // set recording
+    setRecording(true)
+    // we've started already
+    if (started) {
+      // we've played back and need to start a new file to concat
+      if (needsNewFile) {
+        setNeedsNewFile(false)
+        setNeedsConcat(true)
+        await recorder.startRecorder(additionalFile)
       }
-      // set recording
-      setRecording(true)
-      // we've started already
-      if (started) {
-        // we've played back and need to start a new file to concat
-        if (needsNewFile) {
-          setNeedsNewFile(false)
-          setNeedsConcat(true)
-          await recorder.startRecorder(additionalFile)
-        }
-        // we can simply unpause
-        else {
-          await recorder.resumeRecorder()
-        }
-      }
-      // we havent started, create the original file and start
+      // we can simply unpause
       else {
-        setStarted(true)
-        await recorder.startRecorder(originalFile)
+        await recorder.resumeRecorder()
       }
+    }
+    // we havent started, create the original file and start
+    else {
+      setStarted(true)
+      await recorder.startRecorder(originalFile)
     }
     setLock(false)
   }
 
   const recordReleased = async () => {
-    if (lock) return
+    if (lock) {
+      // if we ever wind up here, we dont want to miss the recordRelease event, so keep retrying
+      setTimeout(recordReleased, 50)
+      return
+    }
     setLock(true)
     if (recording) {
       setRecording(false)
@@ -100,11 +102,8 @@ const Question = () => {
   }
 
   const restartRecording = async () => {
-    if (lock) return
+    if (lock || recording) return
     setLock(true)
-    if (recording)  {
-      return
-    }
     if (playing) {
       await recorder.stopPlayer()
       setPlaying(false)
@@ -116,9 +115,12 @@ const Question = () => {
   }
 
   const submitRecording = async () => {
-    if (lock) return
+    if (lock || recording) return
     setLock(true)
-    if (playing) await recorder.stopPlaying()
+    if (playing) {
+      await recorder.stopPlaying()
+      setPlaying(false)
+    }
     await stopRecorderAndConcat()
     // TODO await SUBMIT THE LAST ONE
     // TODO move on from this screen
@@ -130,12 +132,8 @@ const Question = () => {
   }
 
   const hearRecording = async () => {
-    if (lock) return
+    if (lock || recording) return
     setLock(true)
-    if (recording) {
-      setLock(false)
-      return
-    }
     if (playing) {
       await recorder.stopPlayer()
     }
@@ -147,15 +145,12 @@ const Question = () => {
   }
 
   const deleteCurrentFile = async () => {
-    if (lock) return
-    setLock(true)
     try {
       await RNFS.unlink(originalFile)
     }
     catch (e) {
       console.log("delete failed")
     }
-    setLock(false)
   }
   
 // TODO

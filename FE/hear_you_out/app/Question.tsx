@@ -6,7 +6,7 @@ import {
   Text,
   Image,
   TouchableOpacity,
-  Platform
+  Platform,
 } from 'react-native';
 // https://github.com/react-native-linear-gradient/react-native-linear-gradient
 import LinearGradient from 'react-native-linear-gradient';
@@ -18,8 +18,20 @@ import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import RNFS from 'react-native-fs'
 import { RNFFmpeg } from 'react-native-ffmpeg';
 
+// for tutorial maybe
+// https://reactnativeelements.com/docs/tooltip/
+
+
+
 const Question = () => {
+  // keep track of which items have been checked
+  const [checked, setChecked] = React.useState(false)
+  const [checklist, setChecklist] = React.useState(false)
+
+  // recorder/player
   const recorder = React.useRef(new AudioRecorderPlayer()).current
+  // maintain a lock for the recorder so we only execute 1 function at time
+  const [lock, setLock] = React.useState(false)
   // whether we started a recording
   const [started, setStarted] = React.useState(false)
   // whether we are currently recording
@@ -29,10 +41,7 @@ const Question = () => {
   // each time we playback, we need to stop our recording, playback, and then start a new one when the user continues recording (we're not allowed to playback while paused)
   const [needsNewFile, setNeedsNewFile] = React.useState(false)
   // if we stop a recording that isnt the original file, concat it with the original file 
-  const [needsConcat, setNeedsConcat] = React.useState(0)
-  const [lock, setLock] = React.useState(false)
-  const [checked, setChecked] = React.useState(false)
-  const [checklist, setChecklist] = React.useState(false)
+  const [needsConcat, setNeedsConcat] = React.useState(false)
   const extention = Platform.OS === 'android' ? ".mp4" : ".m4a"
   const originalFile = RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention
   const additionalFile = RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordAdditional" + extention
@@ -41,13 +50,13 @@ const Question = () => {
   // we make a text file with our audio file paths listed for later concatenation
   React.useEffect(() => {
     const asyncFun = async () => {
-      const filePaths = [originalFile, additionalFile]
-      var fileContent = ''
-      filePaths.forEach(path => {
-        fileContent += `file '${path}'\n`
+      const paths = [originalFile, additionalFile]
+      var listContent = ''
+      paths.forEach(path => {
+        listContent += `file '${path}'\n`
       });
       try {
-        await RNFS.writeFile(fileList, fileContent, 'utf8')
+        await RNFS.writeFile(fileList, listContent, 'utf8')
       } catch (error) {
       }
     }
@@ -118,7 +127,7 @@ const Question = () => {
     if (lock || recording) return
     setLock(true)
     if (playing) {
-      await recorder.stopPlaying()
+      await recorder.stopPlayer()
       setPlaying(false)
     }
     await stopRecorderAndConcat()
@@ -153,9 +162,9 @@ const Question = () => {
     }
   }
   
-// TODO
+// TODO setup for ios
 // https://www.npmjs.com/package/react-native-ffmpeg
-// see 2.3.2 iOS to see about enabling m4a on iOS
+// see 2.3.2 iOS to see about enabling audio package on iOS
   // concat original file + additional file => original file
   const stopRecorderAndConcat = async () => {
     await recorder.stopRecorder()

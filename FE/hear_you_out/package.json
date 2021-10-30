@@ -15,12 +15,15 @@
     "react-native": "0.63.0",
     "react-native-audio-recorder-player": "^3.2.0",
     "react-native-deck-swiper": "^2.0.5",
+    "react-native-elements": "^3.4.2",
     "react-native-ffmpeg": "^0.5.2",
     "react-native-fs": "^2.18.0",
     "react-native-linear-gradient": "^2.5.6",
     "react-native-permissions": "^3.0.5",
     "react-native-radial-gradient": "^1.0.9",
-    "react-native-uuid": "^2.0.1"
+    "react-native-safe-area-context": "^3.3.2",
+    "react-native-uuid": "^2.0.1",
+    "react-native-vector-icons": "^9.0.0"
   },
   "devDependencies": {
     "@babel/core": "^7.8.4",

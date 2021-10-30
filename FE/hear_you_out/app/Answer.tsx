@@ -85,6 +85,9 @@ const Answer = ({setDisableSwipes}) => {
     // we're not playing, start
     else {
       started.current = true
+      // theoretical base64 encode/decode: 
+      //const res = await RNFS.readFile(RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention, 'base64')
+      //await RNFS.writeFile(RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention, res, 'base64')
       await player.startPlayer(RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention)
     }
     setPlaying(!playing)

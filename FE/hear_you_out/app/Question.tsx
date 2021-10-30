@@ -81,6 +81,20 @@ const Question = () => {
       if (needsNewFile) {
         setNeedsNewFile(false)
         setNeedsConcat(true)
+        /* TODO set audio compression
+        const audioSet: AudioSet = {
+          AudioEncoderAndroid: AudioEncoderAndroidType.AAC,
+          AudioSourceAndroid: AudioSourceAndroidType.MIC,
+          AVEncoderAudioQualityKeyIOS: AVEncoderAudioQualityIOSType.high,
+          AVNumberOfChannelsKeyIOS: 2,
+          AVFormatIDKeyIOS: AVEncodingOption.aac,
+        };
+        startRecorder(
+          path,
+          audioSet,
+          meteringEnabled,
+        );
+        also use metering enabled for animations */
         await recorder.startRecorder(additionalFile)
       }
       // we can simply unpause

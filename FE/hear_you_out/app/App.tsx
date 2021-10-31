@@ -14,11 +14,18 @@ import Swiper from 'react-native-deck-swiper'
 import Question from './Question'
 import Answer from './Answer'
 import PermissionsAndroid from 'react-native-permissions';
-// TODO should we add this?
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 const App = () => {
-  const [disableSwipes, setDisableSwipes] = React.useState(false)
+  const [disableSwipes, setDisableSwipes] = React.useState(true)
+  const swiper = React.useRef(null)
+
+  const submitAnswer = async () => {
+    // see recorder docs regarding rn-fetch-blob if you have trouble uploading file
+    // TODO submit answer to server
+    swiper.current.swipeRight()
+    setDisableSwipes(false)
+  }
 
   // get permissions
   React.useEffect(() => {
@@ -51,33 +58,36 @@ const App = () => {
   }, [])
 
   return (
-    <Swiper
-      cards={['Question', 'Answer', 'Question', 'Answer', 'Question', 'Answer', 'Question', 'Answer', 'Question', 'Answer', 'Question', 'Answer']}
-      renderCard={(card) => {
-          if (card === 'Question') {
-            return <Question />
-          }
-          else {
-            return <Answer setDisableSwipes={setDisableSwipes} />
-          }
-      }}
-      onSwiped={(cardIndex) => {}}
-      onSwipedAll={() => {}}
-      cardIndex={0}
-      backgroundColor={'rgba(0,0,0,0)'}
-      stackSize={2}
-      cardVerticalMargin={0}
-      cardHorizontalMargin={0}
-      stackSeparation={0}
-      stackScale={0}
-      disableBottomSwipe={disableSwipes}
-      disableLeftSwipe={disableSwipes}
-      disableRightSwipe={disableSwipes}
-      disableTopSwipe={disableSwipes}
-      horizontalSwipe={!disableSwipes}
-      verticalSwipe={!disableSwipes}
-      onTapCardDeadZone={disableSwipes? Number.MAX_VALUE : 50}
-    />
+    <SafeAreaProvider>
+      <Swiper
+        cards={['Question', 'Answer', 'Answer', 'Answer', 'Answer', 'Answer', 'Answer']}
+        renderCard={(card) => {
+            if (card === 'Question') {
+              return <Question submit={submitAnswer} />
+            }
+            else {
+              return <Answer setDisableSwipes={setDisableSwipes} />
+            }
+        }}
+        onSwiped={(cardIndex) => {}}
+        onSwipedAll={() => {}}
+        cardIndex={0}
+        backgroundColor={'rgba(0,0,0,0)'}
+        stackSize={2}
+        cardVerticalMargin={0}
+        cardHorizontalMargin={0}
+        stackSeparation={0}
+        stackScale={0}
+        disableBottomSwipe={disableSwipes}
+        disableLeftSwipe={disableSwipes}
+        disableRightSwipe={disableSwipes}
+        disableTopSwipe={disableSwipes}
+        horizontalSwipe={!disableSwipes}
+        verticalSwipe={!disableSwipes}
+        onTapCardDeadZone={disableSwipes? Number.MAX_VALUE : 50}
+        ref={swiper}
+      />
+    </SafeAreaProvider>
   );
 };
 

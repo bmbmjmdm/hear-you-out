@@ -14,7 +14,7 @@ import Mic from './Mic.png';
 import Shadow from './Shadow'
 import Checklist from './Checklist'
 import BottomButtons from './BottomButtons'
-import AudioRecorderPlayer from 'react-native-audio-recorder-player';
+import AudioRecorderPlayer, { AudioEncoderAndroidType } from 'react-native-audio-recorder-player';
 import RNFS from 'react-native-fs'
 import { RNFFmpeg } from 'react-native-ffmpeg';
 
@@ -22,8 +22,23 @@ import { RNFFmpeg } from 'react-native-ffmpeg';
 // https://reactnativeelements.com/docs/tooltip/
 
 
+// TODO find best settings for iOS
+// https://github.com/hyochan/react-native-audio-recorder-player/blob/master/index.ts
+const audioSet = {
+  AudioEncoderAndroid: AudioEncoderAndroidType.HE_AAC, // AAC is slightly better quality but like 75% increase in size
+  AudioEncodingBitRateAndroid: 102400, // increase to 128000 if we get more storage
+  AudioSamplingRateAndroid: 48000,
+  //AVSampleRateKeyIOS?: number;
+  //AVFormatIDKeyIOS?: AVEncodingType;
+  //AVNumberOfChannelsKeyIOS?: number;
+  //AVEncoderAudioQualityKeyIOS?: AVEncoderAudioQualityIOSType;
+  //AVLinearPCMBitDepthKeyIOS?: AVLinearPCMBitDepthKeyIOSType;
+  //AVLinearPCMIsBigEndianKeyIOS?: boolean;
+  //AVLinearPCMIsFloatKeyIOS?: boolean;
+  //AVLinearPCMIsNonInterleavedIOS?: boolean;
+}
 
-const Question = () => {
+const Question = ({ submit }) => {
   // keep track of which items have been checked
   const [checked, setChecked] = React.useState(false)
   const [checklist, setChecklist] = React.useState(false)
@@ -65,6 +80,7 @@ const Question = () => {
 
   // TODO error handling on all these
 
+  // TODO set metering enabled so we can use it for background animation
   const recordPressed = async () => {
     if (lock || recording) return
     setLock(true)
@@ -81,21 +97,7 @@ const Question = () => {
       if (needsNewFile) {
         setNeedsNewFile(false)
         setNeedsConcat(true)
-        /* TODO set audio compression
-        const audioSet: AudioSet = {
-          AudioEncoderAndroid: AudioEncoderAndroidType.AAC,
-          AudioSourceAndroid: AudioSourceAndroidType.MIC,
-          AVEncoderAudioQualityKeyIOS: AVEncoderAudioQualityIOSType.high,
-          AVNumberOfChannelsKeyIOS: 2,
-          AVFormatIDKeyIOS: AVEncodingOption.aac,
-        };
-        startRecorder(
-          path,
-          audioSet,
-          meteringEnabled,
-        );
-        also use metering enabled for animations */
-        await recorder.startRecorder(additionalFile)
+        await recorder.startRecorder(additionalFile, audioSet)
       }
       // we can simply unpause
       else {
@@ -105,7 +107,7 @@ const Question = () => {
     // we havent started, create the original file and start
     else {
       setStarted(true)
-      await recorder.startRecorder(originalFile)
+      await recorder.startRecorder(originalFile, audioSet)
     }
     setLock(false)
   }
@@ -133,6 +135,10 @@ const Question = () => {
     }
     setStarted(false)
     await stopRecorderAndConcat()
+    
+    // when we're ready to measure iOS file sizes
+    // console.log((await RNFS.stat(originalFile)).size)
+
     await deleteCurrentFile()
     setLock(false)
   }
@@ -145,10 +151,7 @@ const Question = () => {
       setPlaying(false)
     }
     await stopRecorderAndConcat()
-    // TODO await SUBMIT THE LAST ONE
-    // TODO move on from this screen
-    // see recorder docs regarding rn-fetch-blob if you have trouble uploading file
-    // until these 2 TODOs are done, always swipe the current question card away after pressing submit button
+    await submit()
     await deleteCurrentFile()
     // we dont even care about cleaning up the states because we're gonna move on from this screen
     setLock(false)

@@ -7,6 +7,7 @@ import {
   Image,
   TouchableOpacity,
   Platform,
+  Animated
 } from 'react-native';
 // https://github.com/react-native-linear-gradient/react-native-linear-gradient
 import LinearGradient from 'react-native-linear-gradient';
@@ -17,6 +18,7 @@ import BottomButtons from './BottomButtons'
 import AudioRecorderPlayer, { AudioEncoderAndroidType } from 'react-native-audio-recorder-player';
 import RNFS from 'react-native-fs'
 import { RNFFmpeg } from 'react-native-ffmpeg';
+import uuid from 'react-native-uuid';
 
 // for tutorial maybe
 // https://reactnativeelements.com/docs/tooltip/
@@ -42,6 +44,7 @@ const Question = ({ submit }) => {
   // keep track of which items have been checked
   const [checked, setChecked] = React.useState(false)
   const [checklist, setChecklist] = React.useState(false)
+  const [circles, setCircles] = React.useState({})
 
   // recorder/player
   const recorder = React.useRef(new AudioRecorderPlayer()).current
@@ -62,9 +65,16 @@ const Question = ({ submit }) => {
   const additionalFile = RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordAdditional" + extention
   const concatFile = RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordConcated" + extention
   const fileList = RNFS.CachesDirectoryPath + '/' + "fileList.txt"
-  // we make a text file with our audio file paths listed for later concatenation
+  // run this effect ONCE when this component mounts
   React.useEffect(() => {
     const asyncFun = async () => {
+      // add a playback listener for recording animations
+      recorder.setSubscriptionDuration(0.2)
+      recorder.addRecordBackListener(({ currentMetering }) => {
+        // TODO test this level on other devices, incl iOS
+        if (currentMetering > -20) animateCircle()
+      })
+      // we make a text file with our audio file paths listed for later concatenation
       const paths = [originalFile, additionalFile]
       var listContent = ''
       paths.forEach(path => {
@@ -77,6 +87,59 @@ const Question = ({ submit }) => {
     }
     asyncFun()
   }, [])
+
+  // while the user is recording, we make a cute animation behind the record button
+  // create a circle that will fade out from the center in a random directon
+  const animateCircle = () => {
+    // get an up-to-date mutable copy of the state so we set it right
+    setCircles((lastState) => {
+      const circlesCopy = {...lastState}
+      // id of our animation
+      const id: any = uuid.v4()
+      // the animated value we'll use to drive our animation
+      const anim = new Animated.Value(0)
+      // a random degree from 0 to 360 in radians
+      const rotation = Math.random() * 360 * Math.PI / 180
+      // add the circle with all its values to our list of animations
+      circlesCopy[id] = 
+      (<Animated.View 
+        key={id}
+        style={{
+          // TODO is this good color?
+          // TODO also this color is lighter for some reason than it should be. in fact "white" doesnt show at all.... doesnt matter too much, if we find a color that works then w.e
+          backgroundColor: "#ff617c",
+          height: 175,
+          width: 175,
+          borderRadius: 999,
+          position: "absolute",
+          elevation: -1,
+          zIndex: -1,
+          opacity: Animated.subtract(new Animated.Value(1), anim),
+          transform: [
+            // polar coordinate using our random rotation where distance goes from 0 to 100
+            {translateY: Animated.multiply(Animated.multiply(anim, new Animated.Value(200)), new Animated.Value(Math.sin(rotation)))},
+            {translateX: Animated.multiply(Animated.multiply(anim, new Animated.Value(200)), new Animated.Value(Math.cos(rotation)))}
+          ]
+        }}
+      />)
+      // kick off the animation
+      Animated.timing(anim, {
+        toValue: 1,
+        duration: 1000,
+        useNativeDriver: true
+      }).start(() => {
+        // remove animation from our list after animation finishes
+        // get a new copy 
+        setCircles((lastState2) => {
+          const circlesCopy2 = {...lastState2}
+          circlesCopy2[id] = null
+          return circlesCopy2
+        })
+      })
+      // finish setting state
+      return circlesCopy
+    })
+  }
 
   // TODO error handling on all these
 
@@ -97,7 +160,7 @@ const Question = ({ submit }) => {
       if (needsNewFile) {
         setNeedsNewFile(false)
         setNeedsConcat(true)
-        await recorder.startRecorder(additionalFile, audioSet)
+        await recorder.startRecorder(additionalFile, audioSet, true)
       }
       // we can simply unpause
       else {
@@ -107,7 +170,7 @@ const Question = ({ submit }) => {
     // we havent started, create the original file and start
     else {
       setStarted(true)
-      await recorder.startRecorder(originalFile, audioSet)
+      await recorder.startRecorder(originalFile, audioSet, true)
     }
     setLock(false)
   }
@@ -207,6 +270,7 @@ const Question = ({ submit }) => {
           What does class warfare look like to you?
         </Text>
         <Shadow radius={175} style={{ marginTop: 30 }}>
+          {Object.values(circles)}
           <TouchableOpacity
             style={[styles.audioCircle, started ? (recording ? styles.redCircle : styles.yellowCircle) : styles.whiteCircle]}
             onPressIn={recordPressed}
@@ -262,6 +326,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'white',
   },
 
+  // TODO is this good color?
   redCircle: {
     backgroundColor: '#FFADBB',
   },

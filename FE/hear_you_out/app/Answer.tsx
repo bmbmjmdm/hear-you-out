@@ -50,8 +50,10 @@ const Answer = ({setDisableSwipes}) => {
     // update slider value
     setSliderValue(currentPosition)
   }
+  // run this effect ONCE when this component mounts
   React.useEffect(() => {
     player.addPlayBackListener(playbackListener)
+    // run this return function ONCE when the component unmounts
     return () => {
       player.removePlayBackListener()
     }

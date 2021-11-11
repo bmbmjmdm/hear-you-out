@@ -2,6 +2,8 @@ import os
 import secrets
 #import uuid # temp solution in place
 
+import yaml
+
 from math import sqrt
 from typing import List
 from random import uniform, choice
@@ -14,7 +16,8 @@ from fastapi.responses import  PlainTextResponse
 try: # to accommodate deta
     from dotenv import load_dotenv
 except:
-    pass
+    print("specify DETA_PROJECT_KEY in your .env")
+    exit()
 
 #from fastapi import FastAPI, File, UploadFile
 #from fastapi.responses import HTMLResponse, StreamingResponse
@@ -28,6 +31,7 @@ Secret_key = os.environ.get('DETA_PROJECT_KEY')
 Discord_flag_url = os.environ.get('DISCORD_FLAG_WEBHOOK') # todo error if not set unless overridden
 deta = Deta(Secret_key)
 drive = Drive("hyo")
+q_drive = Drive('questions')
 questions_db = Base('questions')
 answers_db = Base('answers')
 app = FastAPI()  # must be app
@@ -37,6 +41,9 @@ class QuestionModel(BaseModel):
     q: str
     category: str
 
+#class QuestionTableSchema(QuestionModel):
+#    num_asks: int = 0
+    
 class AnswerSubmission(BaseModel):
     audio_data: bytes
     question_uuid: str # uuid.UUID
@@ -80,20 +87,26 @@ async def get_question():
     # - think i want to go with base (need them anwyay). and can dev separate micro to insert Qs to it! or separate endpoint, with special auth?
     # - cron job to delete old files 30min after question change (if they are on a schedule)
 
-    # TODO yaml instead of newline separated, so we can store datetimes and category
-    question_list_stream = drive.get('list of questions')
+    question_list_stream = q_drive.get('list of questions.yaml')
     if question_list_stream is None:
         return PlainTextResponse("what's a question, really?", status_code=500)
 
-    questions = question_list_stream.read().decode().strip().splitlines() # strip to remove trailing newline
+    data_streamed = question_list_stream.read().decode().strip() # strip to remove trailing newline
     # read store of questions every invocation
     # compare the entry with the given datetime TODO
+    data_loaded = yaml.safe_load(data_streamed)
+    questions = data_loaded['questions']
     q = choice(questions)
 
     # TODO keep track of questions asked so far
-    # questions_db.insert()
+    # - and how many responses they got?
+    #q_tschema = QuestionTableSchema(q)
+    #questions_db.insert(q.dict())
+    #questions_db.update(key=q['key'],
+    #                    updates={"num_asks": answers_db.util.increment(1)})
+
     
-    return {"q": q, "key": "1", "category": "?"}
+    return {"q": q['text'], "key": q['id'], "category": q["category"]}
 
 @app.post("/submitAnswer")
 async def submit_answer(ans: AnswerSubmission):
@@ -101,6 +114,8 @@ async def submit_answer(ans: AnswerSubmission):
     question_uuid = ans.question_uuid
     data = ans.audio_data
     # TODO put upper limit on amount of data?
+    # - what is the default POST cap?
+    # - create a unit test for an expected file size, and a file size over the POST cap
     
     # store audio in drive, then bookkeep in base
     try:

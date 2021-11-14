@@ -7,8 +7,9 @@ import {
   Image,
   TouchableOpacity,
   Platform,
-  Animated
+  Animated,
 } from 'react-native';
+import Modal from "react-native-modal";
 // https://github.com/react-native-linear-gradient/react-native-linear-gradient
 import LinearGradient from 'react-native-linear-gradient';
 import Mic from './Mic.png';
@@ -45,6 +46,11 @@ const Question = ({ submit }) => {
   const [checked, setChecked] = React.useState(false)
   const [checklist, setChecklist] = React.useState(false)
   const [circles, setCircles] = React.useState({})
+
+  // modal
+  const [modalVisible, setModalVisible] = React.useState(false)
+  const [modalText, setModalText] = React.useState("")
+  const [modalConfirm, setModalConfirm] = React.useState(() => {})
 
   // recorder/player
   const recorder = React.useRef(new AudioRecorderPlayer()).current
@@ -147,30 +153,35 @@ const Question = ({ submit }) => {
   const recordPressed = async () => {
     if (lock || recording) return
     setLock(true)
-    // stop playing
-    if (playing) {
-      await recorder.stopPlayer()
-      setPlaying(false)
-    }
-    // set recording
-    setRecording(true)
-    // we've started already
-    if (started) {
-      // we've played back and need to start a new file to concat
-      if (needsNewFile) {
-        setNeedsNewFile(false)
-        setNeedsConcat(true)
-        await recorder.startRecorder(additionalFile, audioSet, true)
+    try {
+      // stop playing
+      if (playing) {
+        await recorder.stopPlayer()
+        setPlaying(false)
       }
-      // we can simply unpause
+      // set recording
+      setRecording(true)
+      // we've started already
+      if (started) {
+        // we've played back and need to start a new file to concat
+        if (needsNewFile) {
+          setNeedsNewFile(false)
+          setNeedsConcat(true)
+          await recorder.startRecorder(additionalFile, audioSet, true)
+        }
+        // we can simply unpause
+        else {
+          await recorder.resumeRecorder()
+        }
+      }
+      // we havent started, create the original file and start
       else {
-        await recorder.resumeRecorder()
+        setStarted(true)
+        await recorder.startRecorder(originalFile, audioSet, true)
       }
     }
-    // we havent started, create the original file and start
-    else {
-      setStarted(true)
-      await recorder.startRecorder(originalFile, audioSet, true)
+    catch (e) {
+      
     }
     setLock(false)
   }
@@ -182,9 +193,14 @@ const Question = ({ submit }) => {
       return
     }
     setLock(true)
-    if (recording) {
-      setRecording(false)
-      await recorder.pauseRecorder()
+    try { 
+      if (recording) {
+        setRecording(false)
+        await recorder.pauseRecorder()
+      }
+    }
+    catch (e) {
+      
     }
     setLock(false)
   }
@@ -192,44 +208,68 @@ const Question = ({ submit }) => {
   const restartRecording = async () => {
     if (lock || recording) return
     setLock(true)
-    if (playing) {
-      await recorder.stopPlayer()
-      setPlaying(false)
+    try {
+      if (playing) {
+        await recorder.stopPlayer()
+        setPlaying(false)
+      }
+      setStarted(false)
+      await stopRecorderAndConcat()
+      
+      // when we're ready to measure iOS file sizes
+      // console.log((await RNFS.stat(originalFile)).size)
+  
+      await deleteCurrentFile()
     }
-    setStarted(false)
-    await stopRecorderAndConcat()
-    
-    // when we're ready to measure iOS file sizes
-    // console.log((await RNFS.stat(originalFile)).size)
+    catch (e) {
 
-    await deleteCurrentFile()
+    }
     setLock(false)
   }
 
   const submitRecording = async () => {
     if (lock || recording) return
+    // user pressed first button, now they need to confirm
+    setModalText("Submit your answer?")
+    setModalConfirm(() => submitRecordingConfirmed)
+    setModalVisible(true)
+  }
+
+  const submitRecordingConfirmed = async () => {
+    if (lock || recording) return
     setLock(true)
-    if (playing) {
-      await recorder.stopPlayer()
-      setPlaying(false)
+    try {
+      if (playing) {
+        await recorder.stopPlayer()
+        setPlaying(false)
+      }
+      await stopRecorderAndConcat()
+      setModalVisible(false)
+      await submit()
+      await deleteCurrentFile()
+      // we dont even care about cleaning up the states because we're gonna move on from this screen
     }
-    await stopRecorderAndConcat()
-    await submit()
-    await deleteCurrentFile()
-    // we dont even care about cleaning up the states because we're gonna move on from this screen
+    catch (e) {
+
+    }
     setLock(false)
   }
 
   const hearRecording = async () => {
     if (lock || recording) return
     setLock(true)
-    if (playing) {
-      await recorder.stopPlayer()
+    try {
+      if (playing) {
+        await recorder.stopPlayer()
+      }
+      setPlaying(true)
+      setNeedsNewFile(true)
+      await stopRecorderAndConcat()
+      await recorder.startPlayer(originalFile)
     }
-    setPlaying(true)
-    setNeedsNewFile(true)
-    await stopRecorderAndConcat()
-    await recorder.startPlayer(originalFile)
+    catch (e) {
+
+    }
     setLock(false)
   }
 
@@ -247,10 +287,14 @@ const Question = ({ submit }) => {
 // see 2.3.2 iOS to see about enabling audio package on iOS
   // concat original file + additional file => original file
   const stopRecorderAndConcat = async () => {
+    console.log("stoping")
     await recorder.stopRecorder()
+    console.log("stopped")
     if (needsConcat) {
+      console.log("concatting")
       // concat
-      await RNFFmpeg.execute(`-f concat -safe 0 -i ${fileList} -c copy ${concatFile}`).then(result => console.log(`FFmpeg process exited with rc=${result}.`));
+      const result = await RNFFmpeg.execute(`-f concat -safe 0 -i ${fileList} -c copy ${concatFile}`)
+      console.log(`FFmpeg process exited with rc=${result}.`)
       // delete old files and rename the new one appropriately
       await RNFS.unlink(originalFile)
       await RNFS.unlink(additionalFile)
@@ -266,6 +310,27 @@ const Question = ({ submit }) => {
         // alternatively rgba(255,0,138,0.25)
         colors={['#FFADBB', 'rgba(255,181,38,0.25)']}
       >
+      <Modal
+        isVisible={modalVisible}
+        onBackdropPress={() => setModalVisible(false)}
+        animationIn="fadeIn"
+        animationOut="fadeOut"
+        useNativeDriver={true}
+      >
+        <View style={styles.modalOuter}>
+          <View style={styles.modalInner}>
+            <Text style={styles.modalText}>{modalText}</Text>
+            <View style={styles.modalButtons}>
+              <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
+                <Text style={styles.buttonText}>No</Text>
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.confirmButton} activeOpacity={0.3} onPress={modalConfirm}>
+                <Text style={styles.buttonText}>Yes</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
         <Text style={styles.header}>
           What does class warfare look like to you?
         </Text>
@@ -333,6 +398,55 @@ const styles = StyleSheet.create({
 
   yellowCircle: {
     backgroundColor: '#FFF3B2',
+  },
+
+  modalInner: {
+    width: 320, 
+    padding: 20, 
+    backgroundColor: '#FFD4C6',
+    borderRadius: 20,
+    borderWidth: 2,
+    borderColor: '#FFADBB'
+  },
+
+  modalOuter: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+
+  modalText: {
+    fontSize: 25,
+    textAlign: 'center'
+  },
+
+  buttonText: {
+    fontSize: 25,
+    fontWeight: 'bold'
+  },
+
+  confirmButton: {
+    width: 100,
+    alignItems: 'center',
+    padding: 13,
+    backgroundColor: '#FFADBB',
+    borderRadius: 20
+  },
+
+  cancelButton: {
+    width: 100,
+    alignItems: 'center',
+    padding: 13,
+    borderColor: '#FFADBB',
+    borderWidth: 3,
+    borderRadius: 20,
+  },
+  
+  modalButtons: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexDirection: 'row',
+    marginTop: 20
   }
 });
 

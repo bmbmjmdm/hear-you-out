@@ -207,6 +207,14 @@ const Question = ({ submit }) => {
 
   const restartRecording = async () => {
     if (lock || recording) return
+    // user pressed first button, now they need to confirm
+    setModalText("Delete recording and restart?")
+    setModalConfirm(() => restartRecordingConfirmed())
+    setModalVisible(true)
+  }
+
+  const restartRecordingConfirmed = async () => {
+    if (lock || recording) return
     setLock(true)
     try {
       if (playing) {

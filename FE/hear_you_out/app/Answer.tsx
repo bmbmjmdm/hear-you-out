@@ -19,6 +19,7 @@ import Flag from './Flag.png';
 import { Slider } from 'react-native-elements';
 import RNFS from 'react-native-fs'
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
+import RNShare from 'react-native-share'
 
 const Answer = ({setDisableSwipes}) => {
   const [sliderValue, setSliderValue] = React.useState(0)
@@ -31,6 +32,8 @@ const Answer = ({setDisableSwipes}) => {
   // initialize the player and setup callbacks
   const player = React.useRef(new AudioRecorderPlayer()).current
   const extention = Platform.OS === 'android' ? ".mp4" : ".m4a"
+  const filepath = RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention
+
   const playbackListener = ({currentPosition, duration}) => {
     // if length is set more than once it'll break the slider
     if (!lengthSetOnce.current) {
@@ -72,7 +75,7 @@ const Answer = ({setDisableSwipes}) => {
     if (!started.current) { 
       // if the user finished the audio and wants to seek back, we have to "restart" it for them without them knowing
       started.current = true
-      await player.startPlayer(RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention)
+      await player.startPlayer(filepath)
       await player.pausePlayer()
     }
     await player.seekToPlayer(val)
@@ -90,9 +93,23 @@ const Answer = ({setDisableSwipes}) => {
       // theoretical base64 encode/decode: 
       //const res = await RNFS.readFile(RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention, 'base64')
       //await RNFS.writeFile(RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention, res, 'base64')
-      await player.startPlayer(RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention)
+      await player.startPlayer(filepath)
     }
     setPlaying(!playing)
+  }
+
+  const shareAnswer = async () => {
+    try {
+      // note this method does not work with base64 files. we will have to convert the file to a normal mp3 or w.e and share it like that
+      const options = {
+        url: "file://" + filepath
+      }
+      const result = await RNShare.open(options)
+      console.log(result)
+    }
+    catch (e) {
+      console.log(e)
+    }
   }
 
   return (
@@ -123,11 +140,13 @@ const Answer = ({setDisableSwipes}) => {
             style={{ width: 35, marginRight: 20 }}
             resizeMode={'contain'}
           />
-          <Image
-            source={Share}
-            style={{ width: 35, marginLeft: 20 }}
-            resizeMode={'contain'}
-          />
+          <TouchableOpacity onPress={shareAnswer}>
+            <Image
+              source={Share}
+              style={{ width: 35, marginLeft: 20 }}
+              resizeMode={'contain'}
+            />
+          </TouchableOpacity>
         </View>
         {length ? 
           <Slider

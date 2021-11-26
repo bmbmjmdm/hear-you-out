@@ -254,13 +254,13 @@ const Question = ({ submit }) => {
       await stopRecorderAndConcat()
       setModalVisible(false)
       await submit()
-      await deleteCurrentFile()
+//TODO UNCOMMENT THIS WHEN DONE CODING
+      //await deleteCurrentFile()
       // we dont even care about cleaning up the states because we're gonna move on from this screen
     }
     catch (e) {
 
     }
-    setLock(false)
   }
 
   const hearRecording = async () => {

@@ -438,11 +438,9 @@ const styles = StyleSheet.create({
   confirmButton: {
     width: 100,
     alignItems: 'center',
-    padding: 13,
+    padding: 16,
     backgroundColor: '#FFADBB',
     borderRadius: 20,
-    borderColor: '#FFADBB',
-    borderWidth: 3,
   },
 
   cancelButton: {

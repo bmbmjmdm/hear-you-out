@@ -209,7 +209,7 @@ const Question = ({ submit }) => {
     if (lock || recording) return
     // user pressed first button, now they need to confirm
     setModalText("Delete recording and restart?")
-    setModalConfirm(() => restartRecordingConfirmed())
+    setModalConfirm(() => restartRecordingConfirmed)
     setModalVisible(true)
   }
 
@@ -228,6 +228,7 @@ const Question = ({ submit }) => {
       // console.log((await RNFS.stat(originalFile)).size)
   
       await deleteCurrentFile()
+      setModalVisible(false)
     }
     catch (e) {
 
@@ -316,7 +317,7 @@ const Question = ({ submit }) => {
       <LinearGradient
         style={styles.container}
         // alternatively rgba(255,0,138,0.25)
-        colors={['#FFADBB', 'rgba(255,181,38,0.25)']}
+        colors={['#FFADBB', '#FFEBC9']}
       >
       <Modal
         isVisible={modalVisible}
@@ -410,7 +411,7 @@ const styles = StyleSheet.create({
 
   modalInner: {
     width: 320, 
-    padding: 20, 
+    padding: 30, 
     backgroundColor: '#FFD4C6',
     borderRadius: 20,
     borderWidth: 2,
@@ -454,7 +455,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     flexDirection: 'row',
-    marginTop: 20
+    marginTop: 30
   }
 });
 

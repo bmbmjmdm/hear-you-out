@@ -317,7 +317,7 @@ const Question = ({ submit }) => {
       <LinearGradient
         style={styles.container}
         // alternatively rgba(255,0,138,0.25)
-        colors={['#FFADBB', '#FFEBC9']}
+        colors={['#FFADBB', 'rgba(255,181,38,0.25)']}
       >
       <Modal
         isVisible={modalVisible}
@@ -411,11 +411,6 @@ const styles = StyleSheet.create({
 
   modalInner: {
     width: 320, 
-    padding: 30, 
-    backgroundColor: '#FFD4C6',
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#FFADBB'
   },
 
   modalOuter: {
@@ -426,7 +421,13 @@ const styles = StyleSheet.create({
 
   modalText: {
     fontSize: 25,
-    textAlign: 'center'
+    textAlign: 'center',
+    backgroundColor: 'rgb(255, 212, 198)',
+    borderRadius: 20,
+    padding: 5,
+    paddingVertical: 15,
+    borderColor: '#FFADBB',
+    borderWidth: 3,
   },
 
   buttonText: {
@@ -439,7 +440,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: 13,
     backgroundColor: '#FFADBB',
-    borderRadius: 20
+    borderRadius: 20,
+    borderColor: '#FFADBB',
+    borderWidth: 3,
   },
 
   cancelButton: {
@@ -449,6 +452,7 @@ const styles = StyleSheet.create({
     borderColor: '#FFADBB',
     borderWidth: 3,
     borderRadius: 20,
+    backgroundColor: 'rgb(255, 212, 198)',
   },
   
   modalButtons: {

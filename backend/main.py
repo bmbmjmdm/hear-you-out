@@ -2,6 +2,8 @@ import os
 import secrets
 #import uuid # temp solution in place
 
+import yaml
+
 from math import sqrt
 from typing import List
 from random import uniform, choice
@@ -14,7 +16,8 @@ from fastapi.responses import  PlainTextResponse
 try: # to accommodate deta
     from dotenv import load_dotenv
 except:
-    pass
+    print("specify DETA_PROJECT_KEY in your .env")
+    exit()
 
 #from fastapi import FastAPI, File, UploadFile
 #from fastapi.responses import HTMLResponse, StreamingResponse
@@ -44,6 +47,9 @@ class QuestionModel(BaseModel):
     text: str
     category: str
 
+#class QuestionTableSchema(QuestionModel):
+#    num_asks: int = 0
+    
 class AnswerSubmission(BaseModel):
     audio_data: bytes
     question_uuid: str # uuid.UUID
@@ -87,20 +93,25 @@ async def get_question():
     # - think i want to go with base (need them anwyay). and can dev separate micro to insert Qs to it! or separate endpoint, with special auth?
     # - cron job to delete old files 30min after question change (if they are on a schedule)
 
-    # TODO yaml instead of newline separated, so we can store datetimes and category
-    question_list_stream = questions_drive.get('list of questions.txt')
+    question_list_stream = q_drive.get('list of questions.yaml')
     if question_list_stream is None:
         return PlainTextResponse("what's a question, really?", status_code=500)
 
-    questions = question_list_stream.read().decode().strip().splitlines() # strip to remove trailing newline
+    data_streamed = question_list_stream.read().decode().strip() # strip to remove trailing newline
     # read store of questions every invocation
     # compare the entry with the given datetime TODO
+    data_loaded = yaml.safe_load(data_streamed)
+    questions = data_loaded['questions']
     q = choice(questions)
 
     # TODO keep track of questions asked so far
-    # questions_db.insert()
-    
-    return {"text": q, "key": "1", "category": "?"}
+    # - and how many responses they got?
+    #q_tschema = QuestionTableSchema(q)
+    #questions_db.insert(q.dict())
+    #questions_db.update(key=q['key'],
+    #                    updates={"num_asks": answers_db.util.increment(1)})
+
+    return {"text": q['text'], "key": q['id'], "category": q["category"]}
 
 @app.post("/submitAnswer")
 async def submit_answer(ans: AnswerSubmission):
@@ -108,6 +119,8 @@ async def submit_answer(ans: AnswerSubmission):
     question_uuid = ans.question_uuid
     data = ans.audio_data
     # TODO put upper limit on amount of data?
+    # - what is the default POST cap?
+    # - create a unit test for an expected file size, and a file size over the POST cap
     
     # store audio in drive, then bookkeep in base
     try:
@@ -123,6 +136,29 @@ async def submit_answer(ans: AnswerSubmission):
     answers_db.insert(new_row.dict())
     print(new_row)
     return {'answer_id': answer_uuid}
+
+
+# button meanings:
+# dis/like or dis/agree?
+# to have most effect, need narrowest goal. want to hear different people's philosophy
+# could try to sort it left/right (conservative/liberal). could then show people even distro of viewpoints on political spectrum
+# - other dimensions too (political compass)
+# dale dislike dis/like buttons
+# marc/lily do not like the liberal/conservative labels
+# asking people questions to help categorize answer on some political compass
+# if dis/like, what does dislike mean? could that mean different things to different people?
+# dis/agree is less ambiguous.
+# use ai to categorize answer on political compass?
+# - potential mvp: liberal vs conservative judgement by ai, and potentially expand to other axes
+# - three options: could have dis/agree button and/or ai classification
+# - might work, but significant effort to impl
+# do we want the app to amplify minority opinions?
+# - algorithm should assume random distribution of audience
+# - yes. already flagging answers that are poorly formatted, hatespeech
+# - kind of promoting misinformation?
+# - - we're inherently not making echo chamber, so they should be getting real info too
+# if an answer has a lot of agrees (despite user distribution) bc its convincing (even to people w/ diff view points),
+#   we don't want this ansewr to get "lost"
 
 # wilson score confidence interval for binomial distributions
 # any value in also taking into account people who didn't vote?

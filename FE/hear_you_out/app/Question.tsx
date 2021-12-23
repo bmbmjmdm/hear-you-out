@@ -207,6 +207,14 @@ const Question = ({ submit }) => {
 
   const restartRecording = async () => {
     if (lock || recording) return
+    // user pressed first button, now they need to confirm
+    setModalText("Delete recording and restart?")
+    setModalConfirm(() => restartRecordingConfirmed)
+    setModalVisible(true)
+  }
+
+  const restartRecordingConfirmed = async () => {
+    if (lock || recording) return
     setLock(true)
     try {
       if (playing) {
@@ -220,6 +228,7 @@ const Question = ({ submit }) => {
       // console.log((await RNFS.stat(originalFile)).size)
   
       await deleteCurrentFile()
+      setModalVisible(false)
     }
     catch (e) {
 
@@ -246,13 +255,13 @@ const Question = ({ submit }) => {
       await stopRecorderAndConcat()
       setModalVisible(false)
       await submit()
-      await deleteCurrentFile()
+//TODO UNCOMMENT THIS WHEN DONE CODING
+      //await deleteCurrentFile()
       // we dont even care about cleaning up the states because we're gonna move on from this screen
     }
     catch (e) {
 
     }
-    setLock(false)
   }
 
   const hearRecording = async () => {
@@ -402,11 +411,6 @@ const styles = StyleSheet.create({
 
   modalInner: {
     width: 320, 
-    padding: 20, 
-    backgroundColor: '#FFD4C6',
-    borderRadius: 20,
-    borderWidth: 2,
-    borderColor: '#FFADBB'
   },
 
   modalOuter: {
@@ -417,7 +421,13 @@ const styles = StyleSheet.create({
 
   modalText: {
     fontSize: 25,
-    textAlign: 'center'
+    textAlign: 'center',
+    backgroundColor: 'rgb(255, 212, 198)',
+    borderRadius: 20,
+    padding: 5,
+    paddingVertical: 15,
+    borderColor: '#FFADBB',
+    borderWidth: 3,
   },
 
   buttonText: {
@@ -428,9 +438,9 @@ const styles = StyleSheet.create({
   confirmButton: {
     width: 100,
     alignItems: 'center',
-    padding: 13,
+    padding: 16,
     backgroundColor: '#FFADBB',
-    borderRadius: 20
+    borderRadius: 20,
   },
 
   cancelButton: {
@@ -440,13 +450,14 @@ const styles = StyleSheet.create({
     borderColor: '#FFADBB',
     borderWidth: 3,
     borderRadius: 20,
+    backgroundColor: 'rgb(255, 212, 198)',
   },
   
   modalButtons: {
     alignItems: 'center',
     justifyContent: 'space-between',
     flexDirection: 'row',
-    marginTop: 20
+    marginTop: 30
   }
 });
 

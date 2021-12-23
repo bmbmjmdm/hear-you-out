@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Platform,
 } from 'react-native';
+import Modal from "react-native-modal";
 // https://github.com/react-native-linear-gradient/react-native-linear-gradient
 import LinearGradient from 'react-native-linear-gradient';
 import Play from './Play.png';
@@ -19,6 +20,7 @@ import Flag from './Flag.png';
 import { Slider } from 'react-native-elements';
 import RNFS from 'react-native-fs'
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
+import RNShare from 'react-native-share'
 
 const Answer = ({setDisableSwipes}) => {
   const [sliderValue, setSliderValue] = React.useState(0)
@@ -28,9 +30,16 @@ const Answer = ({setDisableSwipes}) => {
   const lengthSetOnce = React.useRef(false)
   const started = React.useRef(false)
 
+  // modal
+  const [modalVisible, setModalVisible] = React.useState(false)
+  const [modalText, setModalText] = React.useState("")
+  const [modalConfirm, setModalConfirm] = React.useState(() => {})
+
   // initialize the player and setup callbacks
   const player = React.useRef(new AudioRecorderPlayer()).current
   const extention = Platform.OS === 'android' ? ".mp4" : ".m4a"
+  const filepath = RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention
+
   const playbackListener = ({currentPosition, duration}) => {
     // if length is set more than once it'll break the slider
     if (!lengthSetOnce.current) {
@@ -72,7 +81,7 @@ const Answer = ({setDisableSwipes}) => {
     if (!started.current) { 
       // if the user finished the audio and wants to seek back, we have to "restart" it for them without them knowing
       started.current = true
-      await player.startPlayer(RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention)
+      await player.startPlayer(filepath)
       await player.pausePlayer()
     }
     await player.seekToPlayer(val)
@@ -90,10 +99,36 @@ const Answer = ({setDisableSwipes}) => {
       // theoretical base64 encode/decode: 
       //const res = await RNFS.readFile(RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention, 'base64')
       //await RNFS.writeFile(RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention, res, 'base64')
-      await player.startPlayer(RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention)
+      await player.startPlayer(filepath)
     }
     setPlaying(!playing)
   }
+
+  const shareAnswer = async () => {
+    try {
+      // note this method does not work with base64 files. we will have to convert the file to a normal mp3 or w.e and share it like that
+      const options = {
+        url: "file://" + filepath
+      }
+      const result = await RNShare.open(options)
+      console.log(result)
+    }
+    catch (e) {
+      console.log(e)
+    }
+  }
+
+  const reportAnswer = async () => {
+    // user pressed first button, now they need to confirm
+    setModalText("Report innapropriate answer?")
+    setModalConfirm(() => confirmReportAnswer)
+    setModalVisible(true)
+  }
+
+  const confirmReportAnswer = async () => {
+    // TODO
+  }
+
 
   return (
     <View style={styles.whiteBackdrop}>
@@ -101,6 +136,27 @@ const Answer = ({setDisableSwipes}) => {
         style={styles.container}
         colors={['rgba(0,255,117,0.25)', 'rgba(0,74,217,0.25)']}
       >
+        <Modal
+          isVisible={modalVisible}
+          onBackdropPress={() => setModalVisible(false)}
+          animationIn="fadeIn"
+          animationOut="fadeOut"
+          useNativeDriver={true}
+        >
+          <View style={styles.modalOuter}>
+            <View style={styles.modalInner}>
+              <Text style={styles.modalText}>{modalText}</Text>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
+                  <Text style={styles.buttonText}>No</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.confirmButton} activeOpacity={0.3} onPress={modalConfirm}>
+                  <Text style={styles.buttonText}>Yes</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
         <Text style={styles.header}>
           What does class warfare look like to you?
         </Text>
@@ -118,16 +174,20 @@ const Answer = ({setDisableSwipes}) => {
           </TouchableOpacity>
         </Shadow>
         <View style={styles.miscButtons}>
-          <Image
-            source={Flag}
-            style={{ width: 35, marginRight: 20 }}
-            resizeMode={'contain'}
-          />
-          <Image
-            source={Share}
-            style={{ width: 35, marginLeft: 20 }}
-            resizeMode={'contain'}
-          />
+          <TouchableOpacity onPress={reportAnswer}>
+            <Image
+              source={Flag}
+              style={{ width: 35, marginRight: 20 }}
+              resizeMode={'contain'}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={shareAnswer}>
+            <Image
+              source={Share}
+              style={{ width: 35, marginLeft: 20 }}
+              resizeMode={'contain'}
+            />
+          </TouchableOpacity>
         </View>
         {length ? 
           <Slider
@@ -194,6 +254,58 @@ const styles = StyleSheet.create({
 
   yellowCircle: {
     backgroundColor: '#FFF3B2',
+  },
+
+  modalInner: {
+    width: 320, 
+  },
+
+  modalOuter: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+
+  modalText: {
+    fontSize: 25,
+    textAlign: 'center',
+    backgroundColor: '#BFECE7',
+    borderRadius: 20,
+    padding: 5,
+    paddingVertical: 15,
+    borderColor: '#A9C5F2',
+    borderWidth: 3,
+  },
+
+  buttonText: {
+    fontSize: 25,
+    fontWeight: 'bold'
+  },
+
+  // note this background color + the relevant border colors are slightly more saturated versions of the bottom background color
+  confirmButton: {
+    width: 100,
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#A9C5F2',
+    borderRadius: 20,
+  },
+
+  cancelButton: {
+    width: 100,
+    alignItems: 'center',
+    padding: 13,
+    borderColor: '#A9C5F2',
+    borderWidth: 3,
+    borderRadius: 20,
+    backgroundColor: '#BFECE7',
+  },
+  
+  modalButtons: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexDirection: 'row',
+    marginTop: 30
   }
 });
 

@@ -23,14 +23,17 @@ const Shadow = ({
           }
         ]
       }
+      // this should ideally be just 3 entries, and stops should be [0, 0.8, 1], but theres a bug
       colors={[
+        disabled ? clear : 'black',
+        disabled ? clear : 'black',
+        disabled ? clear : 'black',
         disabled ? clear : 'black',
         disabled ? clear : 'black',
         clear
       ]}
       stops={[
         0,
-        0.8,
         1
       ]}
       center={[

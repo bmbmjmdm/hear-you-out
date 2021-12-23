@@ -8,6 +8,7 @@ buildscript {
         compileSdkVersion = 29
         targetSdkVersion = 29
         kotlinVersion = '1.5.0'
+        reactNativeFFmpegPackage = "audio"
     }
     repositories {
         google()

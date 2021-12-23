@@ -4,47 +4,213 @@ import {
   StyleSheet,
   View,
   Text,
-  Image
+  Image,
+  TouchableOpacity,
+  Platform,
 } from 'react-native';
+import Modal from "react-native-modal";
 // https://github.com/react-native-linear-gradient/react-native-linear-gradient
 import LinearGradient from 'react-native-linear-gradient';
 import Play from './Play.png';
+import Pause from './Pause.png';
 import Shadow from './Shadow'
 import BottomButtons from './BottomButtons'
 import Share from './Share.png';
 import Flag from './Flag.png';
+import { Slider } from 'react-native-elements';
+import RNFS from 'react-native-fs'
+import AudioRecorderPlayer from 'react-native-audio-recorder-player';
+import RNShare from 'react-native-share'
 
-const Answer = () => {
+const Answer = ({setDisableSwipes}) => {
+  const [sliderValue, setSliderValue] = React.useState(0)
+  const [length, setLength] = React.useState(0)
+  const [playing, setPlaying] = React.useState(false)
+  const disableUpdates = React.useRef(false)
+  const lengthSetOnce = React.useRef(false)
+  const started = React.useRef(false)
+
+  // modal
+  const [modalVisible, setModalVisible] = React.useState(false)
+  const [modalText, setModalText] = React.useState("")
+  const [modalConfirm, setModalConfirm] = React.useState(() => {})
+
+  // initialize the player and setup callbacks
+  const player = React.useRef(new AudioRecorderPlayer()).current
+  const extention = Platform.OS === 'android' ? ".mp4" : ".m4a"
+  const filepath = RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention
+
+  const playbackListener = ({currentPosition, duration}) => {
+    // if length is set more than once it'll break the slider
+    if (!lengthSetOnce.current) {
+      setLength(duration)
+      lengthSetOnce.current = true
+      return
+    }
+    // dont update value while user is moving slider manually
+    if (disableUpdates.current) return
+    // the answer finished playing
+    if (currentPosition === duration) {
+      setPlaying(false)
+      setSliderValue(0)
+      started.current = false
+      return
+    }
+    // update slider value
+    setSliderValue(currentPosition)
+  }
+  // run this effect ONCE when this component mounts
+  React.useEffect(() => {
+    player.addPlayBackListener(playbackListener)
+    // run this return function ONCE when the component unmounts
+    return () => {
+      player.removePlayBackListener()
+    }
+  }, [])
+  
+  // UI functions
+  const onSlidingStart = () => {
+    // dont let the user accidentily swipe the overall card
+    setDisableSwipes(true)
+    // dont update our position since the users moving it
+    disableUpdates.current = true
+  }
+  
+  const onSlidingComplete = async (val) => {
+    setDisableSwipes(false)
+    if (!started.current) { 
+      // if the user finished the audio and wants to seek back, we have to "restart" it for them without them knowing
+      started.current = true
+      await player.startPlayer(filepath)
+      await player.pausePlayer()
+    }
+    await player.seekToPlayer(val)
+    disableUpdates.current = false
+  }
+
+  const playPressed = async () => {
+    // we're already playing, pause
+    if (playing) {
+      await player.pausePlayer()
+    }
+    // we're not playing, start
+    else {
+      started.current = true
+      // theoretical base64 encode/decode: 
+      //const res = await RNFS.readFile(RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention, 'base64')
+      //await RNFS.writeFile(RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention, res, 'base64')
+      await player.startPlayer(filepath)
+    }
+    setPlaying(!playing)
+  }
+
+  const shareAnswer = async () => {
+    try {
+      // note this method does not work with base64 files. we will have to convert the file to a normal mp3 or w.e and share it like that
+      const options = {
+        url: "file://" + filepath
+      }
+      const result = await RNShare.open(options)
+      console.log(result)
+    }
+    catch (e) {
+      console.log(e)
+    }
+  }
+
+  const reportAnswer = async () => {
+    // user pressed first button, now they need to confirm
+    setModalText("Report innapropriate answer?")
+    setModalConfirm(() => confirmReportAnswer)
+    setModalVisible(true)
+  }
+
+  const confirmReportAnswer = async () => {
+    // TODO
+  }
+
+
   return (
     <View style={styles.whiteBackdrop}>
       <LinearGradient
         style={styles.container}
         colors={['rgba(0,255,117,0.25)', 'rgba(0,74,217,0.25)']}
       >
+        <Modal
+          isVisible={modalVisible}
+          onBackdropPress={() => setModalVisible(false)}
+          animationIn="fadeIn"
+          animationOut="fadeOut"
+          useNativeDriver={true}
+        >
+          <View style={styles.modalOuter}>
+            <View style={styles.modalInner}>
+              <Text style={styles.modalText}>{modalText}</Text>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
+                  <Text style={styles.buttonText}>No</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.confirmButton} activeOpacity={0.3} onPress={modalConfirm}>
+                  <Text style={styles.buttonText}>Yes</Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
         <Text style={styles.header}>
           What does class warfare look like to you?
         </Text>
         <Shadow radius={175} style={{ marginTop: 30 }}>
-          <View style={styles.audioCircle}>
+          <TouchableOpacity
+            style={[styles.audioCircle, playing ? styles.yellowCircle : styles.whiteCircle]}
+            onPress={playPressed}
+            activeOpacity={1}
+          >
             <Image
-              source={Play}
-              style={{ width: 85, marginLeft: 13 }}
+              source={playing ? Pause : Play}
+              style={{ width: 85, marginLeft: playing ? 0 : 13 }}
               resizeMode={'contain'}
             />
-          </View>
+          </TouchableOpacity>
         </Shadow>
         <View style={styles.miscButtons}>
-          <Image
-            source={Flag}
-            style={{ width: 35, marginRight: 20 }}
-            resizeMode={'contain'}
-          />
-          <Image
-            source={Share}
-            style={{ width: 35, marginLeft: 20 }}
-            resizeMode={'contain'}
-          />
+          <TouchableOpacity onPress={reportAnswer}>
+            <Image
+              source={Flag}
+              style={{ width: 35, marginRight: 20 }}
+              resizeMode={'contain'}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={shareAnswer}>
+            <Image
+              source={Share}
+              style={{ width: 35, marginLeft: 20 }}
+              resizeMode={'contain'}
+            />
+          </TouchableOpacity>
         </View>
+        {length ? 
+          <Slider
+            style={{width: 300, height: 40}}
+            minimumValue={0}
+            maximumValue={length}
+            minimumTrackTintColor="#888888"
+            maximumTrackTintColor="#FFFFFF"
+            allowTouchTrack={true}
+            thumbTintColor="#000000"
+            value={sliderValue}
+            onSlidingComplete={onSlidingComplete}
+            onSlidingStart={onSlidingStart}
+            thumbStyle={{ height: 30, width: 30 }}
+            trackStyle={{ height: 8, borderRadius: 99 }}
+          />
+          :
+          // we cannot change the maximumValue of Slider once its rendered, so we render a fake slider until we know length
+          <View style={{ width: 300, height: 40, alignItems: "center", justifyContent: "center", flexDirection: "row" }}>
+            <View style={{ height: 30, width: 30, borderRadius: 999, backgroundColor:"#000000" }} />
+            <View style={{ width:270, height: 8, borderTopRightRadius: 99, borderBottomRightRadius: 99, backgroundColor: "#FFFFFF" }} />
+          </View>
+        }
         <BottomButtons theme={"answer"} />
       </LinearGradient>
     </View>
@@ -70,17 +236,76 @@ const styles = StyleSheet.create({
 
   audioCircle: {
     borderRadius:999,
-    backgroundColor: 'white',
     height: 175,
     width: 175,
     alignItems: 'center',
     justifyContent: 'center'
   },
 
+  whiteCircle: {
+    backgroundColor: 'white',
+  },
+
   miscButtons: {
     alignItems: 'center',
     flexDirection: 'row',
     marginTop: -50
+  },
+
+  yellowCircle: {
+    backgroundColor: '#FFF3B2',
+  },
+
+  modalInner: {
+    width: 320, 
+  },
+
+  modalOuter: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center'
+  },
+
+  modalText: {
+    fontSize: 25,
+    textAlign: 'center',
+    backgroundColor: '#BFECE7',
+    borderRadius: 20,
+    padding: 5,
+    paddingVertical: 15,
+    borderColor: '#A9C5F2',
+    borderWidth: 3,
+  },
+
+  buttonText: {
+    fontSize: 25,
+    fontWeight: 'bold'
+  },
+
+  // note this background color + the relevant border colors are slightly more saturated versions of the bottom background color
+  confirmButton: {
+    width: 100,
+    alignItems: 'center',
+    padding: 16,
+    backgroundColor: '#A9C5F2',
+    borderRadius: 20,
+  },
+
+  cancelButton: {
+    width: 100,
+    alignItems: 'center',
+    padding: 13,
+    borderColor: '#A9C5F2',
+    borderWidth: 3,
+    borderRadius: 20,
+    backgroundColor: '#BFECE7',
+  },
+  
+  modalButtons: {
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexDirection: 'row',
+    marginTop: 30
   }
 });
 

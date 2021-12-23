@@ -93,7 +93,7 @@ async def get_question():
     # - think i want to go with base (need them anwyay). and can dev separate micro to insert Qs to it! or separate endpoint, with special auth?
     # - cron job to delete old files 30min after question change (if they are on a schedule)
 
-    question_list_stream = q_drive.get('list of questions.yaml')
+    question_list_stream = questions_drive.get('list of questions.yaml')
     if question_list_stream is None:
         return PlainTextResponse("what's a question, really?", status_code=500)
 
@@ -111,7 +111,7 @@ async def get_question():
     #questions_db.update(key=q['key'],
     #                    updates={"num_asks": answers_db.util.increment(1)})
 
-    return {"text": q['text'], "key": q['id'], "category": q["category"]}
+    return {"text": q['text'], "key": q['key'], "category": q["category"]}
 
 @app.post("/submitAnswer")
 async def submit_answer(ans: AnswerSubmission):
@@ -136,30 +136,6 @@ async def submit_answer(ans: AnswerSubmission):
     answers_db.insert(new_row.dict())
     print(new_row)
     return {'answer_id': answer_uuid}
-
-
-# button meanings:
-# dis/like or dis/agree?
-# to have most effect, need narrowest goal. want to hear different people's philosophy
-# could try to sort it left/right (conservative/liberal). could then show people even distro of viewpoints on political spectrum
-# - other dimensions too (political compass)
-# dale dislike dis/like buttons
-# marc/lily do not like the liberal/conservative labels
-# asking people questions to help categorize answer on some political compass
-# if dis/like, what does dislike mean? could that mean different things to different people?
-# dis/agree is less ambiguous.
-# use ai to categorize answer on political compass?
-# - potential mvp: liberal vs conservative judgement by ai, and potentially expand to other axes
-# - three options: could have dis/agree button and/or ai classification
-# - might work, but significant effort to impl
-# do we want the app to amplify minority opinions?
-# - algorithm should assume random distribution of audience
-# - yes. already flagging answers that are poorly formatted, hatespeech
-# - kind of promoting misinformation?
-# - - we're inherently not making echo chamber, so they should be getting real info too
-# if an answer has a lot of agrees (despite user distribution) bc its convincing (even to people w/ diff view points),
-#   we don't want this ansewr to get "lost"
-
 
 # button meanings:
 # dis/like or dis/agree?
@@ -212,7 +188,7 @@ def calculate_popularity(num_agrees, num_disagrees):
 def filter_answers_from_db(items: List[AnswerTableSchema], question_uuid: str, seen_answer_uuids: List[str]):
     pop = unpop = contro = seen_pop = seen_unpop = seen_contro = []
     for item in items:
-        if item.question_uuid is not question_uuid:
+        if item.question_uuid != question_uuid:
             continue
         if item.is_banned:
             continue
@@ -238,6 +214,7 @@ def filter_answers_from_db(items: List[AnswerTableSchema], question_uuid: str, s
             else:
                 pop.append(item)
         else:
+            ## todo throw instead of return? think through how error should be handled
             return PlainTextResponse("popularity invalid", status_code=500)
 
     # TODO check for emptiness here? to prevent typeerror unpacking None
@@ -251,7 +228,7 @@ async def get_answer(question_uuid: str, seen_answer_uuids: List[str]):
     #   filter logic in the same place.
     # categorize into popular, controversial, unpopular during the single pass
     res = answers_db.fetch()
-    print(res)
+    #print(res, res.count)
     if res.count == 0:
         return PlainTextResponse("no answers found", status_code=500)
 
@@ -267,7 +244,10 @@ async def get_answer(question_uuid: str, seen_answer_uuids: List[str]):
         seen_pop += seen_pop2
         seen_unpop += seen_unpop2
         seen_contro += seen_contro2
-        
+
+    if len(pop+unpop+contro) == 0:
+        return PlainTextResponse("no answers found", status_code=500)
+
     # calculate distribution thus far from seen answers, since we want to take that into account.
     # TODO finish this
     # TODO take into account empty arrays...

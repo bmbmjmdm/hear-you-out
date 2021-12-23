@@ -1,4 +1,5 @@
 deta
+pyyaml
 fastapi
 pydantic
 python-dotenv

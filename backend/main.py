@@ -26,15 +26,22 @@ if os.environ.get('DETA_RUNTIME') is None:
 Secret_key = os.environ.get('DETA_PROJECT_KEY')
 # TODO update micro env with deta update -e .env
 Discord_flag_url = os.environ.get('DISCORD_FLAG_WEBHOOK') # todo error if not set unless overridden
+Is_dev_build = os.environ.get('IS_DEV_BUILD')
+if Is_dev_build == "True":
+    app = FastAPI()
+else:
+    app = FastAPI(redoc_url=None, docs_url=None)
+    
+
 deta = Deta(Secret_key)
-drive = Drive("hyo")
+answers_drive = Drive("hyo")
+questions_drive = Drive("questions")
 questions_db = Base('questions')
 answers_db = Base('answers')
-app = FastAPI()  # must be app
 
 class QuestionModel(BaseModel):
     key: str
-    q: str
+    text: str
     category: str
 
 class AnswerSubmission(BaseModel):
@@ -81,7 +88,7 @@ async def get_question():
     # - cron job to delete old files 30min after question change (if they are on a schedule)
 
     # TODO yaml instead of newline separated, so we can store datetimes and category
-    question_list_stream = drive.get('list of questions')
+    question_list_stream = questions_drive.get('list of questions.txt')
     if question_list_stream is None:
         return PlainTextResponse("what's a question, really?", status_code=500)
 
@@ -93,7 +100,7 @@ async def get_question():
     # TODO keep track of questions asked so far
     # questions_db.insert()
     
-    return {"q": q, "key": "1", "category": "?"}
+    return {"text": q, "key": "1", "category": "?"}
 
 @app.post("/submitAnswer")
 async def submit_answer(ans: AnswerSubmission):
@@ -104,7 +111,7 @@ async def submit_answer(ans: AnswerSubmission):
     
     # store audio in drive, then bookkeep in base
     try:
-        drive.put(answer_uuid, data, content_type='application/octet-stream')
+        answers_drive.put(answer_uuid, data, content_type='application/octet-stream')
     except Exception(e):
         print(f"~~~~~~~~~~~~~\n\n\n\n!!!!!!!!!!!!!!\n{e}") # i think visor will capture this in the logs?
         return PlainTextResponse("error storing answer in drive", status_code=500)
@@ -115,7 +122,7 @@ async def submit_answer(ans: AnswerSubmission):
     new_row = AnswerTableSchema(key=answer_uuid, question_uuid=question_uuid)
     answers_db.insert(new_row.dict())
     print(new_row)
-    return {'answer id': answer_uuid}
+    return {'answer_id': answer_uuid}
 
 # wilson score confidence interval for binomial distributions
 # any value in also taking into account people who didn't vote?
@@ -232,7 +239,7 @@ async def get_answer(question_uuid: str, seen_answer_uuids: List[str]):
     
     # get the selected answer
     answer_uuid = a.key
-    audio_data = drive.get(answer_uuid).read()
+    audio_data = answers_drive.get(answer_uuid).read()
 
     # update selected answer's num_listen
     # could catch exception here, but i think it makes sense to just abort if this update fails
@@ -258,13 +265,14 @@ async def flag_answer(answer_uuid: str):
     # for now, lets ban after the first flag, to limit the spread of badness
     if answer_row['num_flags'] >= 0: # 0 means the first time it has been flagged
         # we are banning it, so generate a security token for an unban magic link
-        unban_token = secrets.token_urlsafe(32)
+        unban_token = secrets.token_urlsafe(32) # TODO two entries in DB with same token? need to seed?
         answers_db.update(key=answer_uuid, updates={'is_banned': True, 'unban_token': unban_token})
-        webhook = DiscordWebhook(url=Discord_flag_url, username="Flagged Answer",
-                                 content=f"Unban this: https://hearyouout.deta.dev/unbanAnswer/{answer_uuid}/{unban_token}")
-        audio_data_stream = drive.get(answer_uuid)
+        webhook = DiscordWebhook(url=Discord_flag_url, username="Flag Bot",
+                                 content=f"Click to unban this answer: https://hearyouout.deta.dev/unbanAnswer/{answer_uuid}/{unban_token}_")
+        audio_data_stream = answers_drive.get(answer_uuid)
         webhook.add_file(file=audio_data_stream.read(), filename=f"{answer_uuid}.mp3") # will this work?
         response = webhook.execute() # TODO error check
+        
     return PlainTextResponse("answer flagged", status_code=200)
 
 # 32 byte tokens is prob enough to deter people from trying to brute force it?
@@ -276,7 +284,11 @@ async def unban_answer(answer_uuid: str, unban_token: str):
         answers_db.update(key=answer_uuid,
                           updates={'is_banned': False,
                                    'was_banned': True}) # this means it can't get banned again
-        
+
+    webhook = DiscordWebhook(url=Discord_flag_url, username="Flag Bot",
+                             content=f"{answer_uuid} \"unbanned\"")
+    response = webhook.execute() # TODO error check
+
     # we return this regardless of the correct unban token
     return PlainTextResponse("answer unbanned", status_code=200)
 

@@ -106,7 +106,7 @@ async def get_question():
     #                    updates={"num_asks": answers_db.util.increment(1)})
 
     
-    return {"q": q['text'], "key": q['id'], "category": q["category"]}
+    return {"text": q['text'], "key": q['id'], "category": q["category"]}
 
 @app.post("/submitAnswer")
 async def submit_answer(ans: AnswerSubmission):
@@ -130,7 +130,7 @@ async def submit_answer(ans: AnswerSubmission):
     new_row = AnswerTableSchema(key=answer_uuid, question_uuid=question_uuid)
     answers_db.insert(new_row.dict())
     print(new_row)
-    return {'answer id': answer_uuid}
+    return {'answer_id': answer_uuid}
 
 
 # button meanings:

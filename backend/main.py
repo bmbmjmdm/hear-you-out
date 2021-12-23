@@ -132,6 +132,29 @@ async def submit_answer(ans: AnswerSubmission):
     print(new_row)
     return {'answer id': answer_uuid}
 
+
+# button meanings:
+# dis/like or dis/agree?
+# to have most effect, need narrowest goal. want to hear different people's philosophy
+# could try to sort it left/right (conservative/liberal). could then show people even distro of viewpoints on political spectrum
+# - other dimensions too (political compass)
+# dale dislike dis/like buttons
+# marc/lily do not like the liberal/conservative labels
+# asking people questions to help categorize answer on some political compass
+# if dis/like, what does dislike mean? could that mean different things to different people?
+# dis/agree is less ambiguous.
+# use ai to categorize answer on political compass?
+# - potential mvp: liberal vs conservative judgement by ai, and potentially expand to other axes
+# - three options: could have dis/agree button and/or ai classification
+# - might work, but significant effort to impl
+# do we want the app to amplify minority opinions?
+# - algorithm should assume random distribution of audience
+# - yes. already flagging answers that are poorly formatted, hatespeech
+# - kind of promoting misinformation?
+# - - we're inherently not making echo chamber, so they should be getting real info too
+# if an answer has a lot of agrees (despite user distribution) bc its convincing (even to people w/ diff view points),
+#   we don't want this ansewr to get "lost"
+
 # wilson score confidence interval for binomial distributions
 # any value in also taking into account people who didn't vote?
 # TODO need to add continuity correction bc n will often be small (< 40)

@@ -103,7 +103,8 @@ async def get_question():
     # compare the entry with the given datetime TODO
     data_loaded = yaml.safe_load(data_streamed)
     questions = data_loaded['questions']
-    q = choice(questions)
+    #q = choice(questions)
+    q = questions[0]
 
     # TODO keep track of questions asked so far
     # - and how many responses they got?

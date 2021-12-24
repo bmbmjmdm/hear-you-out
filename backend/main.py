@@ -1,13 +1,13 @@
 import os
-import secrets
-#import uuid # temp solution in place
-
 import yaml
+import secrets
+import datetime
+#import uuid # temp solution in place -> tODO try new deta purge
 
 from math import sqrt
-from typing import List
-from random import uniform, choice
+from typing import List, Optional
 from pydantic import BaseModel
+from random import uniform, choice
 from deta import Deta, Drive, Base
 from discord_webhook import DiscordWebhook
 from fastapi import FastAPI, HTTPException
@@ -60,6 +60,7 @@ class AnswerListen(BaseModel):
 
 class AnswerTableSchema(BaseModel):
     key: str # TODO uuid; # answer_uuid
+    entry_timestamp: Optional[str] # todo mandatory
     question_uuid: str # TODO
     num_flags: int = 0
     is_banned: bool = False
@@ -132,7 +133,11 @@ async def submit_answer(ans: AnswerSubmission):
     # TODO test for duplicate filename error
 
     # bookkeep in base
-    new_row = AnswerTableSchema(key=answer_uuid, question_uuid=question_uuid)
+    ts = str(datetime.datetime.now(datetime.timezone.utc))
+    print(ts)
+    new_row = AnswerTableSchema(key=answer_uuid,
+                                question_uuid=question_uuid,
+                                entry_timestamp=ts)
     answers_db.insert(new_row.dict())
     print(new_row)
     return {'answer_id': answer_uuid}
@@ -309,7 +314,7 @@ async def flag_answer(answer_uuid: str):
         webhook = DiscordWebhook(url=Discord_flag_url, username="Flag Bot",
                                  content=f"Click to unban this answer: https://hearyouout.deta.dev/unbanAnswer/{answer_uuid}/{unban_token}_")
         audio_data_stream = answers_drive.get(answer_uuid)
-        webhook.add_file(file=audio_data_stream.read(), filename=f"{answer_uuid}.mp3") # will this work?
+        webhook.add_file(file=audio_data_stream.read(), filename=f"{answer_uuid}.mp4") # will this work?
         response = webhook.execute() # TODO error check
         
     return PlainTextResponse("answer flagged", status_code=200)

@@ -22,6 +22,15 @@ except:
 #from fastapi import FastAPI, File, UploadFile
 #from fastapi.responses import HTMLResponse, StreamingResponse
 
+### TODO
+# - tests (see todo in test_main)
+# - - db+drive DI
+# - # improve api docs thusly: https://fastapi.tiangolo.com/tutorial/path-operation-configuration
+# - qetQuestion algo
+# - getAnswer algo
+# - all other todos in the source code and on jira
+
+
 # load local env if we're running locally
 if os.environ.get('DETA_RUNTIME') is None:
     load_dotenv(override=True)
@@ -103,8 +112,8 @@ async def get_question():
     # compare the entry with the given datetime TODO
     data_loaded = yaml.safe_load(data_streamed)
     questions = data_loaded['questions']
-    #q = choice(questions)
-    q = questions[0]
+    q = choice(questions)
+    #q = questions[1]
 
     # TODO keep track of questions asked so far
     # - and how many responses they got?
@@ -130,7 +139,7 @@ async def submit_answer(ans: AnswerSubmission):
     except Exception(e):
         print(f"~~~~~~~~~~~~~\n\n\n\n!!!!!!!!!!!!!!\n{e}") # i think visor will capture this in the logs?
         return PlainTextResponse("error storing answer in drive", status_code=500)
-    # TODOhow to test drive being full error? maybe uncommonly run use case to fill it up? can test the exact byte limit
+    # TODO how to test drive being full error? maybe uncommonly run use case to fill it up? can test the exact byte limit
     # TODO test for duplicate filename error
 
     # bookkeep in base

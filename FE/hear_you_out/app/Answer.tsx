@@ -21,14 +21,23 @@ import { Slider } from 'react-native-elements';
 import RNFS from 'react-native-fs'
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import RNShare from 'react-native-share'
+import { APIQuestion } from "./Network"
 
-const Answer = ({setDisableSwipes}) => {
+type AnswerProps = {
+  setDisableSwipes: (val: boolean) => void,
+  id: string,
+  data: string,
+  question: APIQuestion
+}
+
+const Answer = ({setDisableSwipes, id, data, question}: AnswerProps) => {
   const [sliderValue, setSliderValue] = React.useState(0)
   const [length, setLength] = React.useState(0)
   const [playing, setPlaying] = React.useState(false)
   const disableUpdates = React.useRef(false)
   const lengthSetOnce = React.useRef(false)
   const started = React.useRef(false)
+  const [ready, setReady] = React.useState(false)
 
   // modal
   const [modalVisible, setModalVisible] = React.useState(false)
@@ -38,7 +47,7 @@ const Answer = ({setDisableSwipes}) => {
   // initialize the player and setup callbacks
   const player = React.useRef(new AudioRecorderPlayer()).current
   const extention = Platform.OS === 'android' ? ".mp4" : ".m4a"
-  const filepath = RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention
+  const filepath = RNFS.CachesDirectoryPath + '/' + "CoolAnswer" + id + extention
 
   const playbackListener = ({currentPosition, duration}) => {
     // if length is set more than once it'll break the slider
@@ -59,8 +68,11 @@ const Answer = ({setDisableSwipes}) => {
     // update slider value
     setSliderValue(currentPosition)
   }
+
   // run this effect ONCE when this component mounts
   React.useEffect(() => {
+    // TODO unlink this after submitting rating
+    RNFS.writeFile(filepath, data, 'base64').then(() => setReady(true))
     player.addPlayBackListener(playbackListener)
     // run this return function ONCE when the component unmounts
     return () => {
@@ -96,9 +108,6 @@ const Answer = ({setDisableSwipes}) => {
     // we're not playing, start
     else {
       started.current = true
-      // theoretical base64 encode/decode: 
-      //const res = await RNFS.readFile(RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention, 'base64')
-      //await RNFS.writeFile(RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention, res, 'base64')
       await player.startPlayer(filepath)
     }
     setPlaying(!playing)
@@ -129,6 +138,14 @@ const Answer = ({setDisableSwipes}) => {
     // TODO
   }
 
+  if (!ready) return (
+    <View style={styles.whiteBackdrop}>
+      <LinearGradient
+        style={styles.container}
+        colors={['rgba(0,255,117,0.25)', 'rgba(0,74,217,0.25)']}
+      ></LinearGradient>
+    </View>
+  )
 
   return (
     <View style={styles.whiteBackdrop}>
@@ -158,7 +175,7 @@ const Answer = ({setDisableSwipes}) => {
           </View>
         </Modal>
         <Text style={styles.header}>
-          What does class warfare look like to you?
+          { question.text }
         </Text>
         <Shadow radius={175} style={{ marginTop: 30 }}>
           <TouchableOpacity

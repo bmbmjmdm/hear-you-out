@@ -20,6 +20,7 @@ import AudioRecorderPlayer, { AudioEncoderAndroidType } from 'react-native-audio
 import RNFS from 'react-native-fs'
 import { RNFFmpeg } from 'react-native-ffmpeg';
 import uuid from 'react-native-uuid';
+import { APIQuestion } from "./Network"
 
 // for tutorial maybe
 // https://reactnativeelements.com/docs/tooltip/
@@ -41,7 +42,12 @@ const audioSet = {
   //AVLinearPCMIsNonInterleavedIOS?: boolean;
 }
 
-const Question = ({ submit }) => {
+type QuestionProps = {
+  question: APIQuestion,
+  submitAnswerAndProceed: (data:string) => void
+}
+
+const Question = ({ submitAnswerAndProceed, question }: QuestionProps) => {
   // keep track of which items have been checked
   const [checked, setChecked] = React.useState(false)
   const [checklist, setChecklist] = React.useState(false)
@@ -54,6 +60,7 @@ const Question = ({ submit }) => {
 
   // recorder/player
   const recorder = React.useRef(new AudioRecorderPlayer()).current
+  const [ready, setReady] = React.useState(false)
   // maintain a lock for the recorder so we only execute 1 function at time
   const [lock, setLock] = React.useState(false)
   // whether we started a recording
@@ -88,6 +95,7 @@ const Question = ({ submit }) => {
       });
       try {
         await RNFS.writeFile(fileList, listContent, 'utf8')
+        setReady(true)
       } catch (error) {
       }
     }
@@ -149,7 +157,6 @@ const Question = ({ submit }) => {
 
   // TODO error handling on all these
 
-  // TODO set metering enabled so we can use it for background animation
   const recordPressed = async () => {
     if (lock || recording) return
     setLock(true)
@@ -254,9 +261,9 @@ const Question = ({ submit }) => {
       }
       await stopRecorderAndConcat()
       setModalVisible(false)
-      await submit()
-//TODO UNCOMMENT THIS WHEN DONE CODING
-      //await deleteCurrentFile()
+      // convert file to base64 to pass it to the backend
+      await submitAnswerAndProceed(await RNFS.readFile(originalFile, 'base64'))
+      await deleteCurrentFile()
       // we dont even care about cleaning up the states because we're gonna move on from this screen
     }
     catch (e) {
@@ -296,11 +303,8 @@ const Question = ({ submit }) => {
 // see 2.3.2 iOS to see about enabling audio package on iOS
   // concat original file + additional file => original file
   const stopRecorderAndConcat = async () => {
-    console.log("stoping")
     await recorder.stopRecorder()
-    console.log("stopped")
     if (needsConcat) {
-      console.log("concatting")
       // concat
       const result = await RNFFmpeg.execute(`-f concat -safe 0 -i ${fileList} -c copy ${concatFile}`)
       console.log(`FFmpeg process exited with rc=${result}.`)
@@ -311,6 +315,16 @@ const Question = ({ submit }) => {
       setNeedsConcat(false)
     }
   }
+
+  if (!ready) return (
+    <View style={styles.whiteBackdrop}>
+      <LinearGradient
+        style={styles.container}
+        // alternatively rgba(255,0,138,0.25)
+        colors={['#FFADBB', 'rgba(255,181,38,0.25)']}
+      ></LinearGradient>
+      </View>
+  )
 
   return (
     <View style={styles.whiteBackdrop}>
@@ -341,7 +355,7 @@ const Question = ({ submit }) => {
         </View>
       </Modal>
         <Text style={styles.header}>
-          What does class warfare look like to you?
+          { question.text }
         </Text>
         <Shadow radius={175} style={{ marginTop: 30 }}>
           {Object.values(circles)}

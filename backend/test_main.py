@@ -4,6 +4,26 @@ from .main import app
 
 client = TestClient(app)
 
+### todo
+# mock out both databases
+# mock out both drives
+# (support test, dev, and prod version of both)
+# i think I can do this with fastapi's dependency injections?
+# - exactly here: https://fastapi.tiangolo.com/advanced/testing-database/
+# - - override for testing, but read from env for dev/prod
+# - - - or maybe itnroduce /prod and /dev path prefixes?
+# - - - - so, reuse micro, parameterized on db+drive
+# - consider using fastapi Settings object for env vars, drive, and base objects
+# - - https://fastapi.tiangolo.com/advanced/settings/
+# make code idempotent so creation of databases and drives is not an issue
+# oh, could even make the dependence on /Deta/ injectable. so can easily switch
+#  to a diff BaaS if I needed. just define the db and drive interfaces as dependencies
+#  - not sure if interface would be different from deta's default yet...  
+
+# happy path for each endpoint
+
+# enumerate edge caes for each end point, decide which oens to write tests for
+
 def test_get_question():
     response = client.get("/getQuestion")
     assert response.status_code == 200
@@ -16,12 +36,20 @@ def test_get_question():
         "description": "There goes my hero",
     }
 
-def test_no_questions_available():
-    # TODO mock client to temp erase it's question store
-    # (put question getting in a separate func?)
-    response = client.get("/getQuestion")
-    assert response.status_code == 500
-    #assert response.json() == "uh oh"
+# def test_no_questions_available():
+#     # TODO mock client to temp erase it's question store
+#     # (put question getting in a separate func?)
+#     response = client.get("/getQuestion")
+#     assert response.status_code == 500
+#    #assert response.json() == "uh oh"
+
+def test_submit_answer():
+    response = client.post("/submitAnswer",
+                           json={"audio_data": "test data",
+                                 "question_uuid": "test question"})
+    assert response.status_code == 200
+    # check the answer_uuid is a string of digits
+    #assert response.json 
 
 # submitAnswer
 # - happy path results in entry appearing in drive, and entry and db

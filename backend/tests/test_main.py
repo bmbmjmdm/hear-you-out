@@ -1,40 +1,47 @@
 from fastapi.testclient import TestClient
 
-from .main import app
+from ..main import app, get_db, get_drive
+
+def override_get_drives():
+    try:
+        questions_drive = Drive("TEST_questions")
+        answers_drive = Drive("TEST_answers")
+        yield {'questions': questions_drive,
+               'answers': answers_drive}
+    finally:
+        pass # don't need to close drive
+def override_get_dbs():
+    try:
+        questions_db = Base("TEST_questions")
+        answers_db = Base("TEST_answers")
+        yield {'questions': questions_db,
+               'answers': answers_db}
+    finally:
+        pass # don't need to close db
+
+
+app.dependency_overrides[get_dbs] = override_get_dbs
+app.dependency_overrides[get_drives] = override_get_drives
+
+db = override_get_dbs()
+drive = override_get_drives()
 
 client = TestClient(app)
 
-### todo
-# mock out both databases
-# mock out both drives
-# (support test, dev, and prod version of both)
-# i think I can do this with fastapi's dependency injections?
-# - exactly here: https://fastapi.tiangolo.com/advanced/testing-database/
-# - - override for testing, but read from env for dev/prod
-# - - - or maybe itnroduce /prod and /dev path prefixes?
-# - - - - so, reuse micro, parameterized on db+drive
-# - consider using fastapi Settings object for env vars, drive, and base objects
-# - - https://fastapi.tiangolo.com/advanced/settings/
-# make code idempotent so creation of databases and drives is not an issue
-# oh, could even make the dependence on /Deta/ injectable. so can easily switch
-#  to a diff BaaS if I needed. just define the db and drive interfaces as dependencies
-#  - not sure if interface would be different from deta's default yet...  
-
+### TODO
 # happy path for each endpoint
-
+# - need setup/teardown structure. need to learn pytest. fixtures i think
 # enumerate edge caes for each end point, decide which oens to write tests for
 
 def test_get_question():
+    # add a question to the drive (via file)
     response = client.get("/getQuestion")
     assert response.status_code == 200
     # assert structure of response
     # assert types (uuid, str, int)
     # don't think it's worth checking content of str and int?
-    assert response.json() == {
-        "id": "foo",
-        "title": "Foo",
-        "description": "There goes my hero",
-    }
+    # todo compare to class attribs?
+    # assert response.json().keys == model.QuestionModel
 
 # def test_no_questions_available():
 #     # TODO mock client to temp erase it's question store

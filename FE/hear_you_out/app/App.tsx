@@ -15,8 +15,13 @@ import Question from './Question'
 import Answer from './Answer'
 import PermissionsAndroid from 'react-native-permissions';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { APIAnswer, APIQuestion, getAnswer, getQuestion, submitAnswer } from './Network'
+import { APIAnswer, APIQuestion, getAnswer, getQuestion, rateAnswer, submitAnswer } from './Network'
 import AsyncStorage from '@react-native-async-storage/async-storage';
+
+type AnswerCard = {
+  id: string,
+  data: string
+}
 
 const App = () => {
   const [disableSwipes, setDisableSwipes] = React.useState(false)
@@ -81,6 +86,10 @@ const App = () => {
     setDisableSwipes(false)
   }
 
+  const rateAnswerAndAnimate = async (card: AnswerCard, rating: number) => {
+    await rateAnswer(card.id, rating)
+  }
+
   // TODO error handling
   // on initial load we need to pass through the recently loaded question because it may not have been set yet
   const loadStack = async (stack:number, loadedQuestion?:APIQuestion) => {
@@ -136,10 +145,22 @@ const App = () => {
               return <Question submitAnswerAndProceed={submitAnswerAndProceed} question={question} />
             }
             else {
-              return <Answer setDisableSwipes={setDisableSwipes} data={card.data} id={card.id} question={question} />
+              return <Answer setDisableSwipes={setDisableSwipes} data={card.data} id={card.id} question={question} onApprove={() => swiper1.current.swipeRight()} onDisapprove={() => swiper1.current.swipeLeft()} onPass={() => swiper1.current.swipeTop()} />
             }
           }}
-          onSwiped={(cardIndex) => {}}
+          onSwiped={() => {}}
+          onSwipedRight={(index) => {
+            if (cards1[index] !== "Question") rateAnswerAndAnimate(cards1[index], 1)
+          }}
+          onSwipedLeft={(index) => {
+            if (cards1[index] !== "Question") rateAnswerAndAnimate(cards1[index], -1)
+          }}
+          onSwipedTop={(index) => {
+            if (cards1[index] !== "Question") rateAnswerAndAnimate(cards1[index], 0)
+          }}
+          onSwipedBottom={(index) => {
+            if (cards1[index] !== "Question") return //TODO report answer
+          }}
           onSwipedAll={() => {
             toggleTopStack()
           }}
@@ -150,12 +171,12 @@ const App = () => {
           cardHorizontalMargin={0}
           stackSeparation={0}
           stackScale={0}
-          disableBottomSwipe={disableSwipes}
+          disableBottomSwipe={true}
           disableLeftSwipe={disableSwipes}
           disableRightSwipe={disableSwipes}
-          disableTopSwipe={disableSwipes}
+          disableTopSwipe={true}
           horizontalSwipe={!disableSwipes}
-          verticalSwipe={!disableSwipes}
+          verticalSwipe={false}
           onTapCardDeadZone={disableSwipes? Number.MAX_VALUE : 50}
           ref={swiper1}
           keyExtractor={(val) => {
@@ -180,10 +201,22 @@ const App = () => {
               return <Question submitAnswerAndProceed={submitAnswerAndProceed} question={question} />
             }
             else {
-              return <Answer setDisableSwipes={setDisableSwipes} data={card.data} id={card.id} question={question} />
+              return <Answer setDisableSwipes={setDisableSwipes} data={card.data} id={card.id} question={question} onApprove={() => swiper2.current.swipeRight()} onDisapprove={() => swiper2.current.swipeLeft()} onPass={() => swiper2.current.swipeTop()} />
             }
           }}
-          onSwiped={(cardIndex) => {}}
+          onSwiped={() => {}}
+          onSwipedRight={(index) => {
+            if (cards2[index] !== "Question") rateAnswerAndAnimate(cards2[index], 1)
+          }}
+          onSwipedLeft={(index) => {
+            if (cards2[index] !== "Question") rateAnswerAndAnimate(cards2[index], -1)
+          }}
+          onSwipedTop={(index) => {
+            if (cards2[index] !== "Question") rateAnswerAndAnimate(cards2[index], 0)
+          }}
+          onSwipedBottom={(index) => {
+            if (cards2[index] !== "Question") return //TODO report answer
+          }}
           onSwipedAll={() => {
             toggleTopStack()
           }}
@@ -194,12 +227,12 @@ const App = () => {
           cardHorizontalMargin={0}
           stackSeparation={0}
           stackScale={0}
-          disableBottomSwipe={disableSwipes}
+          disableBottomSwipe={true}
           disableLeftSwipe={disableSwipes}
           disableRightSwipe={disableSwipes}
-          disableTopSwipe={disableSwipes}
+          disableTopSwipe={true}
           horizontalSwipe={!disableSwipes}
-          verticalSwipe={!disableSwipes}
+          verticalSwipe={false}
           onTapCardDeadZone={disableSwipes? Number.MAX_VALUE : 50}
           ref={swiper2}
           keyExtractor={(val) => {

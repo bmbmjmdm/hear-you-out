@@ -27,10 +27,13 @@ type AnswerProps = {
   setDisableSwipes: (val: boolean) => void,
   id: string,
   data: string,
-  question: APIQuestion
+  question: APIQuestion,
+  onApprove: () => {},
+  onDisapprove: () => {},
+  onPass: () => {}
 }
 
-const Answer = ({setDisableSwipes, id, data, question}: AnswerProps) => {
+const Answer = ({setDisableSwipes, id, data, question, onDisapprove, onApprove, onPass}: AnswerProps) => {
   const [sliderValue, setSliderValue] = React.useState(0)
   const [length, setLength] = React.useState(0)
   const [playing, setPlaying] = React.useState(false)
@@ -228,7 +231,7 @@ const Answer = ({setDisableSwipes, id, data, question}: AnswerProps) => {
             <View style={{ width:270, height: 8, borderTopRightRadius: 99, borderBottomRightRadius: 99, backgroundColor: "#FFFFFF" }} />
           </View>
         }
-        <BottomButtons theme={"answer"} />
+        <BottomButtons theme={"answer"} xPressed={onDisapprove} checkPressed={onApprove} miscPressed={onPass} disabled={!started.current} />
       </LinearGradient>
     </View>
   );

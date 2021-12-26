@@ -12,7 +12,15 @@ import Skip from './Skip.png'
 import X from './X.png'
 import Check from './Check.png'
 
-const BottomButtons = ({theme, disabled, xPressed, miscPressed, checkPressed}) => {
+type BottomButtonsProps = {
+  theme: "answer" | "question",
+  xPressed: () => {},
+  miscPressed: () => {},
+  checkPressed: () => {},
+  disabled: boolean,
+}
+
+const BottomButtons = ({theme, disabled, xPressed, miscPressed, checkPressed}: BottomButtonsProps) => {
   return (
     <View style={styles.container}>
       <Button theme={theme} name={'x'} onPress={xPressed} disabled={disabled} />

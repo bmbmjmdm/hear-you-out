@@ -26,8 +26,9 @@ export type APIAnswerId = {
 }
 
 export const submitAnswer = async (answer: APIAnswer): Promise<APIAnswerId> => {
-  // overwrite previously rated answers since we're on a new question
+  // overwrite previously seen answers since we're on a new question
   await AsyncStorage.setItem("answerList", JSON.stringify([]))
+  tempAnswerList = []
   // submit answer
   const result = await fetch('https://hearyouout.deta.dev/submitAnswer', {
     method: 'POST',
@@ -44,20 +45,29 @@ export type APIOthersAnswer = {
   answer_uuid: string
 }
 
+// this temporary answer list is used to store answers loaded but not rated. When we fetch new answers, we need to check both lists
+let tempAnswerList = []
+
 export const getAnswer = async (questionId: string): Promise<APIOthersAnswer> => {
+  // construct our previously seen answer list from our permanant list and temporary one
+  let list: Array<string> = JSON.parse(await AsyncStorage.getItem("answerList"))
+  list = list.concat(tempAnswerList)
+  // fetch based on total list
   const result = await fetch(`https://hearyouout.deta.dev/getAnswer?question_uuid=${questionId}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
     },
-    // our answer list is already stringified
-    body: await AsyncStorage.getItem("answerList")
+    body: JSON.stringify(list)
   });
-  return await result.json()
+  // update temporary list of seen answers
+  const res = await result.json()
+  if (res.answer_uuid) tempAnswerList.push(res.answer_uuid)
+  return res
 }
 
-export const rateAnswer = async (answerId: string, rating: string): Promise<APIOthersAnswer> => {
-  // update our list of rated answers
+export const rateAnswer = async (answerId: string, rating: number): Promise<void> => {
+  // update our permanant list of seen answers
   const oldPreviouslyRatedAnswers =  JSON.parse(await AsyncStorage.getItem("answerList"))
   oldPreviouslyRatedAnswers.push(answerId)
   const newPreviouslyRatedAnswers = JSON.stringify(oldPreviouslyRatedAnswers)
@@ -71,5 +81,4 @@ export const rateAnswer = async (answerId: string, rating: string): Promise<APIO
     },
     body: newPreviouslyRatedAnswers
   });
-  return await result.json()
 }

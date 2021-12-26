@@ -71,11 +71,11 @@ const Answer = ({setDisableSwipes, id, data, question}: AnswerProps) => {
 
   // run this effect ONCE when this component mounts
   React.useEffect(() => {
-    // TODO unlink this after submitting rating
     RNFS.writeFile(filepath, data, 'base64').then(() => setReady(true))
     player.addPlayBackListener(playbackListener)
     // run this return function ONCE when the component unmounts
     return () => {
+      RNFS.unlink(filepath)
       player.removePlayBackListener()
     }
   }, [])

@@ -26,6 +26,9 @@ export type APIAnswerId = {
 }
 
 export const submitAnswer = async (answer: APIAnswer): Promise<APIAnswerId> => {
+  // overwrite previously rated answers since we're on a new question
+  await AsyncStorage.setItem("answerList", JSON.stringify([]))
+  // submit answer
   const result = await fetch('https://hearyouout.deta.dev/submitAnswer', {
     method: 'POST',
     headers: {
@@ -48,10 +51,25 @@ export const getAnswer = async (questionId: string): Promise<APIOthersAnswer> =>
       'Content-Type': 'application/json'
     },
     // our answer list is already stringified
-    body: await AsyncStorage.getItem("answerList") || JSON.stringify([])
+    body: await AsyncStorage.getItem("answerList")
   });
   return await result.json()
 }
 
-// TODO when you rate an answer, add it to our async storage list
-// TODO delete saved list at some point
+export const rateAnswer = async (answerId: string, rating: string): Promise<APIOthersAnswer> => {
+  // update our list of rated answers
+  const oldPreviouslyRatedAnswers =  JSON.parse(await AsyncStorage.getItem("answerList"))
+  oldPreviouslyRatedAnswers.push(answerId)
+  const newPreviouslyRatedAnswers = JSON.stringify(oldPreviouslyRatedAnswers)
+  await AsyncStorage.setItem("answerList", newPreviouslyRatedAnswers)
+  
+  // post rating
+  const result = await fetch(`https://hearyouout.deta.dev/rateAnswer?answer_uuid=${answerId}&agreement=${rating}`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json'
+    },
+    body: newPreviouslyRatedAnswers
+  });
+  return await result.json()
+}

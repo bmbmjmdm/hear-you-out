@@ -5,13 +5,14 @@ import datetime
 #import uuid # temp solution in place -> tODO try new deta purge
 
 from math import sqrt
-from typing import List, Optional
 from pydantic import BaseModel
+from functools import lru_cache
+from typing import List, Optional
 from random import uniform, choice
 from deta import Deta, Drive, Base
 from discord_webhook import DiscordWebhook
-from fastapi import FastAPI, HTTPException
 from fastapi.responses import  PlainTextResponse
+from fastapi import FastAPI, Depends, HTTPException
 
 try: # to accommodate deta
     from dotenv import load_dotenv
@@ -23,13 +24,15 @@ except:
 #from fastapi.responses import HTMLResponse, StreamingResponse
 
 ### TODO
-# - tests (see todo in test_main)
-# - - db+drive DI
-# - # improve api docs thusly: https://fastapi.tiangolo.com/tutorial/path-operation-configuration
 # - qetQuestion algo
 # - getAnswer algo
-# - all other todos in the source code and on jira
-
+# - tests (see todo in test_main)
+# - - db+drive DI
+# - all other todos in the source code and on jir
+# - consider using fastapi Settings object for env vars, drive, and base objects
+# - - https://fastapi.tiangolo.com/advanced/settings/
+# - - alt to dev/prod env flag, could and/or read it from path (eg as path prefix)
+# - # improve api docs thusly: https://fastapi.tiangolo.com/tutorial/path-operation-configuration
 
 # load local env if we're running locally
 if os.environ.get('DETA_RUNTIME') is None:
@@ -46,10 +49,27 @@ else:
     
 
 deta = Deta(Secret_key)
-answers_drive = Drive("hyo")
-questions_drive = Drive("questions")
-questions_db = Base('questions')
-answers_db = Base('answers')
+
+# these are dependencies injected into path functions
+# todo make more ergonomic in terms of DX
+# - can I do anything like https://fastapi.tiangolo.com/tutorial/sql-databases/
+# - since I use db and drive together almost always,
+#   maybe create a pydantic schema for them and use it as a single Dependency
+@lru_cache
+def get_drives():
+    questions_drive = Drive("questions")
+    answers_drive = Drive("hyo")
+    return {'questions': questions_drive,
+            'answers': answers_drive}
+@lru_cache
+def get_dbs():
+    questions_db = Base('questions')
+    answers_db = Base('answers')
+    return {'questions': questions_db,
+            'answers': answers_db}
+
+#questions_drive, answers_drive = get_drives()
+#questions_db, answers_db = get_dbs()
 
 class QuestionModel(BaseModel):
     key: str
@@ -77,7 +97,8 @@ class AnswerTableSchema(BaseModel):
     was_banned: bool = False
     num_agrees: int = 0
     num_disagrees: int = 0
-    num_listens: int = 0
+    num_abstains: int = 0
+    num_serves: int = 0
 
 # utility
 def gen_uuid(): # TODO
@@ -98,12 +119,12 @@ async def root():
     return {'hey': 'world'}
 
 @app.get("/getQuestion", response_model=QuestionModel)
-async def get_question():
+async def get_question(drive: dict = Depends(get_drives), db: dict = Depends(get_dbs)):
     # get today's question...how? from drive? from base? from internet endpoint? from file?/src
     # - think i want to go with base (need them anwyay). and can dev separate micro to insert Qs to it! or separate endpoint, with special auth?
     # - cron job to delete old files 30min after question change (if they are on a schedule)
 
-    question_list_stream = questions_drive.get('list of questions.yaml')
+    question_list_stream = drive['questions'].get('list of questions.yaml')
     if question_list_stream is None:
         return PlainTextResponse("what's a question, really?", status_code=500)
 
@@ -118,14 +139,16 @@ async def get_question():
     # TODO keep track of questions asked so far
     # - and how many responses they got?
     #q_tschema = QuestionTableSchema(q)
-    #questions_db.insert(q.dict())
-    #questions_db.update(key=q['key'],
-    #                    updates={"num_asks": answers_db.util.increment(1)})
+    #db['questions'].insert(q.dict())
+    #db['questions'].update(key=q['key'],
+    #                    updates={"num_asks": db['questions'].util.increment(1)})
 
     return {"text": q['text'], "key": q['key'], "category": q["category"]}
 
 @app.post("/submitAnswer")
-async def submit_answer(ans: AnswerSubmission):
+async def submit_answer(ans: AnswerSubmission,
+                        drive: dict = Depends(get_drives),
+                        db: dict = Depends(get_dbs)):
     answer_uuid = gen_uuid()
     question_uuid = ans.question_uuid
     data = ans.audio_data
@@ -135,7 +158,7 @@ async def submit_answer(ans: AnswerSubmission):
     
     # store audio in drive, then bookkeep in base
     try:
-        answers_drive.put(answer_uuid, data, content_type='application/octet-stream')
+        drive['answers'].put(answer_uuid, data, content_type='application/octet-stream')
     except Exception(e):
         print(f"~~~~~~~~~~~~~\n\n\n\n!!!!!!!!!!!!!!\n{e}") # i think visor will capture this in the logs?
         return PlainTextResponse("error storing answer in drive", status_code=500)
@@ -144,12 +167,11 @@ async def submit_answer(ans: AnswerSubmission):
 
     # bookkeep in base
     ts = str(datetime.datetime.now(datetime.timezone.utc))
-    print(ts)
     new_row = AnswerTableSchema(key=answer_uuid,
                                 question_uuid=question_uuid,
                                 entry_timestamp=ts)
-    answers_db.insert(new_row.dict())
-    print(new_row)
+    db['answers'].insert(new_row.dict())
+
     return {'answer_id': answer_uuid}
 
 # button meanings:
@@ -211,7 +233,7 @@ def filter_answers_from_db(items: List[AnswerTableSchema], question_uuid: str, s
         # negative is unpop, 0 is controv/unknown, positive is pop
         popularity = calculate_popularity(item.num_agrees,
                                           item.num_disagrees)
-                                          #item.num_listens)
+                                          #item.num_serves)
         
         if popularity < 0:
             if item.key in seen_answer_uuids:
@@ -236,13 +258,16 @@ def filter_answers_from_db(items: List[AnswerTableSchema], question_uuid: str, s
     return pop, unpop, contro, seen_pop, seen_unpop, seen_contro
         
 @app.post("/getAnswer", response_model=AnswerListen)
-async def get_answer(question_uuid: str, seen_answer_uuids: List[str]):
+async def get_answer(question_uuid: str,
+                     seen_answer_uuids: List[str],
+                     drive: dict = Depends(get_drives),
+                     db: dict = Depends(get_dbs)):
     # filter through all answers in DB once.
     # want all of them to get an equal random distribution.
     # not bothering writing a query for fetch cuz it feels btter to have all
     #   filter logic in the same place.
     # categorize into popular, controversial, unpopular during the single pass
-    res = answers_db.fetch()
+    res = db['answers'].fetch()
     #print(res, res.count)
     if res.count == 0:
         return PlainTextResponse("no answers found", status_code=500)
@@ -251,7 +276,7 @@ async def get_answer(question_uuid: str, seen_answer_uuids: List[str]):
     pop, unpop, contro, seen_pop, seen_unpop, seen_contro = filter_answers_from_db(answers_items, question_uuid, seen_answer_uuids)
     while res.last: # Todo when will this be too slow?
         # TODO ought to unit test this inner logic
-        res = answers_db.fetch(last=res.last)
+        res = db['answers'].fetch(last=res.last)
         pop2, unpop2, contro2, seen_pop2, seen_unpop2, seen_contro2 = filter_answers_from_db(answers_items, question_uuid, seen_answer_uuids)
         pop += pop2
         unpop += unpop2
@@ -293,25 +318,32 @@ async def get_answer(question_uuid: str, seen_answer_uuids: List[str]):
     
     # get the selected answer
     answer_uuid = a.key
-    audio_data = answers_drive.get(answer_uuid).read()
+    audio_data = drive['answers'].get(answer_uuid).read()
 
-    # update selected answer's num_listen
+    # increment selected answer's num_serves
     # could catch exception here, but i think it makes sense to just abort if this update fails
-    answers_db.update({"num_listens": answers_db.util.increment(1)}, answer_uuid)
+    db['answers'].update({"num_serves": db['answers'].util.increment(1)}, answer_uuid)
     
     return {"audio_data": audio_data,
             "answer_uuid": answer_uuid}
 
+# phone_id for potential future abuse mitigation
 @app.post("/flagAnswer")
-async def flag_answer(answer_uuid: str):
+async def flag_answer(answer_uuid: str,
+                      phone_id: str,
+                      drive: dict = Depends(get_drives),
+                      db: dict = Depends(get_dbs)):
     # check what value it is at. if at a threshold, flag it as needing moderation (won't be sent to users anymore), and ping us somehow
     # set threshold to 1 for now? so we minimized spread of badness. and scale up when it makes sense with number reports and num users
 
-    answers_db.update(key=answer_uuid,
-                      updates={'num_flags': answers_db.util.increment(1)})
+    # todo record phone_id, answer_uuid, and timestamp into a users/activity DB
+    # could shadowban abusers, eg
+    
+    db['answers'].update(key=answer_uuid,
+                      updates={'num_flags': db['answers'].util.increment(1)})
 
     # after noting the flag, if we have already explicitly approved this, then do nothing more
-    answer_row = answers_db.get(key=answer_uuid)
+    answer_row = db['answers'].get(key=answer_uuid)
     if answer_row['was_banned']:
         # todo maybe if it keeps getting flagged after we approved it, send a different message?
         return PlainTextResponse("answer flagged", status_code=200)# could potentially let user know; not sure if there is value
@@ -320,10 +352,11 @@ async def flag_answer(answer_uuid: str):
     if answer_row['num_flags'] >= 0: # 0 means the first time it has been flagged
         # we are banning it, so generate a security token for an unban magic link
         unban_token = secrets.token_urlsafe(32) # TODO two entries in DB with same token? need to seed?
-        answers_db.update(key=answer_uuid, updates={'is_banned': True, 'unban_token': unban_token})
+        db['answers'].update(key=answer_uuid, updates={'is_banned': True, 'unban_token': unban_token})
         webhook = DiscordWebhook(url=Discord_flag_url, username="Flag Bot",
                                  content=f"Click to unban this answer: https://hearyouout.deta.dev/unbanAnswer/{answer_uuid}/{unban_token}_")
-        audio_data_stream = answers_drive.get(answer_uuid)
+        audio_data_stream = drive['answers'].get(answer_uuid)
+        # todo b64 decode into...audio bytes?
         webhook.add_file(file=audio_data_stream.read(), filename=f"{answer_uuid}.mp4") # will this work?
         response = webhook.execute() # TODO error check
         
@@ -331,11 +364,13 @@ async def flag_answer(answer_uuid: str):
 
 # 32 byte tokens is prob enough to deter people from trying to brute force it?
 @app.get("/unbanAnswer/{answer_uuid}/{unban_token}")
-async def unban_answer(answer_uuid: str, unban_token: str):
+async def unban_answer(answer_uuid: str,
+                       unban_token: str,
+                       db: dict = Depends(get_dbs)):
     # using magic link sent to discord as auth
-    stored_token = answers_db.get(key=answer_uuid)['unban_token']
+    stored_token = db['answers'].get(key=answer_uuid)['unban_token']
     if unban_token == stored_token:
-        answers_db.update(key=answer_uuid,
+        db['answers'].update(key=answer_uuid,
                           updates={'is_banned': False,
                                    'was_banned': True}) # this means it can't get banned again
 
@@ -351,12 +386,24 @@ async def unban_answer(answer_uuid: str, unban_token: str):
 # can probably wait til after MVP...?
 # would be cool if the security nonce gen and lookup and be pre/post hooks for these path executions
 @app.post("/rateAnswer")
-async def rate_answer(answer_uuid: str, agreement: bool):
+async def rate_answer(answer_uuid: str,
+                      agreement: int,
+                      db: dict = Depends(get_dbs)):
     # TODO do i need to supply their current value if i'm not modifying them?
-    if agreement:
-        answers_db.update(key=answer_uuid,
-                          updates={"num_agrees": answers_db.util.increment(1)})
-    else:
-        answers_db.update(key=answer_uuid,
-                          updates={"num_disagrees": answers_db.util.increment(1)})
+    try:
+        if agreement > 0:
+            db['answers'].update(key=answer_uuid,
+                              updates={"num_agrees": db['answers'].util.increment(1)})
+        elif agreement < 0:
+            db['answers'].update(key=answer_uuid,
+                              updates={"num_disagrees": db['answers'].util.increment(1)})
+        elif agreement == 0:
+            db['answers'].update(key=answer_uuid,
+                              updates={"num_abstains": db['answers'].util.increment(1)})
+        else:
+            raise Exception("invariant violated")
+    except Exception as e:
+        #return PlainTextResponse("rating recorded", status_code=200)
+        return PlainTextResponse(f"error rating answer: {e}", status_code=500)        
+        
     return PlainTextResponse("rating recorded", status_code=200)

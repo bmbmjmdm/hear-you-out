@@ -30,7 +30,6 @@ except:
 # - getAnswer algo
 # - all other todos in the source code and on jira
 
-
 # load local env if we're running locally
 if os.environ.get('DETA_RUNTIME') is None:
     load_dotenv(override=True)
@@ -77,7 +76,8 @@ class AnswerTableSchema(BaseModel):
     was_banned: bool = False
     num_agrees: int = 0
     num_disagrees: int = 0
-    num_listens: int = 0
+    num_abstains: int = 0
+    num_serves: int = 0
 
 # utility
 def gen_uuid(): # TODO
@@ -211,7 +211,7 @@ def filter_answers_from_db(items: List[AnswerTableSchema], question_uuid: str, s
         # negative is unpop, 0 is controv/unknown, positive is pop
         popularity = calculate_popularity(item.num_agrees,
                                           item.num_disagrees)
-                                          #item.num_listens)
+                                          #item.num_serves)
         
         if popularity < 0:
             if item.key in seen_answer_uuids:
@@ -295,18 +295,22 @@ async def get_answer(question_uuid: str, seen_answer_uuids: List[str]):
     answer_uuid = a.key
     audio_data = answers_drive.get(answer_uuid).read()
 
-    # update selected answer's num_listen
+    # increment selected answer's num_serves
     # could catch exception here, but i think it makes sense to just abort if this update fails
-    answers_db.update({"num_listens": answers_db.util.increment(1)}, answer_uuid)
+    answers_db.update({"num_serves": answers_db.util.increment(1)}, answer_uuid)
     
     return {"audio_data": audio_data,
             "answer_uuid": answer_uuid}
 
+# phone_id for potential future abuse mitigation
 @app.post("/flagAnswer")
-async def flag_answer(answer_uuid: str):
+async def flag_answer(answer_uuid: str, phone_id: str):
     # check what value it is at. if at a threshold, flag it as needing moderation (won't be sent to users anymore), and ping us somehow
     # set threshold to 1 for now? so we minimized spread of badness. and scale up when it makes sense with number reports and num users
 
+    # todo record phone_id, answer_uuid, and timestamp into a users/activity DB
+    # could shadowban abusers, eg
+    
     answers_db.update(key=answer_uuid,
                       updates={'num_flags': answers_db.util.increment(1)})
 
@@ -324,6 +328,7 @@ async def flag_answer(answer_uuid: str):
         webhook = DiscordWebhook(url=Discord_flag_url, username="Flag Bot",
                                  content=f"Click to unban this answer: https://hearyouout.deta.dev/unbanAnswer/{answer_uuid}/{unban_token}_")
         audio_data_stream = answers_drive.get(answer_uuid)
+        # todo b64 decode into...audio bytes?
         webhook.add_file(file=audio_data_stream.read(), filename=f"{answer_uuid}.mp4") # will this work?
         response = webhook.execute() # TODO error check
         
@@ -351,12 +356,22 @@ async def unban_answer(answer_uuid: str, unban_token: str):
 # can probably wait til after MVP...?
 # would be cool if the security nonce gen and lookup and be pre/post hooks for these path executions
 @app.post("/rateAnswer")
-async def rate_answer(answer_uuid: str, agreement: bool):
+async def rate_answer(answer_uuid: str, agreement: int):
     # TODO do i need to supply their current value if i'm not modifying them?
-    if agreement:
-        answers_db.update(key=answer_uuid,
-                          updates={"num_agrees": answers_db.util.increment(1)})
-    else:
-        answers_db.update(key=answer_uuid,
-                          updates={"num_disagrees": answers_db.util.increment(1)})
+    try:
+        if agreement > 0:
+            answers_db.update(key=answer_uuid,
+                              updates={"num_agrees": answers_db.util.increment(1)})
+        elif agreement < 0:
+            answers_db.update(key=answer_uuid,
+                              updates={"num_disagrees": answers_db.util.increment(1)})
+        elif agreement == 0:
+            answers_db.update(key=answer_uuid,
+                              updates={"num_abstains": answers_db.util.increment(1)})
+        else:
+            raise Exception("invariant violated")
+    except Exception as e:
+        #return PlainTextResponse("rating recorded", status_code=200)
+        return PlainTextResponse(f"error rating answer: {e}", status_code=500)        
+        
     return PlainTextResponse("rating recorded", status_code=200)

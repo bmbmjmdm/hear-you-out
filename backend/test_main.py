@@ -73,5 +73,6 @@ def test_submit_answer():
 # - error answer not found
 
 # rateAnswer
-# - 2 happy paths, for each side of the bool
+# - 3 happy paths: abstain, disagree, agree
+# - error case of unknown answer_uuid
 # - answer not found error

@@ -1,12 +1,10 @@
 
 import React from 'react';
 import {
-  SafeAreaView,
   StyleSheet,
-  ScrollView,
-  View,
-  Text,
   Platform,
+  View,
+  ActivityIndicator,
 } from 'react-native';
 
 // https://www.npmjs.com/package/react-native-deck-swiper
@@ -15,7 +13,7 @@ import Question from './Question'
 import Answer from './Answer'
 import PermissionsAndroid from 'react-native-permissions';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { APIAnswer, APIQuestion, getAnswer, getQuestion, rateAnswer, submitAnswer } from './Network'
+import { APIQuestion, getAnswer, getQuestion, rateAnswer, submitAnswer, reportAnswer } from './Network'
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 type AnswerCard = {
@@ -33,6 +31,7 @@ const App = () => {
   const [question, setQuestion] = React.useState<APIQuestion>({})
 
   React.useEffect(() => {
+    // TODO error handling
     const asyncFun = async () => {
       // load last answered question
       const lastQ = await AsyncStorage.getItem("lastQuestionAnswered")
@@ -89,6 +88,10 @@ const App = () => {
     await rateAnswer(card.id, rating)
   }
 
+  const reportAnswerAndAnimate = async (card: AnswerCard) => {
+    await reportAnswer(card.id)
+  }
+
   // TODO error handling
   // on initial load we need to pass through the recently loaded question because it may not have been set yet
   const loadStack = async (stack:number, loadedQuestion?:APIQuestion) => {
@@ -134,6 +137,10 @@ const App = () => {
   // once the one on top runs out, the one below is shown and they swap jobs
   return (
     <SafeAreaProvider>
+      <View style={{elevation: -1, zIndex: -1, position: 'absolute', left: 0, top: 0, width: "100%", height: "100%", alignItems: 'center', justifyContent: 'center'}}>
+        {/* For now we dont set `animating` based on `loadStack`. If we need performance boost, maybe try that */}
+        <ActivityIndicator size="large" color="#A9C5F2" />
+      </View>
       {cards1.length ?
         <Swiper
           cards={cards1}
@@ -142,7 +149,7 @@ const App = () => {
               return <Question submitAnswerAndProceed={submitAnswerAndProceed} question={question} />
             }
             else {
-              return <Answer setDisableSwipes={setDisableSwipes} data={card.data} id={card.id} question={question} onApprove={() => swiper1.current.swipeRight()} onDisapprove={() => swiper1.current.swipeLeft()} onPass={() => swiper1.current.swipeTop()} />
+              return <Answer setDisableSwipes={setDisableSwipes} data={card.data} id={card.id} question={question} onApprove={() => swiper1.current.swipeRight()} onDisapprove={() => swiper1.current.swipeLeft()} onPass={() => swiper1.current.swipeTop()} onReport={() => swiper1.current.swipeBottom()} />
             }
           }}
           onSwiped={() => {}}
@@ -156,7 +163,7 @@ const App = () => {
             if (cards1[index] !== "Question") rateAnswerAndAnimate(cards1[index], 0)
           }}
           onSwipedBottom={(index) => {
-            if (cards1[index] !== "Question") return //TODO report answer
+            if (cards1[index] !== "Question") reportAnswerAndAnimate(cards1[index])
           }}
           onSwipedAll={() => {
             toggleTopStack()
@@ -198,7 +205,7 @@ const App = () => {
               return <Question submitAnswerAndProceed={submitAnswerAndProceed} question={question} />
             }
             else {
-              return <Answer setDisableSwipes={setDisableSwipes} data={card.data} id={card.id} question={question} onApprove={() => swiper2.current.swipeRight()} onDisapprove={() => swiper2.current.swipeLeft()} onPass={() => swiper2.current.swipeTop()} />
+              return <Answer setDisableSwipes={setDisableSwipes} data={card.data} id={card.id} question={question} onApprove={() => swiper2.current.swipeRight()} onDisapprove={() => swiper2.current.swipeLeft()} onPass={() => swiper2.current.swipeTop()} onReport={() => swiper2.current.swipeBottom()} />
             }
           }}
           onSwiped={() => {}}
@@ -212,7 +219,7 @@ const App = () => {
             if (cards2[index] !== "Question") rateAnswerAndAnimate(cards2[index], 0)
           }}
           onSwipedBottom={(index) => {
-            if (cards2[index] !== "Question") return //TODO report answer
+            if (cards2[index] !== "Question") reportAnswerAndAnimate(cards2[index])
           }}
           onSwipedAll={() => {
             toggleTopStack()

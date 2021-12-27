@@ -76,9 +76,13 @@ export const rateAnswer = async (answerId: string, rating: number): Promise<void
   // post rating
   const result = await fetch(`https://hearyouout.deta.dev/rateAnswer?answer_uuid=${answerId}&agreement=${rating}`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json'
-    },
-    body: newPreviouslyRatedAnswers
   });
 }
+
+export const reportAnswer = async (answerId: string): Promise<void> => {
+  const phoneId = "" // TODO decide if we want to send phoneId, which we can get from react-native-device-info
+  const result = await fetch(`https://hearyouout.deta.dev/flagAnswer?answer_uuid=${answerId}&phone_id=${phoneId}`, {
+    method: 'POST',
+  });
+}
+

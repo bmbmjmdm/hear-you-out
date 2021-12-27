@@ -30,10 +30,11 @@ type AnswerProps = {
   question: APIQuestion,
   onApprove: () => {},
   onDisapprove: () => {},
-  onPass: () => {}
+  onPass: () => {},
+  onReport: () => {}
 }
 
-const Answer = ({setDisableSwipes, id, data, question, onDisapprove, onApprove, onPass}: AnswerProps) => {
+const Answer = ({setDisableSwipes, id, data, question, onDisapprove, onApprove, onPass, onReport}: AnswerProps) => {
   const [sliderValue, setSliderValue] = React.useState(0)
   const [length, setLength] = React.useState(0)
   const [playing, setPlaying] = React.useState(false)
@@ -46,7 +47,7 @@ const Answer = ({setDisableSwipes, id, data, question, onDisapprove, onApprove, 
   // modal
   const [modalVisible, setModalVisible] = React.useState(false)
   const [modalText, setModalText] = React.useState("")
-  const [modalConfirm, setModalConfirm] = React.useState(() => {})
+  const [modalConfirm, setModalConfirm] = React.useState<() => void>(() => {})
 
   // initialize the player and setup callbacks
   const player = React.useRef(new AudioRecorderPlayer()).current
@@ -136,15 +137,16 @@ const Answer = ({setDisableSwipes, id, data, question, onDisapprove, onApprove, 
     }
   }
 
-  const reportAnswer = async () => {
+  const reportAnswer = () => {
     // user pressed first button, now they need to confirm
     setModalText("Report innapropriate answer?")
     setModalConfirm(() => confirmReportAnswer)
     setModalVisible(true)
   }
 
-  const confirmReportAnswer = async () => {
-    // TODO
+  const confirmReportAnswer = () => {
+    setModalVisible(false)
+    onReport()
   }
 
   if (!ready) return (

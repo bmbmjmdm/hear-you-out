@@ -40,6 +40,7 @@ const Answer = ({setDisableSwipes, id, data, question, onDisapprove, onApprove, 
   const disableUpdates = React.useRef(false)
   const lengthSetOnce = React.useRef(false)
   const started = React.useRef(false)
+  const startedPerm = React.useRef(false)
   const [ready, setReady] = React.useState(false)
 
   // modal
@@ -92,7 +93,10 @@ const Answer = ({setDisableSwipes, id, data, question, onDisapprove, onApprove, 
   }
   
   const onSlidingComplete = async (val) => {
-    setDisableSwipes(false)
+    if (startedPerm.current) {
+      // we already listened to some of the answer, and since we disabled swipes to slide, we need to re-enable them
+      setDisableSwipes(false)
+    }
     if (!started.current) { 
       // if the user finished the audio and wants to seek back, we have to "restart" it for them without them knowing
       started.current = true
@@ -111,6 +115,8 @@ const Answer = ({setDisableSwipes, id, data, question, onDisapprove, onApprove, 
     // we're not playing, start
     else {
       started.current = true
+      startedPerm.current = true
+      setDisableSwipes(false)
       await player.startPlayer(filepath)
     }
     setPlaying(!playing)
@@ -231,7 +237,7 @@ const Answer = ({setDisableSwipes, id, data, question, onDisapprove, onApprove, 
             <View style={{ width:270, height: 8, borderTopRightRadius: 99, borderBottomRightRadius: 99, backgroundColor: "#FFFFFF" }} />
           </View>
         }
-        <BottomButtons theme={"answer"} xPressed={onDisapprove} checkPressed={onApprove} miscPressed={onPass} disabled={!started.current} />
+        <BottomButtons theme={"answer"} xPressed={onDisapprove} checkPressed={onApprove} miscPressed={onPass} disabled={!startedPerm.current} />
       </LinearGradient>
     </View>
   );

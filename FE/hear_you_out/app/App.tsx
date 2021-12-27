@@ -24,7 +24,7 @@ type AnswerCard = {
 }
 
 const App = () => {
-  const [disableSwipes, setDisableSwipes] = React.useState(false)
+  const [disableSwipes, setDisableSwipes] = React.useState(true)
   const swiper1 = React.useRef(null)
   const swiper2 = React.useRef(null)
   const [cards1, setCards1] = React.useState([])
@@ -83,7 +83,6 @@ const App = () => {
     AsyncStorage.setItem("lastQuestionAnswered", JSON.stringify(question))
     if (topStack === 1) swiper1.current.swipeRight()
     else swiper2.current.swipeRight()
-    setDisableSwipes(false)
   }
 
   const rateAnswerAndAnimate = async (card: AnswerCard, rating: number) => {
@@ -96,10 +95,6 @@ const App = () => {
     // set up the next question if the user hasn't already answered it
     const newQ = await getQuestion()
     if (question.key !== newQ.key && loadedQuestion?.key !== newQ.key) {
-      if (!question.key) {
-        // this is initial load and we have a question to show, so disable swipes
-        setDisableSwipes(true)
-      }
       setQuestion(newQ)
       const cardSetterCallback = (realCards) => [...realCards, "Question"]
       if (stack === 1) setCards1(cardSetterCallback)
@@ -118,7 +113,9 @@ const App = () => {
   }
 
   // when toggling top stack, we clear the completed (top) stack, move the bottom stack on top, initiate a load for the empty stack, and set disabled if we're showing a question
+  // we also disable swipes because questions dont use them and answers need to unlock them 
   const toggleTopStack = () => {
+    setDisableSwipes(true)
     if (topStack === 1) {
       setTopStack(2)
       setCards1([])

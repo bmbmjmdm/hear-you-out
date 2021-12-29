@@ -22,6 +22,7 @@ import RNFS from 'react-native-fs'
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import RNShare from 'react-native-share'
 import { APIQuestion } from "./Network"
+import TutorialElement from './TutorialElement'
 
 type AnswerProps = {
   setDisableSwipes: (val: boolean) => void,
@@ -43,6 +44,8 @@ const Answer = ({setDisableSwipes, id, data, question, onDisapprove, onApprove, 
   const started = React.useRef(false)
   const startedPerm = React.useRef(false)
   const [ready, setReady] = React.useState(false)
+  const [currentTutorialElement, setCurrentTutorialElement] = React.useState("question")
+  const [isInTutorial, setIsInTutorial] = React.useState(true) //TODO set appropriately
 
   // modal
   const [modalVisible, setModalVisible] = React.useState(false)
@@ -149,12 +152,22 @@ const Answer = ({setDisableSwipes, id, data, question, onDisapprove, onApprove, 
     onReport()
   }
 
+  const progressTutorial = () => {
+    if (currentTutorialElement === 'question') setCurrentTutorialElement('play')
+    if (currentTutorialElement === 'play') setCurrentTutorialElement('flag')
+    if (currentTutorialElement === 'flag') setCurrentTutorialElement('share')
+    if (currentTutorialElement === 'share') setCurrentTutorialElement('check')
+    if (currentTutorialElement === 'check') setCurrentTutorialElement('x')
+    if (currentTutorialElement === 'x') setCurrentTutorialElement('misc')
+    if (currentTutorialElement === 'misc') setIsInTutorial(false) // TODO store
+  }
+
   if (!ready) return (
     <View style={styles.whiteBackdrop}>
       <LinearGradient
         style={styles.container}
         colors={['rgba(0,255,117,0.25)', 'rgba(0,74,217,0.25)']}
-      ></LinearGradient>
+      />
     </View>
   )
 
@@ -162,7 +175,7 @@ const Answer = ({setDisableSwipes, id, data, question, onDisapprove, onApprove, 
     <View style={styles.whiteBackdrop}>
       <LinearGradient
         style={styles.container}
-        colors={['rgba(0,255,117,0.25)', 'rgba(0,74,217,0.25)']}
+        colors={isInTutorial ? ['rgba(0,255,117,0.1)', 'rgba(0,74,217,0.1)'] : ['rgba(0,255,117,0.25)', 'rgba(0,74,217,0.25)']}
       >
         <Modal
           isVisible={modalVisible}
@@ -185,61 +198,122 @@ const Answer = ({setDisableSwipes, id, data, question, onDisapprove, onApprove, 
             </View>
           </View>
         </Modal>
-        <Text style={styles.header}>
-          { question.text }
-        </Text>
-        <Shadow radius={175} style={{ marginTop: 30 }}>
-          <TouchableOpacity
-            style={[styles.audioCircle, playing ? styles.yellowCircle : styles.whiteCircle]}
-            onPress={playPressed}
-            activeOpacity={1}
-          >
-            <Image
-              source={playing ? Pause : Play}
-              style={{ width: 85, marginLeft: playing ? 0 : 13 }}
-              resizeMode={'contain'}
-            />
-          </TouchableOpacity>
-        </Shadow>
+        
+        <TutorialElement
+          onPress={progressTutorial}
+          currentElement={currentTutorialElement}
+          id={"question"}
+          isInTutorial={isInTutorial}
+          calloutTheme={"answer"}
+          calloutText={"Now you'll see answers by other people. They'll be answering the same question you just did."}
+          calloutDistance={30}
+        >
+          <Text style={styles.header}>
+            { question.text }
+          </Text>
+        </TutorialElement>
+
+        <TutorialElement
+          onPress={progressTutorial}
+          currentElement={currentTutorialElement}
+          id={"play"}
+          isInTutorial={isInTutorial}
+          calloutTheme={"answer"}
+          calloutText={"Use these to play, pause, fast-forward, and rewind"}
+          calloutDistance={0}
+        >
+          <Shadow radius={175} style={{ marginTop: 30 }} disabled={isInTutorial && currentTutorialElement !== 'play'}>
+            <TouchableOpacity
+              style={[styles.audioCircle, playing ? styles.yellowCircle : styles.whiteCircle]}
+              onPress={playPressed}
+              activeOpacity={1}
+            >
+              <Image
+                source={playing ? Pause : Play}
+                style={{ width: 85, marginLeft: playing ? 0 : 13 }}
+                resizeMode={'contain'}
+              />
+            </TouchableOpacity>
+          </Shadow>
+        </TutorialElement>
+
         <View style={styles.miscButtons}>
-          <TouchableOpacity onPress={reportAnswer}>
-            <Image
-              source={Flag}
-              style={{ width: 35, marginRight: 20 }}
-              resizeMode={'contain'}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={shareAnswer}>
-            <Image
-              source={Share}
-              style={{ width: 35, marginLeft: 20 }}
-              resizeMode={'contain'}
-            />
-          </TouchableOpacity>
+          <TutorialElement
+            onPress={progressTutorial}
+            currentElement={currentTutorialElement}
+            id={"flag"}
+            isInTutorial={isInTutorial}
+            calloutTheme={"answer"}
+            calloutText={"If the answer does not address the question or the various bullet points you did before, flag it here"}
+            calloutDistance={-20}
+          >
+            <TouchableOpacity onPress={reportAnswer}>
+              <Image
+                source={Flag}
+                style={{ width: 35, marginRight: 20 }}
+                resizeMode={'contain'}
+              />
+            </TouchableOpacity>
+          </TutorialElement>
+          <TutorialElement
+            onPress={progressTutorial}
+            currentElement={currentTutorialElement}
+            id={"share"}
+            isInTutorial={isInTutorial}
+            calloutTheme={"answer"}
+            calloutText={"If you find this answer worth sharing, use this"}
+            calloutDistance={-20}
+          >
+            <TouchableOpacity onPress={shareAnswer}>
+              <Image
+                source={Share}
+                style={{ width: 35, marginLeft: 20 }}
+                resizeMode={'contain'}
+              />
+            </TouchableOpacity>
+          </TutorialElement>
         </View>
-        {length ? 
-          <Slider
-            style={{width: 300, height: 40}}
-            minimumValue={0}
-            maximumValue={length}
-            minimumTrackTintColor="#888888"
-            maximumTrackTintColor="#FFFFFF"
-            allowTouchTrack={true}
-            thumbTintColor="#000000"
-            value={sliderValue}
-            onSlidingComplete={onSlidingComplete}
-            onSlidingStart={onSlidingStart}
-            thumbStyle={{ height: 30, width: 30 }}
-            trackStyle={{ height: 8, borderRadius: 99 }}
-          />
-          :
-          // we cannot change the maximumValue of Slider once its rendered, so we render a fake slider until we know length
-          <View style={{ width: 300, height: 40, alignItems: "center", justifyContent: "center", flexDirection: "row" }}>
-            <View style={{ height: 30, width: 30, borderRadius: 999, backgroundColor:"#000000" }} />
-            <View style={{ width:270, height: 8, borderTopRightRadius: 99, borderBottomRightRadius: 99, backgroundColor: "#FFFFFF" }} />
-          </View>
-        }
-        <BottomButtons theme={"answer"} xPressed={onDisapprove} checkPressed={onApprove} miscPressed={onPass} disabled={!startedPerm.current} />
+
+        <TutorialElement
+          onPress={progressTutorial}
+          currentElement={currentTutorialElement}
+          id={"play"}
+          isInTutorial={isInTutorial}
+        >
+          {length ? 
+            <Slider
+              style={{width: 300, height: 40}}
+              minimumValue={0}
+              maximumValue={length}
+              minimumTrackTintColor="#888888"
+              maximumTrackTintColor="#FFFFFF"
+              allowTouchTrack={true}
+              thumbTintColor="#000000"
+              value={sliderValue}
+              onSlidingComplete={onSlidingComplete}
+              onSlidingStart={onSlidingStart}
+              thumbStyle={{ height: 30, width: 30 }}
+              trackStyle={{ height: 8, borderRadius: 99 }}
+            />
+            :
+            // we cannot change the maximumValue of Slider once its rendered, so we render a fake slider until we know length
+            <View style={{ width: 300, height: 40, alignItems: "center", justifyContent: "center", flexDirection: "row" }}>
+              <View style={{ height: 30, width: 30, borderRadius: 999, backgroundColor:"#000000" }} />
+              <View style={{ width:270, height: 8, borderTopRightRadius: 99, borderBottomRightRadius: 99, backgroundColor: "#FFFFFF" }} />
+            </View>
+          }
+        </TutorialElement>
+
+        <BottomButtons
+          theme={"answer"}
+          xPressed={onDisapprove}
+          checkPressed={onApprove}
+          miscPressed={onPass}
+          disabled={!startedPerm.current}
+          isInTutorial={isInTutorial}
+          currentTutorialElement={currentTutorialElement}
+          onTutorialPress={progressTutorial}
+        />
       </LinearGradient>
     </View>
   );
@@ -294,12 +368,19 @@ const styles = StyleSheet.create({
     alignItems: 'center'
   },
 
+  tooltipOuter: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    elevation: 1,
+    zIndex: 1
+  },
+
   modalText: {
     fontSize: 25,
     textAlign: 'center',
     backgroundColor: '#BFECE7',
     borderRadius: 20,
-    padding: 5,
+    padding: 10,
     paddingVertical: 15,
     borderColor: '#A9C5F2',
     borderWidth: 3,

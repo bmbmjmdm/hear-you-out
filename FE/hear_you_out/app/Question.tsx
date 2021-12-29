@@ -21,6 +21,8 @@ import RNFS from 'react-native-fs'
 import { RNFFmpeg } from 'react-native-ffmpeg';
 import uuid from 'react-native-uuid';
 import { APIQuestion } from "./Network"
+import TutorialElement from './TutorialElement'
+
 
 // for tutorial maybe
 // https://reactnativeelements.com/docs/tooltip/
@@ -52,6 +54,8 @@ const Question = ({ submitAnswerAndProceed, question }: QuestionProps) => {
   const [checked, setChecked] = React.useState(false)
   const [checklist, setChecklist] = React.useState(false)
   const [circles, setCircles] = React.useState({})
+  const [currentTutorialElement, setCurrentTutorialElement] = React.useState("question")
+  const [isInTutorial, setIsInTutorial] = React.useState(true) //TODO set appropriately
 
   // modal
   const [modalVisible, setModalVisible] = React.useState(false)
@@ -316,14 +320,23 @@ const Question = ({ submitAnswerAndProceed, question }: QuestionProps) => {
     }
   }
 
+  const progressTutorial = () => {
+    if (currentTutorialElement === 'question') setCurrentTutorialElement('record')
+    if (currentTutorialElement === 'record') setCurrentTutorialElement('checklist')
+    if (currentTutorialElement === 'checklist') setCurrentTutorialElement('misc')
+    if (currentTutorialElement === 'misc') setCurrentTutorialElement('x')
+    if (currentTutorialElement === 'x') setCurrentTutorialElement('check')
+    if (currentTutorialElement === 'check') setIsInTutorial(false) // TODO store
+  }
+
   if (!ready) return (
     <View style={styles.whiteBackdrop}>
       <LinearGradient
         style={styles.container}
         // alternatively rgba(255,0,138,0.25)
         colors={['#FFADBB', 'rgba(255,181,38,0.25)']}
-      ></LinearGradient>
-      </View>
+      />
+    </View>
   )
 
   return (
@@ -331,54 +344,91 @@ const Question = ({ submitAnswerAndProceed, question }: QuestionProps) => {
       <LinearGradient
         style={styles.container}
         // alternatively rgba(255,0,138,0.25)
-        colors={['#FFADBB', 'rgba(255,181,38,0.25)']}
+        colors={isInTutorial ? ['#FFADBB99', 'rgba(255,181,38,0.1)'] : ['#FFADBB', 'rgba(255,181,38,0.25)']}
       >
-      <Modal
-        isVisible={modalVisible}
-        onBackdropPress={() => setModalVisible(false)}
-        animationIn="fadeIn"
-        animationOut="fadeOut"
-        useNativeDriver={true}
-      >
-        <View style={styles.modalOuter}>
-          <View style={styles.modalInner}>
-            <Text style={styles.modalText}>{modalText}</Text>
-            <View style={styles.modalButtons}>
-              <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
-                <Text style={styles.buttonText}>No</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={styles.confirmButton} activeOpacity={0.3} onPress={modalConfirm}>
-                <Text style={styles.buttonText}>Yes</Text>
-              </TouchableOpacity>
+        <Modal
+          isVisible={modalVisible}
+          onBackdropPress={() => setModalVisible(false)}
+          animationIn="fadeIn"
+          animationOut="fadeOut"
+          useNativeDriver={true}
+        >
+          <View style={styles.modalOuter}>
+            <View style={styles.modalInner}>
+              <Text style={styles.modalText}>{modalText}</Text>
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
+                  <Text style={styles.buttonText}>No</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.confirmButton} activeOpacity={0.3} onPress={modalConfirm}>
+                  <Text style={styles.buttonText}>Yes</Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
-      </Modal>
-        <Text style={styles.header}>
-          { question.text }
-        </Text>
-        <Shadow radius={175} style={{ marginTop: 30 }}>
-          {Object.values(circles)}
-          <TouchableOpacity
-            style={[styles.audioCircle, started ? (recording ? styles.redCircle : styles.yellowCircle) : styles.whiteCircle]}
-            onPressIn={recordPressed}
-            onPressOut={recordReleased}
-            activeOpacity={1}
-          >
-            <Image
-              source={Mic}
-              style={{ width: 75 }}
-              resizeMode={'contain'}
-            />
-          </TouchableOpacity>
-        </Shadow>
-        <Checklist type={"test"} />
+        </Modal>
+        
+        <TutorialElement
+          onPress={progressTutorial}
+          currentElement={currentTutorialElement}
+          id={"question"}
+          isInTutorial={isInTutorial}
+          calloutTheme={"question"}
+          calloutText={"This is the current question. A new one comes out every few days. Answer it to the best of your ability!"}
+          calloutDistance={30}
+        >
+          <Text style={styles.header}>
+            { question.text }
+          </Text>
+        </TutorialElement>
+        
+        <TutorialElement
+          onPress={progressTutorial}
+          currentElement={currentTutorialElement}
+          id={"record"}
+          isInTutorial={isInTutorial}
+          calloutTheme={"question"}
+          calloutText={"This is the recorder. You need to hold it down in order to record, not just press it! If you're speaking loud enough, you should see it making color"}
+          calloutDistance={0}
+        >
+          <Shadow radius={175} style={{ marginTop: 30 }} disabled={isInTutorial && currentTutorialElement !== "record"}>
+            {Object.values(circles)}
+            <TouchableOpacity
+              style={[styles.audioCircle, started ? (recording ? styles.redCircle : styles.yellowCircle) : styles.whiteCircle]}
+              onPressIn={recordPressed}
+              onPressOut={recordReleased}
+              activeOpacity={1}
+            >
+              <Image
+                source={Mic}
+                style={{ width: 75 }}
+                resizeMode={'contain'}
+              />
+            </TouchableOpacity>
+          </Shadow>
+        </TutorialElement>
+        
+        <TutorialElement
+          onPress={progressTutorial}
+          currentElement={currentTutorialElement}
+          id={"checklist"}
+          isInTutorial={isInTutorial}
+          calloutTheme={"question"}
+          calloutText={"This is a checklist to make sure you answer the question thoroughly. Make sure all of them are addressed before submitting!"}
+          calloutDistance={-530}
+        >
+          <Checklist type={"test"} />
+        </TutorialElement>
+
         <BottomButtons
           theme={"question"}
           xPressed={restartRecording}
           checkPressed={submitRecording}
           miscPressed={hearRecording}
           disabled={!started}
+          isInTutorial={isInTutorial}
+          currentTutorialElement={currentTutorialElement}
+          onTutorialPress={progressTutorial}
         />
       </LinearGradient>
     </View>
@@ -438,7 +488,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     backgroundColor: 'rgb(255, 212, 198)',
     borderRadius: 20,
-    padding: 5,
+    padding: 10,
     paddingVertical: 15,
     borderColor: '#FFADBB',
     borderWidth: 3,

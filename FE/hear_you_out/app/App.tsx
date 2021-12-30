@@ -15,6 +15,7 @@ import PermissionsAndroid from 'react-native-permissions';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { APIQuestion, getAnswer, getQuestion, rateAnswer, submitAnswer, reportAnswer } from './Network'
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import NoAnswers from './NoAnswers'
 
 type AnswerCard = {
   id: string,
@@ -106,6 +107,7 @@ const App = () => {
     }
     // no new question, so instead set up a new answer for the user to hear
     const newA = await getAnswer(loadedQuestion?.key || question.key)
+    // TODO check if we actually got an answer. if we didn't, set the next card to be "None"
     const cardSetterCallback = (realCards) => [...realCards, {
       id: newA.answer_uuid,
       data: newA.audio_data
@@ -123,13 +125,11 @@ const App = () => {
       setTopStack(2)
       setCards1([])
       loadStack(1)
-      if (cards2[0] === "Question") setDisableSwipes(true)
     }
     else {
       setTopStack(1)
       setCards2([])
       loadStack(2)
-      if (cards1[0] === "Question") setDisableSwipes(true)
     }
   }
 
@@ -147,6 +147,9 @@ const App = () => {
           renderCard={(card) => {
             if (card === 'Question') {
               return <Question submitAnswerAndProceed={submitAnswerAndProceed} question={question} />
+            }
+            else if (card === 'None') {
+              return <NoAnswers />
             }
             else {
               return <Answer setDisableSwipes={setDisableSwipes} data={card.data} id={card.id} question={question} onApprove={() => swiper1.current.swipeRight()} onDisapprove={() => swiper1.current.swipeLeft()} onPass={() => swiper1.current.swipeTop()} onReport={() => swiper1.current.swipeBottom()} />
@@ -184,7 +187,7 @@ const App = () => {
           onTapCardDeadZone={disableSwipes? Number.MAX_VALUE : 50}
           ref={swiper1}
           keyExtractor={(val) => {
-            if (val === "Question") return val
+            if (val === "Question" || val === "None") return val
             else return val.id
           }}
           containerStyle={{
@@ -203,6 +206,9 @@ const App = () => {
           renderCard={(card) => {
             if (card === 'Question') {
               return <Question submitAnswerAndProceed={submitAnswerAndProceed} question={question} />
+            }
+            else if (card === 'None') {
+              return <NoAnswers />
             }
             else {
               return <Answer setDisableSwipes={setDisableSwipes} data={card.data} id={card.id} question={question} onApprove={() => swiper2.current.swipeRight()} onDisapprove={() => swiper2.current.swipeLeft()} onPass={() => swiper2.current.swipeTop()} onReport={() => swiper2.current.swipeBottom()} />
@@ -240,7 +246,7 @@ const App = () => {
           onTapCardDeadZone={disableSwipes? Number.MAX_VALUE : 50}
           ref={swiper2}
           keyExtractor={(val) => {
-            if (val === "Question") return val
+            if (val === "Question" || val === "None") return val
             else return val.id
           }}
           containerStyle={{

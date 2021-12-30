@@ -33,6 +33,8 @@ except:
 # - - https://fastapi.tiangolo.com/advanced/settings/
 # - - alt to dev/prod env flag, could and/or read it from path (eg as path prefix)
 # - # improve api docs thusly: https://fastapi.tiangolo.com/tutorial/path-operation-configuration
+# - which endpoints should have associated pydantic models? all of them? 
+# - new endpoint for returning agrees, disagrees, abstains for a given answer ID
 
 # load local env if we're running locally
 if os.environ.get('DETA_RUNTIME') is None:
@@ -100,6 +102,13 @@ class AnswerTableSchema(BaseModel):
     num_abstains: int = 0
     num_serves: int = 0
 
+class AnswerStats(BaseModel):
+    key: str # TODO uuid; # answer_uuid
+    num_agrees: int = 0
+    num_disagrees: int = 0
+    num_abstains: int = 0
+    num_serves: int = 0
+    
 # utility
 def gen_uuid(): # TODO
     good_enough = str(uniform(0, 100)) # from random
@@ -407,3 +416,9 @@ async def rate_answer(answer_uuid: str,
         return PlainTextResponse(f"error rating answer: {e}", status_code=500)        
         
     return PlainTextResponse("rating recorded", status_code=200)
+
+@app.get("/getAnswerStats", response_model=AnswerStats)
+async def get_answer_stats(answer_uuid: str,
+                           drive: dict = Depends(get_drives),
+                           db: dict = Depends(get_dbs)):
+    pass

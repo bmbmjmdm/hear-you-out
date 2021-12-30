@@ -83,3 +83,14 @@ def test_submit_answer():
 # - 3 happy paths: abstain, disagree, agree
 # - error case of unknown answer_uuid
 # - answer not found error
+
+# getAnswerStats
+# - query empty db -> get error
+# - submitAnswer
+# - verify 0 across the board
+# - get answer -> verify
+# - agree, dis, ab, dis, agree, dis -> 3, 2, 1
+# - - prob need to replace this when auth introduced.
+# - - - can just create func for the workflow loop instead
+
+

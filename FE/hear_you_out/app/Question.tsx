@@ -58,6 +58,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   const [circles, setCircles] = React.useState({})
   const [currentTutorialElement, setCurrentTutorialElement] = React.useState("question")
   const [isInTutorial, setIsInTutorial] = React.useState(!completedTutorial)
+  // TODO set disabled styles on everything when submitting?
   const [submitting, setSubmitting] = React.useState(false)
 
   // modal
@@ -65,11 +66,16 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   const [modalText, setModalText] = React.useState("")
   const [modalConfirm, setModalConfirm] = React.useState(() => {})
 
+  // timer
+  const [recordTime, setRecordTime] = React.useState(0)
+  const timing = React.useRef(false)
+  const interval = React.useRef(null)
+
   // recorder/player
   const recorder = React.useRef(new AudioRecorderPlayer()).current
   const [ready, setReady] = React.useState(false)
   // maintain a lock for the recorder so we only execute 1 function at time
-  const [lock, setLock] = React.useState(false)
+  const lock = React.useRef(false)
   // whether we started a recording
   const [started, setStarted] = React.useState(false)
   // whether we are currently recording
@@ -77,9 +83,9 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   // whether we are playing back what we've recorded so far
   const [playing, setPlaying] = React.useState(false)
   // each time we playback, we need to stop our recording, playback, and then start a new one when the user continues recording (we're not allowed to playback while paused)
-  const [needsNewFile, setNeedsNewFile] = React.useState(false)
+  const needsNewFile = React.useRef(false)
   // if we stop a recording that isnt the original file, concat it with the original file 
-  const [needsConcat, setNeedsConcat] = React.useState(false)
+  const needsConcat = React.useRef(false)
   const extention = Platform.OS === 'android' ? ".mp4" : ".m4a"
   const originalFile = RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention
   const additionalFile = RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordAdditional" + extention
@@ -89,6 +95,21 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   // run this effect ONCE when this component mounts
   React.useEffect(() => {
     const asyncFun = async () => {
+      // our timer is constantly running, we just turn it off and on based on recording/timing
+      interval.current = setInterval(() => {
+        if (timing.current) {
+          setRecordTime((prevTime) => {
+            if (prevTime >= 300) {
+              recordReleased(true)
+              setModalVisible(true)
+              setModalText("You have reached the max recording time")
+              setModalConfirm(null)
+            }
+            return prevTime + 1
+          })
+        }
+      }, 1000)
+
       // add a playback listener for recording animations
       recorder.setSubscriptionDuration(0.2)
       recorder.addRecordBackListener(({ currentMetering }) => {
@@ -107,7 +128,9 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       } catch (error) {
       }
     }
+    // call all the above + cleanup later
     asyncFun()
+    return () => clearInterval(interval.current)
   }, [])
 
   // while the user is recording, we make a cute animation behind the record button
@@ -166,22 +189,29 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   // TODO error handling on all these
 
   const recordPressed = async () => {
-    if (lock || recording) return
-    setLock(true)
+    if (lock.current || recording) return
+    if (recordTime >= 300) {
+      setModalVisible(true)
+      setModalText("You have reached the max recording time")
+      setModalConfirm(null)
+      return
+    }
+    lock.current = true
     try {
       // stop playing
       if (playing) {
         await recorder.stopPlayer()
         setPlaying(false)
       }
-      // set recording
+      // set recording & start timer
       setRecording(true)
+      timing.current = true
       // we've started already
       if (started) {
         // we've played back and need to start a new file to concat
-        if (needsNewFile) {
-          setNeedsNewFile(false)
-          setNeedsConcat(true)
+        if (needsNewFile.current) {
+          needsNewFile.current = false
+          needsConcat.current = true
           await recorder.startRecorder(additionalFile, audioSet, true)
         }
         // we can simply unpause
@@ -198,30 +228,31 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
     catch (e) {
       
     }
-    setLock(false)
+    lock.current = false
   }
 
-  const recordReleased = async () => {
-    if (lock) {
+  const recordReleased = async (force:boolean) => {
+    if (lock.current) {
       // if we ever wind up here, we dont want to miss the recordRelease event, so keep retrying
-      setTimeout(recordReleased, 50)
+      setTimeout(() => recordReleased(force), 50)
       return
     }
-    setLock(true)
+    lock.current = true
     try { 
-      if (recording) {
+      if (recording || force) {
         setRecording(false)
+        timing.current = false
         await recorder.pauseRecorder()
       }
     }
     catch (e) {
       
     }
-    setLock(false)
+    lock.current = false
   }
 
   const restartRecording = async () => {
-    if (lock || recording) return
+    if (lock.current || recording) return
     // user pressed first button, now they need to confirm
     setModalText("Delete recording and restart?")
     setModalConfirm(() => restartRecordingConfirmed)
@@ -229,14 +260,15 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   }
 
   const restartRecordingConfirmed = async () => {
-    if (lock || recording) return
-    setLock(true)
+    if (lock.current || recording) return
+    lock.current = true
     try {
       if (playing) {
         await recorder.stopPlayer()
         setPlaying(false)
       }
       setStarted(false)
+      setRecordTime(0)
       await stopRecorderAndConcat()
       
       // when we're ready to measure iOS file sizes
@@ -248,11 +280,11 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
     catch (e) {
 
     }
-    setLock(false)
+    lock.current = false
   }
 
   const submitRecording = async () => {
-    if (lock || recording) return
+    if (lock.current || recording) return
     // user pressed first button, now they need to confirm
     setModalText("Submit your answer?")
     setModalConfirm(() => submitRecordingConfirmed)
@@ -260,8 +292,8 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   }
 
   const submitRecordingConfirmed = async () => {
-    if (lock || recording) return
-    setLock(true)
+    if (lock.current || recording) return
+    lock.current = true
     try {
       setSubmitting(true)
       if (playing) {
@@ -281,21 +313,21 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   }
 
   const hearRecording = async () => {
-    if (lock || recording) return
-    setLock(true)
+    if (lock.current || recording) return
+    lock.current = true
     try {
       if (playing) {
         await recorder.stopPlayer()
       }
       setPlaying(true)
-      setNeedsNewFile(true)
+      needsNewFile.current = true
       await stopRecorderAndConcat()
       await recorder.startPlayer(originalFile)
     }
     catch (e) {
 
     }
-    setLock(false)
+    lock.current = false
   }
 
   const deleteCurrentFile = async () => {
@@ -313,7 +345,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   // concat original file + additional file => original file
   const stopRecorderAndConcat = async () => {
     await recorder.stopRecorder()
-    if (needsConcat) {
+    if (needsConcat.current) {
       // concat
       const result = await RNFFmpeg.execute(`-f concat -safe 0 -i ${fileList} -c copy ${concatFile}`)
       console.log(`FFmpeg process exited with rc=${result}.`)
@@ -321,7 +353,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       await RNFS.unlink(originalFile)
       await RNFS.unlink(additionalFile)
       await RNFS.moveFile(concatFile, originalFile)
-      setNeedsConcat(false)
+      needsConcat.current = false
     }
   }
 
@@ -337,6 +369,13 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   React.useEffect(() => {
     setIsInTutorial(!completedTutorial)
   }, [completedTutorial])
+
+  const getConvertedRecordTime = () => {
+    const minutes = Math.floor(recordTime / 60)
+    const seconds = recordTime % 60
+    const needsLeadingZero = seconds < 10
+    return `${minutes}:${needsLeadingZero ? '0' : ''}${seconds}`
+  }
 
   if (!ready) return (
     <View style={styles.whiteBackdrop}>
@@ -365,14 +404,22 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
           <View style={styles.modalOuter}>
             <View style={styles.modalInner}>
               <Text style={styles.modalText}>{modalText}</Text>
-              <View style={styles.modalButtons}>
-                <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
-                  <Text style={styles.buttonText}>No</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.confirmButton} activeOpacity={0.3} onPress={modalConfirm}>
-                  <Text style={styles.buttonText}>Yes</Text>
-                </TouchableOpacity>
-              </View>
+              {modalConfirm ? (
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
+                    <Text style={styles.buttonText}>No</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.confirmButton} activeOpacity={0.3} onPress={modalConfirm}>
+                    <Text style={styles.buttonText}>Yes</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.modalOneButton}>
+                  <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
+                    <Text style={styles.buttonText}>Ok</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           </View>
         </Modal>
@@ -397,8 +444,8 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
           id={"record"}
           isInTutorial={isInTutorial}
           calloutTheme={"question"}
-          calloutText={"This is the recorder. You need to hold it down in order to record, not just press it! If you're speaking loud enough, you should see it making color"}
-          calloutDistance={0}
+          calloutText={"This is the recorder. You need to hold it down in order to record, not just press it! You have a 5 minute time limit. If you're speaking loud enough, it'll make pretty colors"}
+          calloutDistance={33}
         >
           <Shadow radius={175} style={{ marginTop: 30 }} disabled={isInTutorial && currentTutorialElement !== "record"}>
             {Object.values(circles)}
@@ -415,6 +462,17 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
               />
             </TouchableOpacity>
           </Shadow>
+        </TutorialElement>
+        
+        <TutorialElement
+          onPress={progressTutorial}
+          currentElement={currentTutorialElement}
+          id={"record"}
+          isInTutorial={isInTutorial}
+        >
+          <Text style={styles.timer}>
+            { getConvertedRecordTime() } / 5:00
+          </Text>
         </TutorialElement>
         
         <TutorialElement
@@ -460,6 +518,13 @@ const styles = StyleSheet.create({
   header: {
     fontSize: 35,
     textAlign: 'center'
+  },
+
+  timer: {
+    fontSize: 20,
+    textAlign: 'center',
+    marginTop: -10,
+    marginBottom: 10
   },
 
   audioCircle: {
@@ -531,6 +596,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     flexDirection: 'row',
+    marginTop: 30
+  },
+  
+  modalOneButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 30
   }
 });

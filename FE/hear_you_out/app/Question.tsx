@@ -46,16 +46,18 @@ const audioSet = {
 
 type QuestionProps = {
   question: APIQuestion,
-  submitAnswerAndProceed: (data:string) => void
+  submitAnswerAndProceed: (data:string) => void,
+  completedTutorial: boolean,
+  onCompleteTutorial: () => void
 }
 
-const Question = ({ submitAnswerAndProceed, question }: QuestionProps) => {
+const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompleteTutorial }: QuestionProps) => {
   // keep track of which items have been checked
   const [checked, setChecked] = React.useState(false)
   const [checklist, setChecklist] = React.useState(false)
   const [circles, setCircles] = React.useState({})
   const [currentTutorialElement, setCurrentTutorialElement] = React.useState("question")
-  const [isInTutorial, setIsInTutorial] = React.useState(true) //TODO set appropriately
+  const [isInTutorial, setIsInTutorial] = React.useState(!completedTutorial)
 
   // modal
   const [modalVisible, setModalVisible] = React.useState(false)
@@ -326,8 +328,12 @@ const Question = ({ submitAnswerAndProceed, question }: QuestionProps) => {
     if (currentTutorialElement === 'checklist') setCurrentTutorialElement('misc')
     if (currentTutorialElement === 'misc') setCurrentTutorialElement('x')
     if (currentTutorialElement === 'x') setCurrentTutorialElement('check')
-    if (currentTutorialElement === 'check') setIsInTutorial(false) // TODO store
+    if (currentTutorialElement === 'check') onCompleteTutorial()
   }
+
+  React.useEffect(() => {
+    setIsInTutorial(!completedTutorial)
+  }, [completedTutorial])
 
   if (!ready) return (
     <View style={styles.whiteBackdrop}>

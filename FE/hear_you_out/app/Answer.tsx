@@ -32,10 +32,12 @@ type AnswerProps = {
   onApprove: () => {},
   onDisapprove: () => {},
   onPass: () => {},
-  onReport: () => {}
+  onReport: () => {},
+  completedTutorial: boolean,
+  onCompleteTutorial: () => void
 }
 
-const Answer = ({setDisableSwipes, id, data, question, onDisapprove, onApprove, onPass, onReport}: AnswerProps) => {
+const Answer = ({setDisableSwipes, id, data, question, onDisapprove, onApprove, onPass, onReport, completedTutorial, onCompleteTutorial}: AnswerProps) => {
   const [sliderValue, setSliderValue] = React.useState(0)
   const [length, setLength] = React.useState(0)
   const [playing, setPlaying] = React.useState(false)
@@ -45,7 +47,7 @@ const Answer = ({setDisableSwipes, id, data, question, onDisapprove, onApprove, 
   const startedPerm = React.useRef(false)
   const [ready, setReady] = React.useState(false)
   const [currentTutorialElement, setCurrentTutorialElement] = React.useState("question")
-  const [isInTutorial, setIsInTutorial] = React.useState(true) //TODO set appropriately
+  const [isInTutorial, setIsInTutorial] = React.useState(!completedTutorial)
 
   // modal
   const [modalVisible, setModalVisible] = React.useState(false)
@@ -159,8 +161,12 @@ const Answer = ({setDisableSwipes, id, data, question, onDisapprove, onApprove, 
     if (currentTutorialElement === 'share') setCurrentTutorialElement('check')
     if (currentTutorialElement === 'check') setCurrentTutorialElement('x')
     if (currentTutorialElement === 'x') setCurrentTutorialElement('misc')
-    if (currentTutorialElement === 'misc') setIsInTutorial(false) // TODO store
+    if (currentTutorialElement === 'misc') onCompleteTutorial()
   }
+
+  React.useEffect(() => {
+    setIsInTutorial(!completedTutorial)
+  }, [completedTutorial])
 
   if (!ready) return (
     <View style={styles.whiteBackdrop}>

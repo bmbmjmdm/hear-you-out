@@ -26,8 +26,6 @@ export type APIAnswerId = {
 }
 
 export const submitAnswer = async (answer: APIAnswer): Promise<APIAnswerId> => {
-  // overwrite previously seen answers since we're on a new question
-  await AsyncStorage.setItem("answerList", JSON.stringify([]))
   tempAnswerList = []
   // submit answer
   const result = await fetch('https://hearyouout.deta.dev/submitAnswer', {
@@ -37,7 +35,10 @@ export const submitAnswer = async (answer: APIAnswer): Promise<APIAnswerId> => {
     },
     body: JSON.stringify(answer)
   });
-  return await result.json()
+  const json = await result.json()
+  // overwrite previously seen answers since we're on a new question
+  await AsyncStorage.setItem("answerList", JSON.stringify([json.answer_id]))
+  return json
 }
 
 export type APIOthersAnswer = {
@@ -50,7 +51,7 @@ let tempAnswerList = []
 
 export const getAnswer = async (questionId: string): Promise<APIOthersAnswer> => {
   // construct our previously seen answer list from our permanant list and temporary one
-  let list: Array<string> = JSON.parse(await AsyncStorage.getItem("answerList"))
+  let list: Array<string> = JSON.parse(await AsyncStorage.getItem("answerList")) || []
   list = list.concat(tempAnswerList)
   // fetch based on total list
   const result = await fetch(`https://hearyouout.deta.dev/getAnswer?question_uuid=${questionId}`, {

@@ -4,7 +4,8 @@ import {
   StyleSheet,
   View,
   Image,
-  TouchableHighlight
+  TouchableHighlight,
+  ActivityIndicator
 } from 'react-native';
 import Shadow from './Shadow'
 import Speaker from './Speaker.png'
@@ -21,21 +22,22 @@ type BottomButtonsProps = {
   disabled: boolean,
   isInTutorial: boolean,
   currentTutorialElement: string,
-  onTutorialPress: () => void
+  onTutorialPress: () => void,
+  submitting?: boolean
 }
 
-const BottomButtons = ({theme, disabled, xPressed, miscPressed, checkPressed, isInTutorial, currentTutorialElement, onTutorialPress}: BottomButtonsProps) => {
+const BottomButtons = ({theme, disabled, xPressed, miscPressed, checkPressed, isInTutorial, currentTutorialElement, onTutorialPress, submitting}: BottomButtonsProps) => {
   return (
     <View style={styles.container}>
       <Button theme={theme} name={'x'} onPress={xPressed} disabled={disabled} isInTutorial={isInTutorial} currentTutorialElement={currentTutorialElement} onTutorialPress={onTutorialPress} />
       <Button theme={theme} name={'misc'} onPress={miscPressed} disabled={disabled} isInTutorial={isInTutorial} currentTutorialElement={currentTutorialElement} onTutorialPress={onTutorialPress} />
-      <Button theme={theme} name={'check'} onPress={checkPressed} disabled={disabled} isInTutorial={isInTutorial} currentTutorialElement={currentTutorialElement} onTutorialPress={onTutorialPress} />
+      <Button theme={theme} name={'check'} onPress={checkPressed} disabled={disabled} isInTutorial={isInTutorial} currentTutorialElement={currentTutorialElement} onTutorialPress={onTutorialPress} submitting={submitting} />
     </View>
   )
 };
 
 // TODO disabled styles
-const Button = ({name, theme, onPress, disabled, isInTutorial, currentTutorialElement, onTutorialPress}) => {
+const Button = ({name, theme, onPress, disabled, isInTutorial, currentTutorialElement, onTutorialPress, submitting = false}) => {
   const bgColor = theme == "question" ? "#FFADBB" : "#ABFFB8"
   const pressedColor = theme == "question" ? "#94636b" : "#598560"
   const [pressed, setPressed] = React.useState(false)
@@ -94,13 +96,17 @@ const Button = ({name, theme, onPress, disabled, isInTutorial, currentTutorialEl
           style={style}
           onPress={() => { if (!disabled) onPress() }}
         >
-          <Image
-            source={image}
-            style={{
-              width: imageSize,
-              height: imageSize
-            }}
-          />
+          {submitting ? 
+            <ActivityIndicator size="large" color="#111111" />
+            : 
+            <Image
+              source={image}
+              style={{
+                width: imageSize,
+                height: imageSize
+              }}
+            />
+          }
         </TouchableHighlight>
       </Shadow>
     </TutorialElement>

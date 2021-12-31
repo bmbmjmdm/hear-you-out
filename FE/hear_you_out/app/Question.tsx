@@ -58,6 +58,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   const [circles, setCircles] = React.useState({})
   const [currentTutorialElement, setCurrentTutorialElement] = React.useState("question")
   const [isInTutorial, setIsInTutorial] = React.useState(!completedTutorial)
+  const [submitting, setSubmitting] = React.useState(false)
 
   // modal
   const [modalVisible, setModalVisible] = React.useState(false)
@@ -84,6 +85,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   const additionalFile = RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordAdditional" + extention
   const concatFile = RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordConcated" + extention
   const fileList = RNFS.CachesDirectoryPath + '/' + "fileList.txt"
+
   // run this effect ONCE when this component mounts
   React.useEffect(() => {
     const asyncFun = async () => {
@@ -261,6 +263,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
     if (lock || recording) return
     setLock(true)
     try {
+      setSubmitting(true)
       if (playing) {
         await recorder.stopPlayer()
         setPlaying(false)
@@ -435,6 +438,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
           isInTutorial={isInTutorial}
           currentTutorialElement={currentTutorialElement}
           onTutorialPress={progressTutorial}
+          submitting={submitting}
         />
       </LinearGradient>
     </View>

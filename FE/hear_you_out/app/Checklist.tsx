@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useImperativeHandle, forwardRef } from 'react'
 import {
   StyleSheet,
   ScrollView,
@@ -8,18 +8,55 @@ import {
 } from 'react-native';
 import CheckBox from '@react-native-community/checkbox';
 
-const Checklist = ({type}) => {
+const Checklist = ({type}:{type:string}, ref) => {
+  const allRefs = React.useRef({}).current
+  const itemList = checklist_map[type]
+  const itemComponents = []
+
+  // expose a function that goes through all items in the checklist to see if theyre all checked
+  useImperativeHandle(ref, () => ({
+    areAllChecked: () => {
+      for (const i in allRefs) {
+        if (!allRefs[i].isChecked()) return false
+      }
+      return true
+    }
+  }))
+  
+  // construct our checklist items from our known checklist map + type
+  for (const i in itemList) {
+    itemComponents.push(
+      <CheckItemWithRef text={itemList[i]} key={i} ref={curRef => allRefs[i] = curRef} />
+    )
+  }
+
   return (
-    <View style={styles.checkList}>
-      <CheckItem text={"This is a test asd asd jasd asdas,d aljksdjksdfsdffs s sd sd "} />
-      <CheckItem text={"This is a test asd asd jasd asdas,d aljksdjksdfsdffs s sd sd "} />
-      <CheckItem text={"This is a test asd asd jasd asdas,d aljksdjksdfsdffs s sd sd "} />
-    </View>
+    <ScrollView style={styles.checkList}>
+      { itemComponents }
+    </ScrollView>
   )
 };
 
-const CheckItem = ({text}) => {
+// backend tells us the type, we know the checklist items based on this type
+const checklist_map = {
+  political: [
+    "Answer the question",
+    "Provide supporting arguments and facts. Cite specific sources if possible (ex: name of website/newspaper)",
+    "Give your understanding of the Opposing argument(s) and why you think they're wrong"
+  ],
+  other: [
+    "Answer the question",
+  ],
+}
+
+// a single item with a check and text
+const CheckItem = ({text}, ref) => {
   const [val, setVal] = React.useState(false)
+  
+  // expose our checked value to the parent
+  useImperativeHandle(ref, () => ({
+    isChecked: () => val
+  }))
 
   return (
     <View style={styles.checkItem}>
@@ -40,12 +77,12 @@ const CheckItem = ({text}) => {
     </View>
   )
 }
-// make text clickable for box too
+
+const CheckItemWithRef = forwardRef(CheckItem)
 
 
 const styles = StyleSheet.create({
   checkList: {
-    marginRight: 20,
     height: 300
   },
   checkItem: {
@@ -56,8 +93,9 @@ const styles = StyleSheet.create({
   text: {
     fontSize: 20,
     marginLeft: 10,
-    maxWidth: 250
+    marginBottom: 3,
+    maxWidth: 300
   }
 });
 
-export default Checklist;
+export default forwardRef(Checklist)

@@ -52,9 +52,7 @@ type QuestionProps = {
 }
 
 const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompleteTutorial }: QuestionProps) => {
-  // keep track of which items have been checked
-  const [checked, setChecked] = React.useState(false)
-  const [checklist, setChecklist] = React.useState(false)
+  const checklist = React.useRef()
   const [circles, setCircles] = React.useState({})
   const [currentTutorialElement, setCurrentTutorialElement] = React.useState("question")
   const [isInTutorial, setIsInTutorial] = React.useState(!completedTutorial)
@@ -285,6 +283,13 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
 
   const submitRecording = async () => {
     if (lock.current || recording) return
+    // validate checklist
+    if (!checklist?.current?.areAllChecked()) {
+      setModalText("Please make sure you addressed all points in the checklist before submitting")
+      setModalConfirm(null)
+      setModalVisible(true)
+      return
+    }
     // user pressed first button, now they need to confirm
     setModalText("Submit your answer?")
     setModalConfirm(() => submitRecordingConfirmed)
@@ -484,7 +489,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
           calloutText={"This is a checklist to make sure you answer the question thoroughly. Make sure all of them are addressed before submitting!"}
           calloutDistance={-530}
         >
-          <Checklist type={"test"} />
+          <Checklist type={question.category} ref={checklist} />
         </TutorialElement>
 
         <BottomButtons

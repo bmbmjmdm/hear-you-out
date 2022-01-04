@@ -1,6 +1,7 @@
+from deta import Drive, Base
 from fastapi.testclient import TestClient
 
-from ..main import app, get_db, get_drive
+from ..main import app, get_dbs, get_drives
 
 def override_get_drives():
     try:
@@ -36,6 +37,7 @@ client = TestClient(app)
 def test_get_question():
     # add a question to the drive (via file)
     response = client.get("/getQuestion")
+    print(response)
     assert response.status_code == 200
     # assert structure of response
     # assert types (uuid, str, int)
@@ -92,5 +94,5 @@ def test_submit_answer():
 # - agree, dis, ab, dis, agree, dis -> 3, 2, 1
 # - - prob need to replace this when auth introduced.
 # - - - can just create func for the workflow loop instead
-
-
+def test_get_answer_stats():
+    pass

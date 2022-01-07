@@ -4,40 +4,19 @@ import {
   StyleSheet,
   Image,
   Text,
-  AppState
 } from 'react-native';
 
 import cat from './cat.png'
 import LinearGradient from 'react-native-linear-gradient';
 
 type NoAnswersProps = {
-  reloadStacks: () => void,
   setDisableSwipes: (toDisable: boolean) => void
 }
 
-const NoAnswers = ({reloadStacks, setDisableSwipes}: NoAnswersProps) => {
-  const appState = React.useRef(AppState.currentState);
-
+const NoAnswers = ({setDisableSwipes}: NoAnswersProps) => {
   React.useEffect(() => {
     setDisableSwipes(false)
-    const subscription = AppState.addEventListener("change", nextAppState => {
-      if (
-        appState.current.match(/inactive|background/) &&
-        nextAppState === "active"
-      ) {
-        // app has come to foreground
-        reloadStacks()
-      }
-
-      appState.current = nextAppState;
-    });
-
-    return () => {
-      subscription?.remove?.();
-    };
-  }, []);
-
-
+  }, [])
   return (
     <LinearGradient
       style={styles.container}

@@ -5,6 +5,7 @@ import {
   Platform,
   View,
   ActivityIndicator,
+  AppState,
 } from 'react-native';
 
 // https://www.npmjs.com/package/react-native-deck-swiper
@@ -32,6 +33,8 @@ const App = () => {
   const [question, setQuestion] = React.useState<APIQuestion>({})
   const [completedQuestionTutorial, setCompletedQuestionTutorial ] = React.useState(false)
   const [completedAnswerTutorial, setCompletedAnswerTutorial ] = React.useState(false)
+  const appState = React.useRef(AppState.currentState);
+  const appStateListener = React.useRef(null);
 
   React.useEffect(() => {
     // TODO error handling
@@ -79,6 +82,51 @@ const App = () => {
     asyncFun()
   }, [])
 
+  // listen to when app is sent to background+foreground to reload stacks appropriately
+  React.useEffect(() => {
+    // clear the last one
+    appStateListener.current?.remove?.();
+    // setup reload when put in background
+    appStateListener.current = AppState.addEventListener("change", nextAppState => {
+      // check if app has come to foreground
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextAppState === "active"
+      ) {
+        // TODO test
+        // if the top stack is showing the "NoAnswers" card, reload both stacks
+        // if the top stack is showing an Answer card, try to reload a question on the bottom stack if a new one is available
+        // if the top stack is showing a Question card and we know a new one is availalble, reload both stacks
+        if (topStack === 1) {
+          if (cards1[0] === 'None') reloadStacks()
+          else if (cards1[0] !== "Question") loadStack(2, null, true)
+          else {
+            const asyncFun = async () => {
+              if (await hasNewQuestion()) reloadStacks()
+            }
+            asyncFun()
+          }
+        }
+        else {
+          if (cards2[0] === 'None') reloadStacks()
+          else if (cards2[0] !== "Question") loadStack(1, null, true)
+          else {
+            const asyncFun = async () => {
+              if (await hasNewQuestion()) reloadStacks()
+            }
+            asyncFun()
+          }
+        }
+      }
+      appState.current = nextAppState;
+    });
+    // cleanup on unmount
+    return () => {
+      appStateListener.current?.remove?.();
+    };
+  // we need to keep these variables updated
+  }, [topStack, cards1, cards2, question])
+
   const submitAnswerAndProceed = async (data:string) => {
     // see recorder docs regarding rn-fetch-blob if you have trouble uploading file
     const result = await submitAnswer({
@@ -101,10 +149,14 @@ const App = () => {
 
   // TODO error handling
   // on initial load we need to pass through the recently loaded question because it may not have been set yet
-  const loadStack = async (stack:number, loadedQuestion?:APIQuestion) => {
+  // on subsequent full-app reloads we need to pass through a "previousQuestionForced" to get around react not updating
+  // the question state variable yet
+  // lastly "justQuestions" tells loadStack to only load questions, and not worry about answers
+  const loadStack = async (stack:number, loadedQuestion?:APIQuestion, justQuestions?: boolean, previousQuestionForced?: APIQuestion) => {
     // set up the next question if the user hasn't already answered it
     const newQ = await getQuestion()
-    if (question.key !== newQ.key && loadedQuestion?.key !== newQ.key) {
+    const curQuestion = previousQuestionForced || question
+    if (curQuestion.key !== newQ.key && loadedQuestion?.key !== newQ.key) {
       setQuestion(newQ)
       // we completely override the card stack since we only allow 1 card per stack right now
       const cardSetterCallback = (oldCards) => ["Question"]
@@ -112,8 +164,9 @@ const App = () => {
       else setCards2(cardSetterCallback)
       return newQ
     }
+    if (justQuestions) return
     // no new question, so instead set up a new answer for the user to hear
-    const newA = await getAnswer(loadedQuestion?.key || question.key)
+    const newA = await getAnswer(loadedQuestion?.key || curQuestion.key)
     // TODO check if we actually got an answer. if we didn't, set the next card to be "None"
     // we completely override the card stack since we only allow 1 card per stack right now
     const cardSetterCallback = (oldCards) => [{
@@ -123,6 +176,12 @@ const App = () => {
     if (stack === 1) setCards1(cardSetterCallback)
     else setCards2(cardSetterCallback)
     return loadedQuestion
+  }
+
+  // TODO error handling
+  const hasNewQuestion = async () => {
+    const newQ = await getQuestion()
+    return question.key !== newQ.key
   }
 
   // when toggling top stack, we clear the completed (top) stack, move the bottom stack on top, initiate a load for the empty stack, and disable swipes because questions dont use them and answers need to unlock them
@@ -148,11 +207,17 @@ const App = () => {
     }
   }
 
-  // clears both stacks and loads them similar to how the app loads when its first opened
-  const reloadStacks = () => {
+  // clears both stacks + question and loads them just like how the app loads when its first opened
+  const reloadStacks = async () => {
     setCards1([])
     setCards2([])
-    loadStack(1).then((questionPassthrough) => loadStack(2, questionPassthrough))
+    const lastQ = await AsyncStorage.getItem("lastQuestionAnswered")
+    let lastQParsed
+    if (lastQ) {
+      lastQParsed = JSON.parse(lastQ)
+      setQuestion(lastQParsed)
+    }
+    loadStack(1, lastQParsed, false, {}).then((questionPassthrough) => loadStack(2, questionPassthrough, false, {}))
   }
 
   const onCompleteQuestionTutorial = () => {
@@ -181,7 +246,7 @@ const App = () => {
               return <Question submitAnswerAndProceed={submitAnswerAndProceed} question={question} completedTutorial={completedQuestionTutorial} onCompleteTutorial={onCompleteQuestionTutorial} />
             }
             else if (card === 'None') {
-              return <NoAnswers reloadStacks={reloadStacks} setDisableSwipes={setDisableSwipes} />
+              return <NoAnswers setDisableSwipes={setDisableSwipes} />
             }
             else {
               return <Answer setDisableSwipes={setDisableSwipes} data={card.data} id={card.id} question={question} completedTutorial={completedAnswerTutorial} onCompleteTutorial={onCompleteAnswerTutorial} onApprove={() => swiper1.current.swipeRight()} onDisapprove={() => swiper1.current.swipeLeft()} onPass={() => swiper1.current.swipeTop()} onReport={() => swiper1.current.swipeBottom()} />
@@ -241,7 +306,7 @@ const App = () => {
               return <Question submitAnswerAndProceed={submitAnswerAndProceed} question={question} completedTutorial={completedQuestionTutorial} onCompleteTutorial={onCompleteQuestionTutorial} />
             }
             else if (card === 'None') {
-              return <NoAnswers reloadStacks={reloadStacks} setDisableSwipes={setDisableSwipes} />
+              return <NoAnswers setDisableSwipes={setDisableSwipes} />
             }
             else {
               return <Answer setDisableSwipes={setDisableSwipes} data={card.data} id={card.id} question={question} completedTutorial={completedAnswerTutorial} onCompleteTutorial={onCompleteAnswerTutorial} onApprove={() => swiper2.current.swipeRight()} onDisapprove={() => swiper2.current.swipeLeft()} onPass={() => swiper2.current.swipeTop()} onReport={() => swiper2.current.swipeBottom()} />

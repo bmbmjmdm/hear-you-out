@@ -17,6 +17,7 @@ const NoAnswers = ({setDisableSwipes}: NoAnswersProps) => {
   React.useEffect(() => {
     setDisableSwipes(false)
   }, [])
+  
   return (
     <LinearGradient
       style={styles.container}

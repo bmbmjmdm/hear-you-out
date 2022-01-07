@@ -85,21 +85,19 @@ const App = () => {
   // listen to when app is sent to background+foreground to reload stacks appropriately
   React.useEffect(() => {
     // clear the last one
-    appStateListener.current?.remove?.();
+    AppState.removeEventListener("change", appStateListener.current)
     // setup reload when put in background
-    appStateListener.current = AppState.addEventListener("change", nextAppState => {
+    appStateListener.current = nextAppState => {
       // check if app has come to foreground
       if (
         appState.current.match(/inactive|background/) &&
         nextAppState === "active"
       ) {
-        // TODO test
+        // TODO error handle?
         // if the top stack is showing the "NoAnswers" card, reload both stacks
-        // if the top stack is showing an Answer card, try to reload a question on the bottom stack if a new one is available
-        // if the top stack is showing a Question card and we know a new one is availalble, reload both stacks
+        // if the top stack is showing a Question or Answer card and we know a new Question is availalble, reload both stacks
         if (topStack === 1) {
           if (cards1[0] === 'None') reloadStacks()
-          else if (cards1[0] !== "Question") loadStack(2, null, true)
           else {
             const asyncFun = async () => {
               if (await hasNewQuestion()) reloadStacks()
@@ -109,7 +107,6 @@ const App = () => {
         }
         else {
           if (cards2[0] === 'None') reloadStacks()
-          else if (cards2[0] !== "Question") loadStack(1, null, true)
           else {
             const asyncFun = async () => {
               if (await hasNewQuestion()) reloadStacks()
@@ -119,10 +116,11 @@ const App = () => {
         }
       }
       appState.current = nextAppState;
-    });
+    };
+    AppState.addEventListener("change", appStateListener.current)
     // cleanup on unmount
     return () => {
-      appStateListener.current?.remove?.();
+      AppState.removeEventListener("change", appStateListener.current)
     };
   // we need to keep these variables updated
   }, [topStack, cards1, cards2, question])
@@ -151,8 +149,7 @@ const App = () => {
   // on initial load we need to pass through the recently loaded question because it may not have been set yet
   // on subsequent full-app reloads we need to pass through a "previousQuestionForced" to get around react not updating
   // the question state variable yet
-  // lastly "justQuestions" tells loadStack to only load questions, and not worry about answers
-  const loadStack = async (stack:number, loadedQuestion?:APIQuestion, justQuestions?: boolean, previousQuestionForced?: APIQuestion) => {
+  const loadStack = async (stack:number, loadedQuestion?:APIQuestion, previousQuestionForced?: APIQuestion) => {
     // set up the next question if the user hasn't already answered it
     const newQ = await getQuestion()
     const curQuestion = previousQuestionForced || question
@@ -164,7 +161,6 @@ const App = () => {
       else setCards2(cardSetterCallback)
       return newQ
     }
-    if (justQuestions) return
     // no new question, so instead set up a new answer for the user to hear
     const newA = await getAnswer(loadedQuestion?.key || curQuestion.key)
     // TODO check if we actually got an answer. if we didn't, set the next card to be "None"
@@ -211,13 +207,14 @@ const App = () => {
   const reloadStacks = async () => {
     setCards1([])
     setCards2([])
+    setTopStack(1)
     const lastQ = await AsyncStorage.getItem("lastQuestionAnswered")
     let lastQParsed
     if (lastQ) {
       lastQParsed = JSON.parse(lastQ)
       setQuestion(lastQParsed)
     }
-    loadStack(1, lastQParsed, false, {}).then((questionPassthrough) => loadStack(2, questionPassthrough, false, {}))
+    loadStack(1, lastQParsed, {}).then((questionPassthrough) => loadStack(2, questionPassthrough, {}))
   }
 
   const onCompleteQuestionTutorial = () => {

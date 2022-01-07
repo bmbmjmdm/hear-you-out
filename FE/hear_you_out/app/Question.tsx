@@ -128,7 +128,10 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
     }
     // call all the above + cleanup later
     asyncFun()
-    return () => clearInterval(interval.current)
+    return () => {
+      clearInterval(interval.current)
+      deleteCurrentFile()
+    }
   }, [])
 
   // while the user is recording, we make a cute animation behind the record button

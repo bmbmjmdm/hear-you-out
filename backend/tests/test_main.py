@@ -1,7 +1,7 @@
 from deta import Drive, Base
 from fastapi.testclient import TestClient
 
-from ..main import app, get_dbs, get_drives
+from ..main import app, get_dbs, get_drives, touch_backend
 
 def override_get_drives():
     try:
@@ -37,7 +37,7 @@ client = TestClient(app)
 def test_get_question():
     # add a question to the drive (via file)
     response = client.get("/getQuestion")
-    print(response)
+    print(response.json())
     assert response.status_code == 200
     # assert structure of response
     # assert types (uuid, str, int)

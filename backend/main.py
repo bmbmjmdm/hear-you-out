@@ -115,6 +115,10 @@ def gen_uuid(): # TODO
     good_enough = good_enough.replace(".","") # remove the dot
     return f"{good_enough}"
 
+# do something with each db and drive so it's accessible from deta dashboard gui
+def touch_backend(dbs, drives):
+    pass
+
 # handle all exceptions thrown in code below with a 500 http response
 # todo test what happens when this isn't here
 @app.exception_handler(Exception)

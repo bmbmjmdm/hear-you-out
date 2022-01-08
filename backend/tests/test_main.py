@@ -92,5 +92,5 @@ def test_submit_answer():
 # - agree, dis, ab, dis, agree, dis -> 3, 2, 1
 # - - prob need to replace this when auth introduced.
 # - - - can just create func for the workflow loop instead
-
+# - test that num_Serves equals sum of others
 

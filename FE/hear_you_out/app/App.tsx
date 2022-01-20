@@ -23,6 +23,7 @@ type AnswerCard = {
   data: string
 }
 
+// TODO error handling on everything
 const App = () => {
   const [disableSwipes, setDisableSwipes] = React.useState(true)
   const swiper1 = React.useRef(null)
@@ -37,7 +38,6 @@ const App = () => {
   const appStateListener = React.useRef(null);
 
   React.useEffect(() => {
-    // TODO error handling
     const asyncFun = async () => {
       // check if theyve gone through the tutorials or not. do this async since we have to load the stacks anyway
       AsyncStorage.getItem("completedQuestionTutorial").then((val) => setCompletedQuestionTutorial(JSON.parse(val) || false))
@@ -246,7 +246,7 @@ const App = () => {
               return <NoAnswers setDisableSwipes={setDisableSwipes} />
             }
             else {
-              return <Answer setDisableSwipes={setDisableSwipes} data={card.data} id={card.id} question={question} completedTutorial={completedAnswerTutorial} onCompleteTutorial={onCompleteAnswerTutorial} onApprove={() => swiper1.current.swipeRight()} onDisapprove={() => swiper1.current.swipeLeft()} onPass={() => swiper1.current.swipeTop()} onReport={() => swiper1.current.swipeBottom()} />
+              return <Answer setDisableSwipes={setDisableSwipes} answerAudioData={card.data} id={card.id} question={question} completedTutorial={completedAnswerTutorial} onCompleteTutorial={onCompleteAnswerTutorial} onApprove={() => swiper1.current.swipeRight()} onDisapprove={() => swiper1.current.swipeLeft()} onPass={() => swiper1.current.swipeTop()} onReport={() => swiper1.current.swipeBottom()} />
             }
           }}
           onSwiped={() => {}}
@@ -306,7 +306,7 @@ const App = () => {
               return <NoAnswers setDisableSwipes={setDisableSwipes} />
             }
             else {
-              return <Answer setDisableSwipes={setDisableSwipes} data={card.data} id={card.id} question={question} completedTutorial={completedAnswerTutorial} onCompleteTutorial={onCompleteAnswerTutorial} onApprove={() => swiper2.current.swipeRight()} onDisapprove={() => swiper2.current.swipeLeft()} onPass={() => swiper2.current.swipeTop()} onReport={() => swiper2.current.swipeBottom()} />
+              return <Answer setDisableSwipes={setDisableSwipes} answerAudioData={card.data} id={card.id} question={question} completedTutorial={completedAnswerTutorial} onCompleteTutorial={onCompleteAnswerTutorial} onApprove={() => swiper2.current.swipeRight()} onDisapprove={() => swiper2.current.swipeLeft()} onPass={() => swiper2.current.swipeTop()} onReport={() => swiper2.current.swipeBottom()} />
             }
           }}
           onSwiped={() => {}}

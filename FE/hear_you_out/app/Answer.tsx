@@ -27,7 +27,7 @@ import TutorialElement from './TutorialElement'
 type AnswerProps = {
   setDisableSwipes: (val: boolean) => void,
   id: string,
-  data: string,
+  answerAudioData: string,
   question: APIQuestion,
   onApprove: () => {},
   onDisapprove: () => {},
@@ -37,7 +37,8 @@ type AnswerProps = {
   onCompleteTutorial: () => void
 }
 
-const Answer = ({setDisableSwipes, id, data, question, onDisapprove, onApprove, onPass, onReport, completedTutorial, onCompleteTutorial}: AnswerProps) => {
+// TODO error handling on everything
+const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, onApprove, onPass, onReport, completedTutorial, onCompleteTutorial}: AnswerProps) => {
   const [sliderValue, setSliderValue] = React.useState(0)
   const [length, setLength] = React.useState(0)
   const [playing, setPlaying] = React.useState(false)
@@ -79,9 +80,9 @@ const Answer = ({setDisableSwipes, id, data, question, onDisapprove, onApprove, 
     setSliderValue(currentPosition)
   }
 
-  // run this effect ONCE when this component mounts
+  // run this effect ONCE when this component mounts to load the audio file and prep the player
   React.useEffect(() => {
-    RNFS.writeFile(filepath, data, 'base64').then(() => setReady(true))
+    RNFS.writeFile(filepath, answerAudioData, 'base64').then(() => setReady(true))
     player.addPlayBackListener(playbackListener)
     // run this return function ONCE when the component unmounts
     return () => {

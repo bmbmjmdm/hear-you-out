@@ -37,7 +37,7 @@ const TutorialElement = ({onPress, isInTutorial, currentElement, id, children, c
         activeOpacity={1}
         onPress={onPress}
       >
-        <View style={styles.modalInner}>
+        <View style={styles.tooltipInner}>
           <Text style={calloutTheme === 'answer' ? styles.modalTextAnswer : styles.modalTextQuestion}>
             { calloutText }
           </Text>
@@ -69,6 +69,8 @@ const TutorialElement = ({onPress, isInTutorial, currentElement, id, children, c
   )
 }
 
+const tooltipWidth = 320
+
 const styles = StyleSheet.create({
   elevated: {
     elevation: 1,
@@ -85,13 +87,13 @@ const styles = StyleSheet.create({
     elevation: 1
   },
 
-  modalInner: {
-    width: 320
+  tooltipInner: {
+    width: tooltipWidth
   },
 
   tooltipOuter: {
     position: 'absolute',
-    left: Dimensions.get('window').width / 2 - 160 //centers our modal horizontally based on window, not parent
+    left: (Dimensions.get('window').width / 2) - (tooltipWidth / 2) //centers our modal horizontally based on window, not parent
   },
 
   modalTextAnswer: {

@@ -5,6 +5,7 @@ from ..main import app, get_dbs, get_drives, touch_backend
 
 def override_get_drives():
     try:
+        print("test drive")
         questions_drive = Drive("TEST_questions")
         answers_drive = Drive("TEST_answers")
         yield {'questions': questions_drive,
@@ -13,6 +14,7 @@ def override_get_drives():
         pass # don't need to close drive
 def override_get_dbs():
     try:
+        print("test db")
         questions_db = Base("TEST_questions")
         answers_db = Base("TEST_answers")
         yield {'questions': questions_db,
@@ -24,12 +26,14 @@ def override_get_dbs():
 app.dependency_overrides[get_dbs] = override_get_dbs
 app.dependency_overrides[get_drives] = override_get_drives
 
-db = override_get_dbs()
-drive = override_get_drives()
+dbs = override_get_dbs().__next__()
+drives = override_get_drives().__next__()
+touch_backend(dbs, drives)
 
 client = TestClient(app)
 
 ### TODO
+# get TEST_questions db+drive to appear in Deta...
 # happy path for each endpoint
 # - need setup/teardown structure. need to learn pytest. fixtures i think
 # enumerate edge caes for each end point, decide which oens to write tests for

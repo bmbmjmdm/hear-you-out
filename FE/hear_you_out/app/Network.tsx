@@ -1,5 +1,16 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
+const fetchWithRetry = async (url, options) => {
+  try {
+    const result = await fetch(url, options)
+    return result
+  }
+  catch (e) {
+    const result = await fetch(url, options)
+    return result
+  }
+}
+
 export type APIQuestion = {
   category: string,
   key: string,
@@ -7,7 +18,7 @@ export type APIQuestion = {
 }
 
 export const getQuestion = async (): Promise<APIQuestion> => {
-  const result = await fetch('https://hearyouout.deta.dev/getQuestion', {
+  const result = await fetchWithRetry('https://hearyouout.deta.dev/getQuestion', {
     method: 'GET',
     headers: {
       Accept: 'application/json',
@@ -28,7 +39,7 @@ export type APIAnswerId = {
 export const submitAnswer = async (answer: APIAnswer): Promise<APIAnswerId> => {
   tempAnswerList = []
   // submit answer
-  const result = await fetch('https://hearyouout.deta.dev/submitAnswer', {
+  const result = await fetchWithRetry('https://hearyouout.deta.dev/submitAnswer', {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -58,7 +69,7 @@ export const getAnswer = async (questionId: string): Promise<APIOthersAnswer> =>
   let list: Array<string> = JSON.parse(await AsyncStorage.getItem("answerList")) || []
   list = list.concat(tempAnswerList)
   // fetch based on total list
-  const result = await fetch(`https://hearyouout.deta.dev/getAnswer?question_uuid=${questionId}`, {
+  const result = await fetchWithRetry(`https://hearyouout.deta.dev/getAnswer?question_uuid=${questionId}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json'
@@ -79,14 +90,14 @@ export const rateAnswer = async (answerId: string, rating: number): Promise<void
   await AsyncStorage.setItem("answerList", newPreviouslyRatedAnswers)
   
   // post rating
-  const result = await fetch(`https://hearyouout.deta.dev/rateAnswer?answer_uuid=${answerId}&agreement=${rating}`, {
+  const result = await fetchWithRetry(`https://hearyouout.deta.dev/rateAnswer?answer_uuid=${answerId}&agreement=${rating}`, {
     method: 'POST',
   });
 }
 
 export const reportAnswer = async (answerId: string): Promise<void> => {
   const phoneId = "" // TODO decide if we want to send phoneId, which we can get from react-native-device-info
-  const result = await fetch(`https://hearyouout.deta.dev/flagAnswer?answer_uuid=${answerId}&phone_id=${phoneId}`, {
+  const result = await fetchWithRetry(`https://hearyouout.deta.dev/flagAnswer?answer_uuid=${answerId}&phone_id=${phoneId}`, {
     method: 'POST',
   });
 }

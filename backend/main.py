@@ -117,7 +117,10 @@ def gen_uuid(): # TODO
 
 # do something with each db and drive so it's accessible from deta dashboard gui
 def touch_backend(dbs, drives):
-    pass
+    dbs['questions'].put('test')
+    dbs['answers'].put('test')
+    drives['questions'].put('test', 'test')
+    drives['answers'].put('test', 'test')
 
 # handle all exceptions thrown in code below with a 500 http response
 # todo test what happens when this isn't here
@@ -238,6 +241,7 @@ def calculate_popularity(num_agrees, num_disagrees):
 def filter_answers_from_db(items: List[AnswerTableSchema], question_uuid: str, seen_answer_uuids: List[str]):
     pop = unpop = contro = seen_pop = seen_unpop = seen_contro = []
     for item in items:
+        print(item, question_uuid)
         if item.question_uuid != question_uuid:
             continue
         if item.is_banned:
@@ -299,7 +303,7 @@ async def get_answer(question_uuid: str,
         seen_contro += seen_contro2
 
     if len(pop+unpop+contro) == 0:
-        return PlainTextResponse("no answers found", status_code=500)
+        return PlainTextResponse("no filtered answers found", status_code=500)
 
     # calculate distribution thus far from seen answers, since we want to take that into account.
     # TODO finish this

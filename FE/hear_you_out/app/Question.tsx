@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Platform,
   Animated,
+  Alert,
 } from 'react-native';
 import Modal from "react-native-modal";
 // https://github.com/react-native-linear-gradient/react-native-linear-gradient
@@ -45,13 +46,18 @@ const audioSet = {
 }
 
 type QuestionProps = {
+  // contains the text of the question to answer as well as the type which informs our checklist content
   question: APIQuestion,
   submitAnswerAndProceed: (data:string) => void,
+  // whether they completed tutorial or not
   completedTutorial: boolean,
+  // tell the parent we completed the tutorial, which will update the above value
   onCompleteTutorial: () => void
+  // an un-recoverable error has occured and we need to reload the app
+  onError: () => void
 }
 
-const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompleteTutorial }: QuestionProps) => {
+const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompleteTutorial, onError }: QuestionProps) => {
   const checklist = React.useRef()
   const [circles, setCircles] = React.useState({})
   const [currentTutorialElement, setCurrentTutorialElement] = React.useState("question")
@@ -62,7 +68,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   // modal
   const [modalVisible, setModalVisible] = React.useState(false)
   const [modalText, setModalText] = React.useState("")
-  const [modalConfirm, setModalConfirm] = React.useState(() => {})
+  const [modalConfirm, setModalConfirm] = React.useState(null)
 
   // timer
   const [recordTime, setRecordTime] = React.useState(0)
@@ -124,13 +130,24 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
         await RNFS.writeFile(fileList, listContent, 'utf8')
         setReady(true)
       } catch (error) {
+        // if we can't even write our filelist, something's seriously wrong. 
+        Alert.alert("Cannot write files. Please contact support if this keeps happening.")
+        onError()
       }
     }
     // call all the above + cleanup later
     asyncFun()
     return () => {
-      clearInterval(interval.current)
-      deleteCurrentFile()
+      const asyncFunRet = async () => {
+        clearInterval(interval.current)
+        try {
+          await deleteCurrentFile()
+        }
+        catch (e) {
+          // we're unmounting, don't bother handling error
+        }
+      }
+      asyncFunRet()
     }
   }, [])
 
@@ -187,8 +204,6 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
     })
   }
 
-  // TODO error handling on all these
-
   const recordPressed = async () => {
     if (lock.current || recording) return
     if (recordTime >= 300) {
@@ -227,12 +242,15 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       }
     }
     catch (e) {
-      
+      // Writing files or accessing the recorder must have failed, but I don't know why. Reset everything
+      Alert.alert("Recording failed. Please contact support if this keeps happening.")
+      onError()
     }
     lock.current = false
   }
 
-  const recordReleased = async (force:boolean) => {
+  // we use force when we can't rely on `recording` due to the setInterval timer not having updated variables
+  const recordReleased = async (force:boolean = false, retry:boolean = false) => {
     if (lock.current) {
       // if we ever wind up here, we dont want to miss the recordRelease event, so keep retrying
       setTimeout(() => recordReleased(force), 50)
@@ -245,11 +263,19 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
         timing.current = false
         await recorder.pauseRecorder()
       }
+      lock.current = false
     }
     catch (e) {
-      
+      // Pausing failed. Re-attempt without forcing. If we wind up here again, error out.
+      if (retry) {
+        Alert.alert("Pausing failed. Please contact support if this keeps happening.")
+        onError()
+      }
+      else {
+        lock.current = false
+        recordReleased(false, true)
+      }
     }
-    lock.current = false
   }
 
   const restartRecording = async () => {
@@ -279,7 +305,9 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       setModalVisible(false)
     }
     catch (e) {
-
+      // Similar to recording failed, we dont know what went wrong but it's pretty serious and un-recoverable
+      Alert.alert("Restarting failed. Please contact support if this keeps happening.")
+      onError()
     }
     lock.current = false
   }
@@ -312,11 +340,12 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       setModalVisible(false)
       // convert file to base64 to pass it to the backend
       await submitAnswerAndProceed(await RNFS.readFile(originalFile, 'base64'))
-      await deleteCurrentFile()
       // we dont even care about cleaning up the states because we're gonna move on from this screen
     }
     catch (e) {
-
+      // they'll be able to re-answer the question since this wasn't a network error
+      Alert.alert("Error during submission. Please contact support if this keeps happening.")
+      onError()
     }
   }
 
@@ -333,24 +362,23 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       await recorder.startPlayer(originalFile)
     }
     catch (e) {
+      // Don't throw the user out for this. They can still record, restart, and submit possibly
+      Alert.alert("Error during playback. Please contact support if this keeps happening.")
 
     }
     lock.current = false
   }
 
+  // this may throw an error, handle it
   const deleteCurrentFile = async () => {
-    try {
-      await RNFS.unlink(originalFile)
-    }
-    catch (e) {
-      console.log("delete failed")
-    }
+    await RNFS.unlink(originalFile)
   }
   
 // TODO setup for ios
 // https://www.npmjs.com/package/react-native-ffmpeg
 // see 2.3.2 iOS to see about enabling audio package on iOS
   // concat original file + additional file => original file
+  // this may throw an error
   const stopRecorderAndConcat = async () => {
     await recorder.stopRecorder()
     if (needsConcat.current) {

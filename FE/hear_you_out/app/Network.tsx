@@ -49,6 +49,10 @@ export type APIOthersAnswer = {
 // this temporary answer list is used to store answers loaded but not rated. When we fetch new answers, we need to check both lists
 let tempAnswerList = []
 
+export const clearTempAnswerList = () => {
+  tempAnswerList = []
+}
+
 export const getAnswer = async (questionId: string): Promise<APIOthersAnswer> => {
   // construct our previously seen answer list from our permanant list and temporary one
   let list: Array<string> = JSON.parse(await AsyncStorage.getItem("answerList")) || []

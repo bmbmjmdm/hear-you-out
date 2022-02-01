@@ -7,6 +7,7 @@ import {
   Image,
   TouchableOpacity,
   Platform,
+  Alert,
 } from 'react-native';
 import Modal from "react-native-modal";
 // https://github.com/react-native-linear-gradient/react-native-linear-gradient
@@ -34,11 +35,12 @@ type AnswerProps = {
   onPass: () => {},
   onReport: () => {},
   completedTutorial: boolean,
-  onCompleteTutorial: () => void
+  onCompleteTutorial: () => void,
+  // an un-recoverable error has occured and we need to reload the app
+  onError: () => void
 }
 
-// TODO error handling on everything
-const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, onApprove, onPass, onReport, completedTutorial, onCompleteTutorial}: AnswerProps) => {
+const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, onApprove, onPass, onReport, completedTutorial, onCompleteTutorial, onError}: AnswerProps) => {
   const [sliderValue, setSliderValue] = React.useState(0)
   const [length, setLength] = React.useState(0)
   const [playing, setPlaying] = React.useState(false)
@@ -82,12 +84,31 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
 
   // run this effect ONCE when this component mounts to load the audio file and prep the player
   React.useEffect(() => {
-    RNFS.writeFile(filepath, answerAudioData, 'base64').then(() => setReady(true))
-    player.addPlayBackListener(playbackListener)
+    const asyncFun = async () => {
+      try {
+        await RNFS.writeFile(filepath, answerAudioData, 'base64').then(() => setReady(true))
+        player.addPlayBackListener(playbackListener)
+      }
+      catch (e) {
+        // cannot create our audio file, nothing we can do
+        Alert.alert("Cannot write answer to file. Please contact support if this keeps happening.")
+        onError()
+      }
+    }
+    asyncFun()
     // run this return function ONCE when the component unmounts
     return () => {
-      RNFS.unlink(filepath)
-      player.removePlayBackListener()
+      const asyncFunRet = async () => {
+        try {
+          player.removePlayBackListener()
+          await RNFS.unlink(filepath)
+        }
+        catch (e) {
+          console.log("failed to unlink")
+          // we're already unmounted, so don't worry about it
+        }
+      }
+      asyncFunRet()
     }
   }, [])
   
@@ -107,24 +128,47 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
     if (!started.current) { 
       // if the user finished the audio and wants to seek back, we have to "restart" it for them without them knowing
       started.current = true
-      await player.startPlayer(filepath)
-      await player.pausePlayer()
+      try {
+        await player.startPlayer(filepath)
+        await player.pausePlayer()
+      }
+      catch (e) {
+        // let restart fail silently, its not worth reloading the app over and for MVP the user can recover manually
+      }
     }
-    await player.seekToPlayer(val)
+    try {
+      await player.seekToPlayer(val)
+    }
+    catch (e) {
+      // same as above catch
+      Alert.alert("Failed to seek. Please contact support if this keeps happening.")
+    }
     disableUpdates.current = false
   }
 
   const playPressed = async () => {
     // we're already playing, pause
     if (playing) {
-      await player.pausePlayer()
+      try {
+        await player.pausePlayer()
+      }
+      catch (e) {
+        Alert.alert("Failed to pause. Please contact support if this keeps happening.")
+      }
     }
     // we're not playing, start
     else {
       started.current = true
       startedPerm.current = true
       setDisableSwipes(false)
-      await player.startPlayer(filepath)
+      try {
+        await player.startPlayer(filepath)
+      }
+      catch (e) {
+        // if we cant start the player, this is a serious problem
+        Alert.alert("Cannot play answer. Please contact support if this keeps happening.")
+        onError()
+      }
     }
     setPlaying(!playing)
   }
@@ -135,11 +179,12 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
       const options = {
         url: "file://" + filepath
       }
-      const result = await RNShare.open(options)
-      console.log(result)
+      await RNShare.open(options)
     }
     catch (e) {
-      console.log(e)
+      if (e.message !== "User did not share") {
+        Alert.alert("Failed to share. Please contact support if this keeps happening.")
+      }
     }
   }
 

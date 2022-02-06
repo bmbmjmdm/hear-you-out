@@ -141,9 +141,12 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       const asyncFunRet = async () => {
         clearInterval(interval.current)
         try {
+          recorder.removeRecordBackListener()
+          await stopRecorderAndConcat()
           await deleteCurrentFile()
         }
         catch (e) {
+          console.log("failed to stop/unlink question on unmount")
           // we're unmounting, don't bother handling error
         }
       }
@@ -518,7 +521,8 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
           isInTutorial={isInTutorial}
           calloutTheme={"question"}
           calloutText={"This is a checklist to make sure you answer the question thoroughly. Make sure all of them are addressed before submitting!"}
-          calloutDistance={-530}
+          calloutDistance={-230}
+          measureDistanceFromBottom={false}
         >
           <Checklist type={question.category} ref={checklist} />
         </TutorialElement>

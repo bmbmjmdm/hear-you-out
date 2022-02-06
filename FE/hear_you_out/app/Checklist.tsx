@@ -10,7 +10,8 @@ import CheckBox from '@react-native-community/checkbox';
 
 const Checklist = ({type}:{type:string}, ref) => {
   const allRefs = React.useRef({}).current
-  const itemList = checklist_map[type]
+  let itemList = checklist_map[type]
+  if (!itemList) itemList = checklist_map["other"]
   const itemComponents = []
 
   // expose a function that goes through all items in the checklist to see if theyre all checked
@@ -45,7 +46,7 @@ const checklist_map = {
     "Give your understanding of the Opposing argument(s) and why you think they're wrong"
   ],
   other: [
-    "Answer the question",
+    "Answer the question with as much detail as possible",
   ],
 }
 
@@ -92,9 +93,9 @@ const styles = StyleSheet.create({
   },
   text: {
     fontSize: 20,
-    marginLeft: 10,
+    paddingLeft: 10,
     marginBottom: 3,
-    maxWidth: 300
+    maxWidth: 310
   }
 });
 

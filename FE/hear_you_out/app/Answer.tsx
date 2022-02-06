@@ -101,10 +101,11 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
       const asyncFunRet = async () => {
         try {
           player.removePlayBackListener()
+          await player.stopPlayer()
           await RNFS.unlink(filepath)
         }
         catch (e) {
-          console.log("failed to unlink")
+          console.log("failed to stop/unlink answer on unmount")
           // we're already unmounted, so don't worry about it
         }
       }

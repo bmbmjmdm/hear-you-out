@@ -13,6 +13,11 @@ target 'hear_you_out' do
   pod 'glog', :podspec => '../node_modules/react-native/third-party-podspecs/glog.podspec', :modular_headers => false
   pod 'Folly', :podspec => '../node_modules/react-native/third-party-podspecs/Folly.podspec', :modular_headers => false
 
+  # Permission handlers (react-native-permissions)
+  pod 'RNPermissions', :path => '../node_modules/react-native-permissions'
+  pod 'Permission-Microphone', :path => "../node_modules/react-native-permissions/ios/Microphone"
+
+
   # Enables Flipper.
   #
   # Note that if you have use_frameworks! enabled, Flipper will not work and

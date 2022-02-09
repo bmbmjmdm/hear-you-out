@@ -22,6 +22,8 @@ PODS:
     - glog
   - glog (0.3.5)
   - mobile-ffmpeg-https (4.4)
+  - Permission-Microphone (3.0.5):
+    - RNPermissions
   - RCTRequired (0.63.0)
   - RCTTypeSafety (0.63.0):
     - FBLazyVector (= 0.63.0)
@@ -281,6 +283,7 @@ DEPENDENCIES:
   - FBReactNativeSpec (from `../node_modules/react-native/Libraries/FBReactNativeSpec`)
   - Folly (from `../node_modules/react-native/third-party-podspecs/Folly.podspec`)
   - glog (from `../node_modules/react-native/third-party-podspecs/glog.podspec`)
+  - Permission-Microphone (from `../node_modules/react-native-permissions/ios/Microphone`)
   - RCTRequired (from `../node_modules/react-native/Libraries/RCTRequired`)
   - RCTTypeSafety (from `../node_modules/react-native/Libraries/TypeSafety`)
   - React (from `../node_modules/react-native/`)
@@ -333,6 +336,8 @@ EXTERNAL SOURCES:
     :podspec: "../node_modules/react-native/third-party-podspecs/Folly.podspec"
   glog:
     :podspec: "../node_modules/react-native/third-party-podspecs/glog.podspec"
+  Permission-Microphone:
+    :path: "../node_modules/react-native-permissions/ios/Microphone"
   RCTRequired:
     :path: "../node_modules/react-native/Libraries/RCTRequired"
   RCTTypeSafety:
@@ -405,6 +410,7 @@ SPEC CHECKSUMS:
   Folly: b73c3869541e86821df3c387eb0af5f65addfab4
   glog: 40a13f7840415b9a77023fbcae0f1e6f43192af3
   mobile-ffmpeg-https: 311fc4a8f671cf36d1d6b8f421e8246b790978d9
+  Permission-Microphone: 4667fe94d91ca063175966062186ade404ed57d1
   RCTRequired: e46bb77db03887b3e200d34b08515c804669db99
   RCTTypeSafety: 270fed6675c42f80fb87b47d626ef3cede1505e6
   React: e008906ff1328f9bccb345ff4f7826397ad223fc
@@ -437,6 +443,6 @@ SPEC CHECKSUMS:
   SRSRadialGradient: 49ba49a7a8f257c3fe785c250867b07185d1d01e
   Yoga: 7d2edc5b410474191962e6dee88ee67f9b328b6b
 
-PODFILE CHECKSUM: 1651fd3507788bdbb7a89aa75e25c23b786dbb63
+PODFILE CHECKSUM: 3ce7ae4af9019590c4f6e205f41eb43108dae94b
 
 COCOAPODS: 1.10.1

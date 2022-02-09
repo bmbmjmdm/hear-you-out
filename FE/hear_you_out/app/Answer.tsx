@@ -381,6 +381,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     padding: 20,
+    paddingTop: Platform.OS === "ios" ? 40 : 20,
     alignItems: 'center'
   },
 

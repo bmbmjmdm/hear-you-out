@@ -1,7 +1,8 @@
 require_relative '../node_modules/react-native/scripts/react_native_pods'
 require_relative '../node_modules/@react-native-community/cli-platform-ios/native_modules'
 
-platform :ios, '10.0'
+platform :ios, '11.0'
+use_modular_headers!
 
 target 'hear_you_out' do
   config = use_native_modules!
@@ -23,11 +24,3 @@ target 'hear_you_out' do
   end
 end
 
-target 'hear_you_out-tvOS' do
-  # Pods for hear_you_out-tvOS
-
-  target 'hear_you_out-tvOSTests' do
-    inherit! :search_paths
-    # Pods for testing
-  end
-end

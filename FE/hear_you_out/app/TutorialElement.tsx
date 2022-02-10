@@ -107,6 +107,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderColor: '#A9C5F2',
     borderWidth: 3,
+    overflow: "hidden"
   },
 
   modalTextQuestion: {
@@ -118,6 +119,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderColor: '#FFADBB',
     borderWidth: 3,
+    overflow: "hidden"
   },
 })
 

@@ -5,6 +5,7 @@ import {
   ScrollView,
   View,
   Text,
+  Platform,
 } from 'react-native';
 import CheckBox from '@react-native-community/checkbox';
 
@@ -67,7 +68,17 @@ const CheckItem = ({text}, ref) => {
         tintColors={{
           true: "#575757"
         }}
-        onFillColor={"#575757"}
+        onFillColor={Platform.OS === "android" ? "#575757" : undefined}
+        onCheckColor={"#222222"}
+        onTintColor={"#222222"}
+        tintColor={"#575757"}
+        onAnimationType={"one-stroke"}
+        offAnimationType={"one-stroke"}
+        style={Platform.OS === "android" ? {} : {
+          width: 25,
+          height: 25,
+          marginRight: 5
+        }}
       />
       <Text
         style={styles.text}
@@ -89,7 +100,8 @@ const styles = StyleSheet.create({
   checkItem: {
     alignItems: 'center',
     marginBottom: 10,
-    flexDirection: 'row'
+    flexDirection: 'row',
+    padding: 1
   },
   text: {
     fontSize: 20,

@@ -26,9 +26,10 @@ const Shadow = ({
       clear
     ]
     finalRadius = 0.525 * radius
+    // TODO test this center on android
     center = [
-      0.525 * radius,
-      0.525 * radius
+      0.535 * radius,
+      0.535 * radius
     ]
     stops = [
       0,
@@ -42,8 +43,8 @@ const Shadow = ({
     ]
     finalRadius = 0.525 * radius
     center = [
-      0.525 * radius,
-      0.525 * radius
+      0.535 * radius,
+      0.535 * radius
     ]
     stops = [
       0.835,

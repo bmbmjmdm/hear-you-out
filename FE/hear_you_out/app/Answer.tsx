@@ -298,7 +298,8 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
             isInTutorial={isInTutorial}
             calloutTheme={"answer"}
             calloutText={"If the answer does not address the question or the various bullet points you did before, flag it here"}
-            calloutDistance={-20}
+            calloutDistance={-150}
+            measureDistanceFromBottom={false}
           >
             <TouchableOpacity onPress={reportAnswer}>
               <Image
@@ -315,7 +316,8 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
             isInTutorial={isInTutorial}
             calloutTheme={"answer"}
             calloutText={"If you find this answer worth sharing, use this"}
-            calloutDistance={-20}
+            calloutDistance={-100}
+            measureDistanceFromBottom={false}
           >
             <TouchableOpacity onPress={shareAnswer}>
               <Image
@@ -327,35 +329,37 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
           </TutorialElement>
         </View>
 
-        <TutorialElement
-          onPress={progressTutorial}
-          currentElement={currentTutorialElement}
-          id={"play"}
-          isInTutorial={isInTutorial}
-        >
-          {length ? 
-            <Slider
-              style={{width: 300, height: 40}}
-              minimumValue={0}
-              maximumValue={length}
-              minimumTrackTintColor="#888888"
-              maximumTrackTintColor="#FFFFFF"
-              allowTouchTrack={true}
-              thumbTintColor="#000000"
-              value={sliderValue}
-              onSlidingComplete={onSlidingComplete}
-              onSlidingStart={onSlidingStart}
-              thumbStyle={{ height: 30, width: 30 }}
-              trackStyle={{ height: 8, borderRadius: 99 }}
-            />
-            :
-            // we cannot change the maximumValue of Slider once its rendered, so we render a fake slider until we know length
-            <View style={{ width: 300, height: 40, alignItems: "center", justifyContent: "center", flexDirection: "row" }}>
-              <View style={{ height: 30, width: 30, borderRadius: 999, backgroundColor:"#000000" }} />
-              <View style={{ width:270, height: 8, borderTopRightRadius: 99, borderBottomRightRadius: 99, backgroundColor: "#FFFFFF" }} />
-            </View>
-          }
-        </TutorialElement>
+        <View style={{flex: 1}}>
+          <TutorialElement
+            onPress={progressTutorial}
+            currentElement={currentTutorialElement}
+            id={"play"}
+            isInTutorial={isInTutorial}
+          >
+              {length ? 
+                <Slider
+                  style={{width: 300, height: 40}}
+                  minimumValue={0}
+                  maximumValue={length}
+                  minimumTrackTintColor="#888888"
+                  maximumTrackTintColor="#FFFFFF"
+                  allowTouchTrack={true}
+                  thumbTintColor="#000000"
+                  value={sliderValue}
+                  onSlidingComplete={onSlidingComplete}
+                  onSlidingStart={onSlidingStart}
+                  thumbStyle={{ height: 30, width: 30 }}
+                  trackStyle={{ height: 8, borderRadius: 99 }}
+                />
+                :
+                // we cannot change the maximumValue of Slider once its rendered, so we render a fake slider until we know length
+                <View style={{ width: 300, height: 40, alignItems: "center", justifyContent: "center", flexDirection: "row" }}>
+                  <View style={{ height: 30, width: 30, borderRadius: 999, backgroundColor:"#000000" }} />
+                  <View style={{ width:270, height: 8, borderTopRightRadius: 99, borderBottomRightRadius: 99, backgroundColor: "#FFFFFF" }} />
+                </View>
+              }
+          </TutorialElement>
+        </View>
 
         <BottomButtons
           theme={"answer"}
@@ -380,8 +384,9 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    padding: 20,
-    paddingTop: Platform.OS === "ios" ? 40 : 20,
+    paddingHorizontal: 20,
+    // TODO certain devices may need more padding if SafetyArea doesnt account for top bar
+    paddingTop: 20,
     alignItems: 'center'
   },
 
@@ -437,6 +442,7 @@ const styles = StyleSheet.create({
     padding: 10,
     paddingVertical: 15,
     borderColor: '#A9C5F2',
+    overflow: "hidden",
     borderWidth: 3,
   },
 

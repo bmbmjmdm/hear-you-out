@@ -33,7 +33,13 @@ const Checklist = ({type}:{type:string}, ref) => {
   }
 
   return (
-    <ScrollView style={styles.checkList}>
+    <ScrollView
+      style={styles.checkList}
+      horizontal={false}
+      alwaysBounceHorizontal={false}
+      showsVerticalScrollIndicator={false}
+      showsHorizontalScrollIndicator={false}
+    >
       { itemComponents }
     </ScrollView>
   )
@@ -95,19 +101,22 @@ const CheckItemWithRef = forwardRef(CheckItem)
 
 const styles = StyleSheet.create({
   checkList: {
-    height: 300
+    width: "100%",
+    overflow: "hidden",
+    flex: 1,
   },
   checkItem: {
     alignItems: 'center',
     marginBottom: 10,
     flexDirection: 'row',
-    padding: 1
+    padding: 1,
   },
   text: {
     fontSize: 20,
     paddingLeft: 10,
     marginBottom: 3,
-    maxWidth: 310
+    maxWidth: 310,
+    flexGrow: 1,
   }
 });
 

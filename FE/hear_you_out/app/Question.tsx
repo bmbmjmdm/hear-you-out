@@ -319,7 +319,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
     if (lock.current || recording) return
     // validate checklist
     if (!checklist?.current?.areAllChecked()) {
-      setModalText("Please make sure you addressed all points in the checklist before submitting")
+      setModalText("Please make sure you addressed all points in the checklist before submitting (scroll if you have to)")
       setModalConfirm(null)
       setModalVisible(true)
       return
@@ -514,18 +514,21 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
           </Text>
         </TutorialElement>
         
-        <TutorialElement
-          onPress={progressTutorial}
-          currentElement={currentTutorialElement}
-          id={"checklist"}
-          isInTutorial={isInTutorial}
-          calloutTheme={"question"}
-          calloutText={"This is a checklist to make sure you answer the question thoroughly. Make sure all of them are addressed before submitting!"}
-          calloutDistance={-230}
-          measureDistanceFromBottom={false}
-        >
-          <Checklist type={question.category} ref={checklist} />
-        </TutorialElement>
+        <View style={{flex: 1}}>
+          <TutorialElement
+            onPress={progressTutorial}
+            currentElement={currentTutorialElement}
+            id={"checklist"}
+            isInTutorial={isInTutorial}
+            calloutTheme={"question"}
+            calloutText={"This is a checklist to make sure you answer the question thoroughly. Make sure all of them are addressed before submitting!"}
+            calloutDistance={-230}
+            measureDistanceFromBottom={false}
+            inheritedFlex={1}
+          >
+            <Checklist type={question.category} ref={checklist} />
+          </TutorialElement>
+        </View>
 
         <BottomButtons
           theme={"question"}
@@ -551,8 +554,9 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    padding: 20,
-    paddingTop: Platform.OS === "ios" ? 40 : 20,
+    paddingHorizontal: 20,
+    // TODO certain devices may need more padding if SafetyArea doesnt account for top bar
+    paddingTop: 20,
     alignItems: 'center'
   },
 
@@ -604,6 +608,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     backgroundColor: 'rgb(255, 212, 198)',
     borderRadius: 20,
+    overflow: "hidden",
     padding: 10,
     paddingVertical: 15,
     borderColor: '#FFADBB',

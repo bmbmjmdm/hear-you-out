@@ -118,8 +118,6 @@ const Button = ({name, theme, onPress, disabled, isInTutorial, currentTutorialEl
 
 const styles = StyleSheet.create({
   container: {
-    position: 'absolute',
-    bottom: 0,
     alignItems: "center",
     flexDirection: 'row'
   },

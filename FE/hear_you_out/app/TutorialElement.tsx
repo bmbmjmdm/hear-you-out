@@ -10,10 +10,11 @@ type TutorialElementProps = {
   calloutText?: string,
   calloutTheme?: "question" | "answer",
   calloutDistance?: number,
-  measureDistanceFromBottom?: boolean
+  measureDistanceFromBottom?: boolean,
+  inheritedFlex?: number
 }
 
-const TutorialElement = ({onPress, isInTutorial, currentElement, id, children, calloutText, calloutTheme, calloutDistance, measureDistanceFromBottom = true}: TutorialElementProps) => {
+const TutorialElement = ({onPress, isInTutorial, currentElement, id, children, calloutText, calloutTheme, calloutDistance, measureDistanceFromBottom = true, inheritedFlex} : TutorialElementProps) => {
   const childRef = React.useRef(null)
   const [left, setLeft] = React.useState(0)
   const [height, setHeight] = React.useState(0)
@@ -62,7 +63,7 @@ const TutorialElement = ({onPress, isInTutorial, currentElement, id, children, c
         }
       }}
     >
-      <View style={{opacity: isFocused ? 1 : 0.25}}>
+      <View style={{opacity: isFocused ? 1 : 0.25, flex: inheritedFlex}}>
         <View style={styles.disableClicks} />
         { children }
       </View>

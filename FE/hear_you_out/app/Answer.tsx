@@ -60,7 +60,8 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
   // initialize the player and setup callbacks
   const player = React.useRef(new AudioRecorderPlayer()).current
   const extention = Platform.OS === 'android' ? ".mp4" : ".m4a"
-  const filepath = RNFS.CachesDirectoryPath + '/' + "CoolAnswer" + id + extention
+  const prepend = Platform.OS === 'android' ? "" : "file://"
+  const filepath = prepend + RNFS.CachesDirectoryPath + '/' + "CoolAnswer" + id + extention
 
   const playbackListener = ({currentPosition, duration}) => {
     // if length is set more than once it'll break the slider
@@ -178,7 +179,7 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
     try {
       // note this method does not work with base64 files. we will have to convert the file to a normal mp3 or w.e and share it like that
       const options = {
-        url: "file://" + filepath
+        url: filepath
       }
       await RNShare.open(options)
     }
@@ -283,7 +284,7 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
             >
               <Image
                 source={playing ? Pause : Play}
-                style={{ width: 85, marginLeft: playing ? 0 : 13 }}
+                style={{ width: 85 }}
                 resizeMode={'contain'}
               />
             </TouchableOpacity>

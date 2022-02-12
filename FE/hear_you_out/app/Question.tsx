@@ -17,7 +17,7 @@ import Mic from './Mic.png';
 import Shadow from './Shadow'
 import Checklist from './Checklist'
 import BottomButtons from './BottomButtons'
-import AudioRecorderPlayer, { AudioEncoderAndroidType } from 'react-native-audio-recorder-player';
+import AudioRecorderPlayer, { AudioEncoderAndroidType, AVEncodingOption } from 'react-native-audio-recorder-player';
 import RNFS from 'react-native-fs'
 import { RNFFmpeg } from 'react-native-ffmpeg';
 import uuid from 'react-native-uuid';
@@ -35,14 +35,9 @@ const audioSet = {
   AudioEncoderAndroid: AudioEncoderAndroidType.HE_AAC, // AAC is slightly better quality but like 75% increase in size
   AudioEncodingBitRateAndroid: 102400, // increase to 128000 if we get more storage
   AudioSamplingRateAndroid: 48000,
-  //AVSampleRateKeyIOS?: number;
-  //AVFormatIDKeyIOS?: AVEncodingType;
-  //AVNumberOfChannelsKeyIOS?: number;
-  //AVEncoderAudioQualityKeyIOS?: AVEncoderAudioQualityIOSType;
-  //AVLinearPCMBitDepthKeyIOS?: AVLinearPCMBitDepthKeyIOSType;
-  //AVLinearPCMIsBigEndianKeyIOS?: boolean;
-  //AVLinearPCMIsFloatKeyIOS?: boolean;
-  //AVLinearPCMIsNonInterleavedIOS?: boolean;
+  AVFormatIDKeyIOS: AVEncodingOption.aac, // 7% size of alac
+  AVSampleRateKeyIOS: 22050, // half the default, half the size
+  AVNumberOfChannelsKeyIOS: 1, // half the default, 2/3 the size
 }
 
 type QuestionProps = {
@@ -91,10 +86,11 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   // if we stop a recording that isnt the original file, concat it with the original file 
   const needsConcat = React.useRef(false)
   const extention = Platform.OS === 'android' ? ".mp4" : ".m4a"
-  const originalFile = RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention
-  const additionalFile = RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordAdditional" + extention
-  const concatFile = RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordConcated" + extention
-  const fileList = RNFS.CachesDirectoryPath + '/' + "fileList.txt"
+  const prepend = Platform.OS === 'android' ? "" : "file://"
+  const originalFile = prepend + RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention
+  const additionalFile = prepend + RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordAdditional" + extention
+  const concatFile = prepend + RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordConcated" + extention
+  const fileList = prepend + RNFS.CachesDirectoryPath + '/' + "fileList.txt"
 
   // run this effect ONCE when this component mounts
   React.useEffect(() => {
@@ -117,8 +113,9 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       // add a playback listener for recording animations
       recorder.setSubscriptionDuration(0.2)
       recorder.addRecordBackListener(({ currentMetering }) => {
-        // TODO test this level on other devices, incl iOS
-        if (currentMetering > -20) animateCircle()
+        // TODO test this level on other devices
+        const minMeter = Platform.OS === "android" ? -20 : -23
+        if (currentMetering > minMeter) animateCircle()
       })
       // we make a text file with our audio file paths listed for later concatenation
       const paths = [originalFile, additionalFile]
@@ -300,10 +297,6 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       setStarted(false)
       setRecordTime(0)
       await stopRecorderAndConcat()
-      
-      // when we're ready to measure iOS file sizes
-      // console.log((await RNFS.stat(originalFile)).size)
-  
       await deleteCurrentFile()
       setModalVisible(false)
     }
@@ -386,8 +379,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
     await recorder.stopRecorder()
     if (needsConcat.current) {
       // concat
-      const result = await RNFFmpeg.execute(`-f concat -safe 0 -i ${fileList} -c copy ${concatFile}`)
-      console.log(`FFmpeg process exited with rc=${result}.`)
+      await RNFFmpeg.execute(`-f concat -safe 0 -i ${fileList} -c copy ${concatFile}`)
       // delete old files and rename the new one appropriately
       await RNFS.unlink(originalFile)
       await RNFS.unlink(additionalFile)

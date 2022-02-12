@@ -284,7 +284,7 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
             >
               <Image
                 source={playing ? Pause : Play}
-                style={{ width: 85 }}
+                style={{ width: 100 }}
                 resizeMode={'contain'}
               />
             </TouchableOpacity>

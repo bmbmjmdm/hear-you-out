@@ -10,9 +10,11 @@ type TutorialElementProps = {
   calloutText?: string,
   calloutTheme?: "question" | "answer",
   calloutDistance?: number,
+  measureDistanceFromBottom?: boolean,
+  inheritedFlex?: number
 }
 
-const TutorialElement = ({onPress, isInTutorial, currentElement, id, children, calloutText, calloutTheme, calloutDistance}: TutorialElementProps) => {
+const TutorialElement = ({onPress, isInTutorial, currentElement, id, children, calloutText, calloutTheme, calloutDistance, measureDistanceFromBottom = true, inheritedFlex} : TutorialElementProps) => {
   const childRef = React.useRef(null)
   const [left, setLeft] = React.useState(0)
   const [height, setHeight] = React.useState(0)
@@ -54,13 +56,14 @@ const TutorialElement = ({onPress, isInTutorial, currentElement, id, children, c
         if (layout.nativeEvent.layout.height) {
           layout.persist()
           childRef.current.measure( (fx, fy, w, h, px, py) => {
-            setHeight(layout.nativeEvent.layout.y + h) // this allows us to offset the tooltip properly based on the element's y and height
+            const bottom = measureDistanceFromBottom ? h : 0
+            setHeight(layout.nativeEvent.layout.y + bottom) // this allows us to offset the tooltip properly based on the element's y and height
             setLeft(layout.nativeEvent.layout.x - px) // this allows us to center the tooltip properly based on window width and true left, not the parent
         })
         }
       }}
     >
-      <View style={{opacity: isFocused ? 1 : 0.25}}>
+      <View style={{opacity: isFocused ? 1 : 0.25, flex: inheritedFlex}}>
         <View style={styles.disableClicks} />
         { children }
       </View>
@@ -105,6 +108,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderColor: '#A9C5F2',
     borderWidth: 3,
+    overflow: "hidden"
   },
 
   modalTextQuestion: {
@@ -116,6 +120,7 @@ const styles = StyleSheet.create({
     paddingVertical: 15,
     borderColor: '#FFADBB',
     borderWidth: 3,
+    overflow: "hidden"
   },
 })
 

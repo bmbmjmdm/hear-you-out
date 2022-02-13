@@ -38,8 +38,6 @@ const BottomButtons = ({theme, disabled, xPressed, miscPressed, checkPressed, is
 
 // TODO disabled styles
 const Button = ({name, theme, onPress, disabled, isInTutorial, currentTutorialElement, onTutorialPress, submitting = false}) => {
-  const bgColor = theme == "question" ? "#FFADBB" : "#ABFFB8"
-  const pressedColor = theme == "question" ? "#94636b" : "#598560"
   const [pressed, setPressed] = React.useState(false)
   let radius;
   let style;
@@ -50,6 +48,8 @@ const Button = ({name, theme, onPress, disabled, isInTutorial, currentTutorialEl
   let calloutDistance
 
   if (name === "check") {
+    const bgColor = theme == "question" ? "#FF8AB2" : "#ABFFB8"
+    const pressedColor = theme == "question" ? "#C16A89" : "#598560"
     radius = 100
     underlay = pressedColor
     style = [styles.bigCircle, {backgroundColor: pressed ? underlay : bgColor}, pressed ? styles.depth : {}]
@@ -59,6 +59,8 @@ const Button = ({name, theme, onPress, disabled, isInTutorial, currentTutorialEl
     calloutDistance = theme === 'question' ? -300 : -400
   }
   else if (name === "x") {
+    const bgColor = theme == "question" ? "#FFC5C3" : "#ABFFB8"
+    const pressedColor = theme == "question" ? "#C69A99" : "#598560"
     radius = 100
     underlay = pressedColor
     style = [styles.bigCircle, {backgroundColor: pressed ? underlay : bgColor}, pressed ? styles.depth : {}]
@@ -116,8 +118,6 @@ const Button = ({name, theme, onPress, disabled, isInTutorial, currentTutorialEl
 
 const styles = StyleSheet.create({
   container: {
-    position: 'absolute',
-    bottom: 0,
     alignItems: "center",
     flexDirection: 'row'
   },

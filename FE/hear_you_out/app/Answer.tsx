@@ -7,6 +7,7 @@ import {
   Image,
   TouchableOpacity,
   Platform,
+  Alert,
 } from 'react-native';
 import Modal from "react-native-modal";
 // https://github.com/react-native-linear-gradient/react-native-linear-gradient
@@ -34,11 +35,12 @@ type AnswerProps = {
   onPass: () => {},
   onReport: () => {},
   completedTutorial: boolean,
-  onCompleteTutorial: () => void
+  onCompleteTutorial: () => void,
+  // an un-recoverable error has occured and we need to reload the app
+  onError: () => void
 }
 
-// TODO error handling on everything
-const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, onApprove, onPass, onReport, completedTutorial, onCompleteTutorial}: AnswerProps) => {
+const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, onApprove, onPass, onReport, completedTutorial, onCompleteTutorial, onError}: AnswerProps) => {
   const [sliderValue, setSliderValue] = React.useState(0)
   const [length, setLength] = React.useState(0)
   const [playing, setPlaying] = React.useState(false)
@@ -58,7 +60,8 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
   // initialize the player and setup callbacks
   const player = React.useRef(new AudioRecorderPlayer()).current
   const extention = Platform.OS === 'android' ? ".mp4" : ".m4a"
-  const filepath = RNFS.CachesDirectoryPath + '/' + "CoolAnswer" + id + extention
+  const prepend = Platform.OS === 'android' ? "" : "file://"
+  const filepath = prepend + RNFS.CachesDirectoryPath + '/' + "CoolAnswer" + id + extention
 
   const playbackListener = ({currentPosition, duration}) => {
     // if length is set more than once it'll break the slider
@@ -82,12 +85,32 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
 
   // run this effect ONCE when this component mounts to load the audio file and prep the player
   React.useEffect(() => {
-    RNFS.writeFile(filepath, answerAudioData, 'base64').then(() => setReady(true))
-    player.addPlayBackListener(playbackListener)
+    const asyncFun = async () => {
+      try {
+        await RNFS.writeFile(filepath, answerAudioData, 'base64').then(() => setReady(true))
+        player.addPlayBackListener(playbackListener)
+      }
+      catch (e) {
+        // cannot create our audio file, nothing we can do
+        Alert.alert("Cannot write answer to file. Please contact support if this keeps happening.")
+        onError()
+      }
+    }
+    asyncFun()
     // run this return function ONCE when the component unmounts
     return () => {
-      RNFS.unlink(filepath)
-      player.removePlayBackListener()
+      const asyncFunRet = async () => {
+        try {
+          player.removePlayBackListener()
+          await player.stopPlayer()
+          await RNFS.unlink(filepath)
+        }
+        catch (e) {
+          console.log("failed to stop/unlink answer on unmount")
+          // we're already unmounted, so don't worry about it
+        }
+      }
+      asyncFunRet()
     }
   }, [])
   
@@ -107,24 +130,47 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
     if (!started.current) { 
       // if the user finished the audio and wants to seek back, we have to "restart" it for them without them knowing
       started.current = true
-      await player.startPlayer(filepath)
-      await player.pausePlayer()
+      try {
+        await player.startPlayer(filepath)
+        await player.pausePlayer()
+      }
+      catch (e) {
+        // let restart fail silently, its not worth reloading the app over and for MVP the user can recover manually
+      }
     }
-    await player.seekToPlayer(val)
+    try {
+      await player.seekToPlayer(val)
+    }
+    catch (e) {
+      // same as above catch
+      Alert.alert("Failed to seek. Please contact support if this keeps happening.")
+    }
     disableUpdates.current = false
   }
 
   const playPressed = async () => {
     // we're already playing, pause
     if (playing) {
-      await player.pausePlayer()
+      try {
+        await player.pausePlayer()
+      }
+      catch (e) {
+        Alert.alert("Failed to pause. Please contact support if this keeps happening.")
+      }
     }
     // we're not playing, start
     else {
       started.current = true
       startedPerm.current = true
       setDisableSwipes(false)
-      await player.startPlayer(filepath)
+      try {
+        await player.startPlayer(filepath)
+      }
+      catch (e) {
+        // if we cant start the player, this is a serious problem
+        Alert.alert("Cannot play answer. Please contact support if this keeps happening.")
+        onError()
+      }
     }
     setPlaying(!playing)
   }
@@ -133,13 +179,14 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
     try {
       // note this method does not work with base64 files. we will have to convert the file to a normal mp3 or w.e and share it like that
       const options = {
-        url: "file://" + filepath
+        url: filepath
       }
-      const result = await RNShare.open(options)
-      console.log(result)
+      await RNShare.open(options)
     }
     catch (e) {
-      console.log(e)
+      if (e.message !== "User did not share") {
+        Alert.alert("Failed to share. Please contact support if this keeps happening.")
+      }
     }
   }
 
@@ -237,7 +284,7 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
             >
               <Image
                 source={playing ? Pause : Play}
-                style={{ width: 85, marginLeft: playing ? 0 : 13 }}
+                style={{ width: 100 }}
                 resizeMode={'contain'}
               />
             </TouchableOpacity>
@@ -252,7 +299,8 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
             isInTutorial={isInTutorial}
             calloutTheme={"answer"}
             calloutText={"If the answer does not address the question or the various bullet points you did before, flag it here"}
-            calloutDistance={-20}
+            calloutDistance={-150}
+            measureDistanceFromBottom={false}
           >
             <TouchableOpacity onPress={reportAnswer}>
               <Image
@@ -269,7 +317,8 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
             isInTutorial={isInTutorial}
             calloutTheme={"answer"}
             calloutText={"If you find this answer worth sharing, use this"}
-            calloutDistance={-20}
+            calloutDistance={-100}
+            measureDistanceFromBottom={false}
           >
             <TouchableOpacity onPress={shareAnswer}>
               <Image
@@ -281,35 +330,37 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
           </TutorialElement>
         </View>
 
-        <TutorialElement
-          onPress={progressTutorial}
-          currentElement={currentTutorialElement}
-          id={"play"}
-          isInTutorial={isInTutorial}
-        >
-          {length ? 
-            <Slider
-              style={{width: 300, height: 40}}
-              minimumValue={0}
-              maximumValue={length}
-              minimumTrackTintColor="#888888"
-              maximumTrackTintColor="#FFFFFF"
-              allowTouchTrack={true}
-              thumbTintColor="#000000"
-              value={sliderValue}
-              onSlidingComplete={onSlidingComplete}
-              onSlidingStart={onSlidingStart}
-              thumbStyle={{ height: 30, width: 30 }}
-              trackStyle={{ height: 8, borderRadius: 99 }}
-            />
-            :
-            // we cannot change the maximumValue of Slider once its rendered, so we render a fake slider until we know length
-            <View style={{ width: 300, height: 40, alignItems: "center", justifyContent: "center", flexDirection: "row" }}>
-              <View style={{ height: 30, width: 30, borderRadius: 999, backgroundColor:"#000000" }} />
-              <View style={{ width:270, height: 8, borderTopRightRadius: 99, borderBottomRightRadius: 99, backgroundColor: "#FFFFFF" }} />
-            </View>
-          }
-        </TutorialElement>
+        <View style={{flex: 1}}>
+          <TutorialElement
+            onPress={progressTutorial}
+            currentElement={currentTutorialElement}
+            id={"play"}
+            isInTutorial={isInTutorial}
+          >
+              {length ? 
+                <Slider
+                  style={{width: 300, height: 40}}
+                  minimumValue={0}
+                  maximumValue={length}
+                  minimumTrackTintColor="#888888"
+                  maximumTrackTintColor="#FFFFFF"
+                  allowTouchTrack={true}
+                  thumbTintColor="#000000"
+                  value={sliderValue}
+                  onSlidingComplete={onSlidingComplete}
+                  onSlidingStart={onSlidingStart}
+                  thumbStyle={{ height: 30, width: 30 }}
+                  trackStyle={{ height: 8, borderRadius: 99 }}
+                />
+                :
+                // we cannot change the maximumValue of Slider once its rendered, so we render a fake slider until we know length
+                <View style={{ width: 300, height: 40, alignItems: "center", justifyContent: "center", flexDirection: "row" }}>
+                  <View style={{ height: 30, width: 30, borderRadius: 999, backgroundColor:"#000000" }} />
+                  <View style={{ width:270, height: 8, borderTopRightRadius: 99, borderBottomRightRadius: 99, backgroundColor: "#FFFFFF" }} />
+                </View>
+              }
+          </TutorialElement>
+        </View>
 
         <BottomButtons
           theme={"answer"}
@@ -334,7 +385,9 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 20,
+    // TODO certain devices may need more padding if SafetyArea doesnt account for top bar
+    paddingTop: 20,
     alignItems: 'center'
   },
 
@@ -390,6 +443,7 @@ const styles = StyleSheet.create({
     padding: 10,
     paddingVertical: 15,
     borderColor: '#A9C5F2',
+    overflow: "hidden",
     borderWidth: 3,
   },
 

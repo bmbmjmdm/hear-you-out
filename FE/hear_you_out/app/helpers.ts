@@ -71,3 +71,28 @@ export const resizeAudioCircle = (screenSize: ScreenSize) => {
     width: size,
    }
 }
+
+export const resizeHeaderMargin = (screenSize: ScreenSize) => {
+  const size = screenSize == "large" ? 200
+    : screenSize == "small" ? 100
+    : screenSize == "tiny" ? 50
+    : 150 // default is 150 at medium
+  return {
+    marginTop: size
+   }
+}
+
+export const resizeCat = (screenSize: ScreenSize) => {
+  const size = screenSize == "large" ? 400
+    : screenSize == "small" ? 300
+    : screenSize == "tiny" ? 250
+    : 350 // default is 350 at medium
+  const margin = screenSize == "large" ? 75
+    : screenSize == "small" ? -25
+    : screenSize == "tiny" ? -75
+    : 25 // default is 25 at medium
+  return {
+    width: size,
+    marginTop: margin
+   }
+}

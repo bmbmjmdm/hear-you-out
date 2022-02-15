@@ -138,6 +138,7 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
         await player.pausePlayer()
       }
       catch (e) {
+        console.log("start then pause failed")
         // let restart fail silently, its not worth reloading the app over and for MVP the user can recover manually
       }
     }
@@ -161,7 +162,26 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
         Alert.alert("Failed to pause. Please contact support if this keeps happening.")
       }
     }
-    // we're not playing, start
+    // we're not playing but we already started, resume
+    else if (started.current) {
+      setDisableSwipes(false)
+      try {
+        await player.resumePlayer()
+      }
+      catch (e) {
+        // if we cant resume the player, try to restart
+        try {
+          await player.startPlayer(filepath)
+        }
+        catch (e) {
+          // if we cant start the player, this is a serious problem
+          Alert.alert("Cannot play answer. Please contact support if this keeps happening.")
+          onError()
+        }
+      }
+      setPlaying(!playing)
+    }
+    // we're not playing and didnt start yet, so start
     else {
       started.current = true
       startedPerm.current = true
@@ -390,7 +410,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     // TODO certain devices may need more padding if SafetyArea doesnt account for top bar
-    paddingTop: 20,
+    paddingTop: 30,
     alignItems: 'center'
   },
 

@@ -13,6 +13,8 @@ import Skip from './Skip.png'
 import X from './X.png'
 import Check from './Check.png'
 import TutorialElement from './TutorialElement';
+import { SizeContext } from './helpers'
+import { getBBLargeSize, getBBSmallSize, resizeBBLarge, resizeBBSmall } from './helpers'
 
 type BottomButtonsProps = {
   theme: "answer" | "question",
@@ -38,6 +40,7 @@ const BottomButtons = ({theme, disabled, xPressed, miscPressed, checkPressed, is
 
 // TODO disabled styles
 const Button = ({name, theme, onPress, disabled, isInTutorial, currentTutorialElement, onTutorialPress, submitting = false}) => {
+  const screenSize = React.useContext(SizeContext)
   const [pressed, setPressed] = React.useState(false)
   let radius;
   let style;
@@ -50,31 +53,31 @@ const Button = ({name, theme, onPress, disabled, isInTutorial, currentTutorialEl
   if (name === "check") {
     const bgColor = theme == "question" ? "#FF8AB2" : "#ABFFB8"
     const pressedColor = theme == "question" ? "#C16A89" : "#598560"
-    radius = 100
+    radius = getBBLargeSize(screenSize)
     underlay = pressedColor
-    style = [styles.bigCircle, {backgroundColor: pressed ? underlay : bgColor}, pressed ? styles.depth : {}]
+    style = [styles.bigCircle, resizeBBLarge(screenSize), {backgroundColor: pressed ? underlay : bgColor}, pressed ? styles.depth : {}]
     image = Check
-    imageSize = 55
+    imageSize = (11/20) * radius
     calloutText = theme === 'question' ? "When you're ready to submit you answer, press this!" : "When you're ready to proceed to the next answer, you can use one of these bottom buttons or swipe. Use this button or swipe right if you agree with the answer"
     calloutDistance = theme === 'question' ? -300 : -400
   }
   else if (name === "x") {
     const bgColor = theme == "question" ? "#FFC5C3" : "#ABFFB8"
     const pressedColor = theme == "question" ? "#C69A99" : "#598560"
-    radius = 100
+    radius = getBBLargeSize(screenSize)
     underlay = pressedColor
-    style = [styles.bigCircle, {backgroundColor: pressed ? underlay : bgColor}, pressed ? styles.depth : {}]
+    style = [styles.bigCircle, resizeBBLarge(screenSize), {backgroundColor: pressed ? underlay : bgColor}, pressed ? styles.depth : {}]
     image = X
-    imageSize = 50
+    imageSize = 0.5 * radius
     calloutText = theme === 'question' ? "If you don't like what you've recorded, press this to delete your recording and start over" : "Use this button or swipe left if you disagree with the answer"
     calloutDistance = theme === 'question' ?  -300 : -300
   }
   else {
-    radius = 60
+    radius = getBBSmallSize(screenSize)
     underlay = '#918a64'
-    style = [styles.littleCircle, pressed ? {backgroundColor: underlay} : {}, pressed ? styles.depthSmall : {}]
+    style = [styles.littleCircle, resizeBBSmall(screenSize), pressed ? {backgroundColor: underlay} : {}, pressed ? styles.depthSmall : {}]
     image = theme == "question" ? Speaker : Skip;
-    imageSize = 40
+    imageSize = (2/3) * radius
     calloutText = theme === 'question' ? "To hear back what you've already recorded, press here" : "Use this button if you aren't sure whether you agree or not"
     calloutDistance = theme === 'question' ? -280 : -280
   }
@@ -123,16 +126,12 @@ const styles = StyleSheet.create({
   },
   bigCircle: {
     borderRadius:999,
-    height: 100,
-    width: 100,
     alignItems: 'center',
     justifyContent: 'center',
   },
   littleCircle: {
     borderRadius:999,
     backgroundColor: '#FFF3B2',
-    height: 60,
-    width: 60,
     alignItems: 'center',
     justifyContent: 'center'
   },

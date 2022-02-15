@@ -7,6 +7,7 @@ import {
   ActivityIndicator,
   AppState,
   Alert,
+  useWindowDimensions,
 } from 'react-native';
 
 // https://www.npmjs.com/package/react-native-deck-swiper
@@ -18,6 +19,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { APIQuestion, getAnswer, getQuestion, rateAnswer, submitAnswer, reportAnswer, clearTempAnswerList } from './Network'
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NoAnswers from './NoAnswers'
+import { ScreenSize, SizeContext } from './helpers'
 
 type AnswerCard = {
   id: string,
@@ -26,6 +28,12 @@ type AnswerCard = {
 
 // TODO error handling on everything
 const App = () => {
+  const {height} = useWindowDimensions()
+  let screenSize:ScreenSize = "medium"
+  if (height < 500) screenSize = "tiny"
+  else if (height < 700) screenSize = "small"
+  else if (height < 1000) screenSize = "medium"
+  else screenSize = "large"
   const [disableSwipes, setDisableSwipes] = React.useState(true)
   const swiper1 = React.useRef(null)
   const swiper2 = React.useRef(null)
@@ -276,130 +284,132 @@ const App = () => {
   // once the one on top runs out, the one below is shown and they swap jobs
   return (
     <SafeAreaProvider>
-      <View style={styles.loadingScreen}>
-        {/* For now we dont set `animating` based on `loadStack`. If we need performance boost, maybe try that */}
-        <ActivityIndicator size="large" color="#A9C5F2" />
-      </View>
-      {cards1.length ?
-        <Swiper
-          cards={cards1}
-          renderCard={(card) => {
-            if (card === 'Question') {
-              return <Question submitAnswerAndProceed={submitAnswerAndProceed} question={question} completedTutorial={completedQuestionTutorial} onCompleteTutorial={onCompleteQuestionTutorial} onError={reloadStacks} />
-            }
-            else if (card === 'None') {
-              return <NoAnswers setDisableSwipes={setDisableSwipes} />
-            }
-            else {
-              return <Answer setDisableSwipes={setDisableSwipes} answerAudioData={card.data} id={card.id} question={question} completedTutorial={completedAnswerTutorial} onCompleteTutorial={onCompleteAnswerTutorial} onApprove={() => swiper1.current.swipeRight()} onDisapprove={() => swiper1.current.swipeLeft()} onPass={() => swiper1.current.swipeTop()} onReport={() => swiper1.current.swipeBottom()} onError={reloadStacks} />
-            }
-          }}
-          onSwiped={() => {}}
-          onSwipedRight={(index) => {
-            if (cards1[index] !== "Question" && cards1[index] !== "None") rateAnswerAndAnimate(cards1[index], 1)
-          }}
-          onSwipedLeft={(index) => {
-            if (cards1[index] !== "Question" && cards1[index] !== "None") rateAnswerAndAnimate(cards1[index], -1)
-          }}
-          onSwipedTop={(index) => {
-            if (cards1[index] !== "Question" && cards1[index] !== "None") rateAnswerAndAnimate(cards1[index], 0)
-          }}
-          onSwipedBottom={(index) => {
-            if (cards1[index] !== "Question" && cards1[index] !== "None") reportAnswerAndAnimate(cards1[index])
-          }}
-          onSwipedAll={() => {
-            toggleTopStack(cards1[0] === "None" && cards2[0] === "None")
-          }}
-          cardIndex={0}
-          backgroundColor={'rgba(0,0,0,0)'}
-          stackSize={1}
-          cardVerticalMargin={0}
-          cardHorizontalMargin={0}
-          stackSeparation={0}
-          stackScale={0}
-          disableBottomSwipe={true}
-          disableLeftSwipe={disableSwipes}
-          disableRightSwipe={disableSwipes}
-          disableTopSwipe={true}
-          horizontalSwipe={!disableSwipes}
-          verticalSwipe={false}
-          onTapCardDeadZone={disableSwipes? Number.MAX_VALUE : 50}
-          ref={swiper1}
-          keyExtractor={(val) => {
-            if (val === "Question" || val === "None") return val
-            else return val.id
-          }}
-          containerStyle={{
-            top: 0,
-            left: 0,  
-            position: 'absolute',
-            elevation: topStack === 1 ? 1 : 0,
-            zIndex: topStack === 1 ? 10 : 0
-          }}
-          childProps={[completedQuestionTutorial, completedAnswerTutorial]}
-        />
-        : null
-      }
-      {cards2.length ?
-        <Swiper
-          cards={cards2}
-          renderCard={(card) => {
-            if (card === 'Question') {
-              return <Question submitAnswerAndProceed={submitAnswerAndProceed} question={question} completedTutorial={completedQuestionTutorial} onCompleteTutorial={onCompleteQuestionTutorial} onError={reloadStacks} />
-            }
-            else if (card === 'None') {
-              return <NoAnswers setDisableSwipes={setDisableSwipes} />
-            }
-            else {
-              return <Answer setDisableSwipes={setDisableSwipes} answerAudioData={card.data} id={card.id} question={question} completedTutorial={completedAnswerTutorial} onCompleteTutorial={onCompleteAnswerTutorial} onApprove={() => swiper2.current.swipeRight()} onDisapprove={() => swiper2.current.swipeLeft()} onPass={() => swiper2.current.swipeTop()} onReport={() => swiper2.current.swipeBottom()} onError={reloadStacks} />
-            }
-          }}
-          onSwiped={() => {}}
-          onSwipedRight={(index) => {
-            if (cards2[index] !== "Question" && cards2[index] !== "None") rateAnswerAndAnimate(cards2[index], 1)
-          }}
-          onSwipedLeft={(index) => {
-            if (cards2[index] !== "Question" && cards2[index] !== "None") rateAnswerAndAnimate(cards2[index], -1)
-          }}
-          onSwipedTop={(index) => {
-            if (cards2[index] !== "Question" && cards2[index] !== "None") rateAnswerAndAnimate(cards2[index], 0)
-          }}
-          onSwipedBottom={(index) => {
-            if (cards2[index] !== "Question" && cards2[index] !== "None") reportAnswerAndAnimate(cards2[index])
-          }}
-          onSwipedAll={() => {
-            toggleTopStack(cards1[0] === "None" && cards2[0] === "None")
-          }}
-          cardIndex={0}
-          backgroundColor={'rgba(0,0,0,0)'}
-          stackSize={1}
-          cardVerticalMargin={0}
-          cardHorizontalMargin={0}
-          stackSeparation={0}
-          stackScale={0}
-          disableBottomSwipe={true}
-          disableLeftSwipe={disableSwipes}
-          disableRightSwipe={disableSwipes}
-          disableTopSwipe={true}
-          horizontalSwipe={!disableSwipes}
-          verticalSwipe={false}
-          onTapCardDeadZone={disableSwipes? Number.MAX_VALUE : 50}
-          ref={swiper2}
-          keyExtractor={(val) => {
-            if (val === "Question" || val === "None") return val
-            else return val.id
-          }}
-          containerStyle={{
-            top: 0,
-            left: 0,
-            position: 'absolute',
-            elevation: topStack === 2 ? 1 : 0,
-            zIndex: topStack === 2 ? 10 : 0
-          }}
-          childProps={[completedQuestionTutorial, completedAnswerTutorial]}
-        />
-        : null
-      }
+      <SizeContext.Provider value={screenSize}>
+        <View style={styles.loadingScreen}>
+          {/* For now we dont set `animating` based on `loadStack`. If we need performance boost, maybe try that */}
+          <ActivityIndicator size="large" color="#A9C5F2" />
+        </View>
+        {cards1.length ?
+          <Swiper
+            cards={cards1}
+            renderCard={(card) => {
+              if (card === 'Question') {
+                return <Question submitAnswerAndProceed={submitAnswerAndProceed} question={question} completedTutorial={completedQuestionTutorial} onCompleteTutorial={onCompleteQuestionTutorial} onError={reloadStacks} />
+              }
+              else if (card === 'None') {
+                return <NoAnswers setDisableSwipes={setDisableSwipes} />
+              }
+              else {
+                return <Answer setDisableSwipes={setDisableSwipes} answerAudioData={card.data} id={card.id} question={question} completedTutorial={completedAnswerTutorial} onCompleteTutorial={onCompleteAnswerTutorial} onApprove={() => swiper1.current.swipeRight()} onDisapprove={() => swiper1.current.swipeLeft()} onPass={() => swiper1.current.swipeTop()} onReport={() => swiper1.current.swipeBottom()} onError={reloadStacks} />
+              }
+            }}
+            onSwiped={() => {}}
+            onSwipedRight={(index) => {
+              if (cards1[index] !== "Question" && cards1[index] !== "None") rateAnswerAndAnimate(cards1[index], 1)
+            }}
+            onSwipedLeft={(index) => {
+              if (cards1[index] !== "Question" && cards1[index] !== "None") rateAnswerAndAnimate(cards1[index], -1)
+            }}
+            onSwipedTop={(index) => {
+              if (cards1[index] !== "Question" && cards1[index] !== "None") rateAnswerAndAnimate(cards1[index], 0)
+            }}
+            onSwipedBottom={(index) => {
+              if (cards1[index] !== "Question" && cards1[index] !== "None") reportAnswerAndAnimate(cards1[index])
+            }}
+            onSwipedAll={() => {
+              toggleTopStack(cards1[0] === "None" && cards2[0] === "None")
+            }}
+            cardIndex={0}
+            backgroundColor={'rgba(0,0,0,0)'}
+            stackSize={1}
+            cardVerticalMargin={0}
+            cardHorizontalMargin={0}
+            stackSeparation={0}
+            stackScale={0}
+            disableBottomSwipe={true}
+            disableLeftSwipe={disableSwipes}
+            disableRightSwipe={disableSwipes}
+            disableTopSwipe={true}
+            horizontalSwipe={!disableSwipes}
+            verticalSwipe={false}
+            onTapCardDeadZone={disableSwipes? Number.MAX_VALUE : 50}
+            ref={swiper1}
+            keyExtractor={(val) => {
+              if (val === "Question" || val === "None") return val
+              else return val.id
+            }}
+            containerStyle={{
+              top: 0,
+              left: 0,  
+              position: 'absolute',
+              elevation: topStack === 1 ? 1 : 0,
+              zIndex: topStack === 1 ? 10 : 0
+            }}
+            childProps={[completedQuestionTutorial, completedAnswerTutorial]}
+          />
+          : null
+        }
+        {cards2.length ?
+          <Swiper
+            cards={cards2}
+            renderCard={(card) => {
+              if (card === 'Question') {
+                return <Question submitAnswerAndProceed={submitAnswerAndProceed} question={question} completedTutorial={completedQuestionTutorial} onCompleteTutorial={onCompleteQuestionTutorial} onError={reloadStacks} />
+              }
+              else if (card === 'None') {
+                return <NoAnswers setDisableSwipes={setDisableSwipes} />
+              }
+              else {
+                return <Answer setDisableSwipes={setDisableSwipes} answerAudioData={card.data} id={card.id} question={question} completedTutorial={completedAnswerTutorial} onCompleteTutorial={onCompleteAnswerTutorial} onApprove={() => swiper2.current.swipeRight()} onDisapprove={() => swiper2.current.swipeLeft()} onPass={() => swiper2.current.swipeTop()} onReport={() => swiper2.current.swipeBottom()} onError={reloadStacks} />
+              }
+            }}
+            onSwiped={() => {}}
+            onSwipedRight={(index) => {
+              if (cards2[index] !== "Question" && cards2[index] !== "None") rateAnswerAndAnimate(cards2[index], 1)
+            }}
+            onSwipedLeft={(index) => {
+              if (cards2[index] !== "Question" && cards2[index] !== "None") rateAnswerAndAnimate(cards2[index], -1)
+            }}
+            onSwipedTop={(index) => {
+              if (cards2[index] !== "Question" && cards2[index] !== "None") rateAnswerAndAnimate(cards2[index], 0)
+            }}
+            onSwipedBottom={(index) => {
+              if (cards2[index] !== "Question" && cards2[index] !== "None") reportAnswerAndAnimate(cards2[index])
+            }}
+            onSwipedAll={() => {
+              toggleTopStack(cards1[0] === "None" && cards2[0] === "None")
+            }}
+            cardIndex={0}
+            backgroundColor={'rgba(0,0,0,0)'}
+            stackSize={1}
+            cardVerticalMargin={0}
+            cardHorizontalMargin={0}
+            stackSeparation={0}
+            stackScale={0}
+            disableBottomSwipe={true}
+            disableLeftSwipe={disableSwipes}
+            disableRightSwipe={disableSwipes}
+            disableTopSwipe={true}
+            horizontalSwipe={!disableSwipes}
+            verticalSwipe={false}
+            onTapCardDeadZone={disableSwipes? Number.MAX_VALUE : 50}
+            ref={swiper2}
+            keyExtractor={(val) => {
+              if (val === "Question" || val === "None") return val
+              else return val.id
+            }}
+            containerStyle={{
+              top: 0,
+              left: 0,
+              position: 'absolute',
+              elevation: topStack === 2 ? 1 : 0,
+              zIndex: topStack === 2 ? 10 : 0
+            }}
+            childProps={[completedQuestionTutorial, completedAnswerTutorial]}
+          />
+          : null
+        }
+      </SizeContext.Provider>
     </SafeAreaProvider>
   );
 };

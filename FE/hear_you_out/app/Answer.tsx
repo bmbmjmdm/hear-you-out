@@ -24,6 +24,8 @@ import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import RNShare from 'react-native-share'
 import { APIQuestion } from "./Network"
 import TutorialElement from './TutorialElement'
+import { SizeContext } from './helpers'
+import { getAudioCircleSize, resizeAudioCircle, resizePlayPause, resizeTitle } from './helpers'
 
 type AnswerProps = {
   setDisableSwipes: (val: boolean) => void,
@@ -41,6 +43,7 @@ type AnswerProps = {
 }
 
 const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, onApprove, onPass, onReport, completedTutorial, onCompleteTutorial, onError}: AnswerProps) => {
+  const screenSize = React.useContext(SizeContext)
   const [sliderValue, setSliderValue] = React.useState(0)
   const [length, setLength] = React.useState(0)
   const [playing, setPlaying] = React.useState(false)
@@ -262,7 +265,7 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
           calloutText={"Now you'll see answers by other people. They'll be answering the same question you just did."}
           calloutDistance={30}
         >
-          <Text style={styles.header}>
+          <Text style={[styles.header, resizeTitle(screenSize)]}>
             { question.text }
           </Text>
         </TutorialElement>
@@ -276,15 +279,15 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
           calloutText={"Use these to play, pause, fast-forward, and rewind"}
           calloutDistance={0}
         >
-          <Shadow radius={175} style={{ marginTop: 30 }} disabled={isInTutorial && currentTutorialElement !== 'play'}>
+          <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }} disabled={isInTutorial && currentTutorialElement !== 'play'}>
             <TouchableOpacity
-              style={[styles.audioCircle, playing ? styles.yellowCircle : styles.whiteCircle]}
+              style={[styles.audioCircle, resizeAudioCircle(screenSize), playing ? styles.yellowCircle : styles.whiteCircle]}
               onPress={playPressed}
               activeOpacity={1}
             >
               <Image
                 source={playing ? Pause : Play}
-                style={{ width: 100 }}
+                style={{ width: resizePlayPause(screenSize) }}
                 resizeMode={'contain'}
               />
             </TouchableOpacity>
@@ -392,7 +395,6 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    fontSize: 35,
     textAlign: 'center'
   },
 

@@ -171,6 +171,7 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
       catch (e) {
         // if we cant resume the player, try to restart
         try {
+          console.log("failed to resume player, restarting")
           await player.startPlayer(filepath)
         }
         catch (e) {

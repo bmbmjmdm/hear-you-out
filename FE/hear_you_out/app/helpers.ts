@@ -29,9 +29,9 @@ export const resizeBBLarge = (screenSize: ScreenSize) => {
 }
 
 export const getBBSmallSize = (screenSize: ScreenSize) => {
-  return screenSize == "large" ? 125
-    : screenSize == "small" ? 75
-    : screenSize == "tiny" ? 50
+  return screenSize == "large" ? 80
+    : screenSize == "small" ? 50
+    : screenSize == "tiny" ? 40
     : 60 // default is 60 at medium
 }
 

@@ -171,11 +171,9 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       circlesCopy[id] = 
       (<Animated.View 
         key={id}
-        style={{
+        style={[{
           // time limit changes color of circles to be darker
           backgroundColor: recordTimeForCircles.current < 240 ? "#ff617c" : '#880000',
-          height: 175,
-          width: 175,
           borderRadius: 999,
           position: "absolute",
           elevation: -1,
@@ -186,7 +184,8 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
             {translateY: Animated.multiply(Animated.multiply(anim, new Animated.Value(200)), new Animated.Value(Math.sin(rotation)))},
             {translateX: Animated.multiply(Animated.multiply(anim, new Animated.Value(200)), new Animated.Value(Math.cos(rotation)))}
           ]
-        }}
+        },
+        resizeAudioCircle(screenSize)]}
       />)
       // kick off the animation
       Animated.timing(anim, {

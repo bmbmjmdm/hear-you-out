@@ -30,8 +30,8 @@ type AnswerCard = {
 const App = () => {
   const {height} = useWindowDimensions()
   let screenSize:ScreenSize = "medium"
-  if (height < 500) screenSize = "tiny"
-  else if (height < 700) screenSize = "small"
+  if (height < 600) screenSize = "tiny"
+  else if (height < 750) screenSize = "small"
   else if (height < 1000) screenSize = "medium"
   else screenSize = "large"
   const [disableSwipes, setDisableSwipes] = React.useState(true)

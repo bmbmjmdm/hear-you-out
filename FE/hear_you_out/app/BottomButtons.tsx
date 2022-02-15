@@ -49,6 +49,7 @@ const Button = ({name, theme, onPress, disabled, isInTutorial, currentTutorialEl
   let imageSize;
   let calloutText;
   let calloutDistance
+  const xCalloutDistance = theme === 'question' ? -300 : -300
 
   if (name === "check") {
     const bgColor = theme == "question" ? "#FF8AB2" : "#ABFFB8"
@@ -70,7 +71,7 @@ const Button = ({name, theme, onPress, disabled, isInTutorial, currentTutorialEl
     image = X
     imageSize = 0.5 * radius
     calloutText = theme === 'question' ? "If you don't like what you've recorded, press this to delete your recording and start over" : "Use this button or swipe left if you disagree with the answer"
-    calloutDistance = theme === 'question' ?  -300 : -300
+    calloutDistance = xCalloutDistance
   }
   else {
     radius = getBBSmallSize(screenSize)
@@ -79,7 +80,7 @@ const Button = ({name, theme, onPress, disabled, isInTutorial, currentTutorialEl
     image = theme == "question" ? Speaker : Skip;
     imageSize = (2/3) * radius
     calloutText = theme === 'question' ? "To hear back what you've already recorded, press here" : "Use this button if you aren't sure whether you agree or not"
-    calloutDistance = theme === 'question' ? -280 : -280
+    calloutDistance = xCalloutDistance + (getBBLargeSize(screenSize) - getBBSmallSize(screenSize)) / 2
   }
 
   return (

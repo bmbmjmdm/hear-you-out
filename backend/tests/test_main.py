@@ -36,6 +36,9 @@ client = TestClient(app)
 # get TEST_questions db+drive to appear in Deta...
 # happy path for each endpoint
 # - need setup/teardown structure. need to learn pytest. fixtures i think
+#   - load test_question drive with question list, use as precond for all...maybe as a module-level vs test/session
+#   - autouse for fixtures to be run before every test -> diff than session?
+#   - when to init test db w/ data if using dep inj override? in override_ functions, but only need/want to init it once per tseting session, not per endpoint call -> how to model? maybe do that top level in file, and return the init'd instance in override_
 # enumerate edge caes for each end point, decide which oens to write tests for
 
 def test_get_question():

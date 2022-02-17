@@ -411,7 +411,7 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     // TODO certain devices may need more padding if SafetyArea doesnt account for top bar
-    paddingTop: 30,
+    paddingTop: Platform.OS === "ios" ? 30 : 20,
     alignItems: 'center'
   },
 

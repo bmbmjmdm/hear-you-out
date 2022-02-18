@@ -7,7 +7,7 @@ import datetime
 from math import sqrt
 from pydantic import BaseModel
 from functools import lru_cache
-from typing import List, Optional
+from typing import List, Optional, Union
 from random import uniform, choice
 from deta import Deta, Drive, Base
 from discord_webhook import DiscordWebhook
@@ -88,6 +88,9 @@ class AnswerSubmission(BaseModel):
 class AnswerListen(BaseModel):
     audio_data: bytes
     answer_uuid: str # TODO
+    
+class NoAnswerListen(BaseModel):
+    no_answers = True
 
 class AnswerTableSchema(BaseModel):
     key: str # TODO uuid; # answer_uuid
@@ -273,8 +276,9 @@ def filter_answers_from_db(items: List[AnswerTableSchema], question_uuid: str, s
 
     # TODO check for emptiness here? to prevent typeerror unpacking None
     return pop, unpop, contro, seen_pop, seen_unpop, seen_contro
-        
-@app.post("/getAnswer", response_model=AnswerListen)
+
+# returns diff data model if no answers found (2nd happy path)
+@app.post("/getAnswer", response_model=Union[AnswerListen,NoAnswerListen])
 async def get_answer(question_uuid: str,
                      seen_answer_uuids: List[str],
                      drive: dict = Depends(get_drives),
@@ -287,7 +291,7 @@ async def get_answer(question_uuid: str,
     res = db['answers'].fetch()
     #print(res, res.count)
     if res.count == 0:
-        return PlainTextResponse("no answers found", status_code=500)
+        return NoAnswerListen()
 
     answers_items = [AnswerTableSchema(**item) for item in res.items]
     pop, unpop, contro, seen_pop, seen_unpop, seen_contro = filter_answers_from_db(answers_items, question_uuid, seen_answer_uuids)
@@ -303,7 +307,7 @@ async def get_answer(question_uuid: str,
         seen_contro += seen_contro2
 
     if len(pop+unpop+contro) == 0:
-        return PlainTextResponse("no filtered answers found", status_code=500)
+        return NoAnswerListen()
 
     # calculate distribution thus far from seen answers, since we want to take that into account.
     # TODO finish this

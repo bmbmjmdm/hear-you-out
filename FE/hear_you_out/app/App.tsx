@@ -196,12 +196,20 @@ const App = () => {
       }
       // no new question, so instead set up a new answer for the user to hear
       const newA = await getAnswer(loadedQuestion?.key || curQuestion.key)
-      // TODO check if we actually got an answer. if we didn't, set the next card to be "None"
-      // we completely override the card stack since we only allow 1 card per stack right now
-      const cardSetterCallback = (oldCards) => [{
-        id: newA.answer_uuid,
-        data: newA.audio_data
-      }]
+      let cardSetterCallback
+      if (newA.no_answers) {
+        // we were not given an answer
+        // we completely override the card stack since we only allow 1 card per stack right now
+        cardSetterCallback = (oldCards) => ["None"]
+      }
+      else {
+        // we have an answer
+        // we completely override the card stack since we only allow 1 card per stack right now
+        cardSetterCallback = (oldCards) => [{
+          id: newA.answer_uuid,
+          data: newA.audio_data
+        }]
+      }
       if (stack === 1) setCards1(cardSetterCallback)
       else setCards2(cardSetterCallback)
       return loadedQuestion
@@ -297,7 +305,7 @@ const App = () => {
                 return <Question submitAnswerAndProceed={submitAnswerAndProceed} question={question} completedTutorial={completedQuestionTutorial} onCompleteTutorial={onCompleteQuestionTutorial} onError={reloadStacks} />
               }
               else if (card === 'None') {
-                return <NoAnswers setDisableSwipes={setDisableSwipes} />
+                return <NoAnswers setDisableSwipes={setDisableSwipes} isShown={topStack === 1} />
               }
               else {
                 return <Answer setDisableSwipes={setDisableSwipes} answerAudioData={card.data} id={card.id} question={question} completedTutorial={completedAnswerTutorial} onCompleteTutorial={onCompleteAnswerTutorial} onApprove={() => swiper1.current.swipeRight()} onDisapprove={() => swiper1.current.swipeLeft()} onPass={() => swiper1.current.swipeTop()} onReport={() => swiper1.current.swipeBottom()} onError={reloadStacks} />
@@ -357,7 +365,7 @@ const App = () => {
                 return <Question submitAnswerAndProceed={submitAnswerAndProceed} question={question} completedTutorial={completedQuestionTutorial} onCompleteTutorial={onCompleteQuestionTutorial} onError={reloadStacks} />
               }
               else if (card === 'None') {
-                return <NoAnswers setDisableSwipes={setDisableSwipes} />
+                return <NoAnswers setDisableSwipes={setDisableSwipes} isShown={topStack === 2} />
               }
               else {
                 return <Answer setDisableSwipes={setDisableSwipes} answerAudioData={card.data} id={card.id} question={question} completedTutorial={completedAnswerTutorial} onCompleteTutorial={onCompleteAnswerTutorial} onApprove={() => swiper2.current.swipeRight()} onDisapprove={() => swiper2.current.swipeLeft()} onPass={() => swiper2.current.swipeTop()} onReport={() => swiper2.current.swipeBottom()} onError={reloadStacks} />

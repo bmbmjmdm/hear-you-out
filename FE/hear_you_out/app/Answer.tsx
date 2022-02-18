@@ -24,6 +24,8 @@ import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import RNShare from 'react-native-share'
 import { APIQuestion } from "./Network"
 import TutorialElement from './TutorialElement'
+import { SizeContext } from './helpers'
+import { getAudioCircleSize, resizeAudioCircle, resizePlayPause, resizeTitle } from './helpers'
 
 type AnswerProps = {
   setDisableSwipes: (val: boolean) => void,
@@ -41,6 +43,7 @@ type AnswerProps = {
 }
 
 const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, onApprove, onPass, onReport, completedTutorial, onCompleteTutorial, onError}: AnswerProps) => {
+  const screenSize = React.useContext(SizeContext)
   const [sliderValue, setSliderValue] = React.useState(0)
   const [length, setLength] = React.useState(0)
   const [playing, setPlaying] = React.useState(false)
@@ -135,6 +138,7 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
         await player.pausePlayer()
       }
       catch (e) {
+        console.log("start then pause failed")
         // let restart fail silently, its not worth reloading the app over and for MVP the user can recover manually
       }
     }
@@ -158,7 +162,27 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
         Alert.alert("Failed to pause. Please contact support if this keeps happening.")
       }
     }
-    // we're not playing, start
+    // we're not playing but we already started, resume
+    else if (started.current) {
+      setDisableSwipes(false)
+      try {
+        await player.resumePlayer()
+      }
+      catch (e) {
+        // if we cant resume the player, try to restart
+        try {
+          console.log("failed to resume player, restarting")
+          await player.startPlayer(filepath)
+        }
+        catch (e) {
+          // if we cant start the player, this is a serious problem
+          Alert.alert("Cannot play answer. Please contact support if this keeps happening.")
+          onError()
+        }
+      }
+      setPlaying(!playing)
+    }
+    // we're not playing and didnt start yet, so start
     else {
       started.current = true
       startedPerm.current = true
@@ -262,7 +286,7 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
           calloutText={"Now you'll see answers by other people. They'll be answering the same question you just did."}
           calloutDistance={30}
         >
-          <Text style={styles.header}>
+          <Text style={[styles.header, resizeTitle(screenSize)]}>
             { question.text }
           </Text>
         </TutorialElement>
@@ -276,15 +300,15 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
           calloutText={"Use these to play, pause, fast-forward, and rewind"}
           calloutDistance={0}
         >
-          <Shadow radius={175} style={{ marginTop: 30 }} disabled={isInTutorial && currentTutorialElement !== 'play'}>
+          <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }} disabled={isInTutorial && currentTutorialElement !== 'play'}>
             <TouchableOpacity
-              style={[styles.audioCircle, playing ? styles.yellowCircle : styles.whiteCircle]}
+              style={[styles.audioCircle, resizeAudioCircle(screenSize), playing ? styles.yellowCircle : styles.whiteCircle]}
               onPress={playPressed}
               activeOpacity={1}
             >
               <Image
                 source={playing ? Pause : Play}
-                style={{ width: 100 }}
+                style={{ width: resizePlayPause(screenSize) }}
                 resizeMode={'contain'}
               />
             </TouchableOpacity>
@@ -387,12 +411,11 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     // TODO certain devices may need more padding if SafetyArea doesnt account for top bar
-    paddingTop: 20,
+    paddingTop: Platform.OS === "ios" ? 30 : 20,
     alignItems: 'center'
   },
 
   header: {
-    fontSize: 35,
     textAlign: 'center'
   },
 

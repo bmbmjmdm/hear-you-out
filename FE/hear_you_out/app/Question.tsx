@@ -23,13 +23,13 @@ import { RNFFmpeg } from 'react-native-ffmpeg';
 import uuid from 'react-native-uuid';
 import { APIQuestion } from "./Network"
 import TutorialElement from './TutorialElement'
+import { SizeContext } from './helpers'
+import { getAudioCircleSize, resizeAudioCircle, resizeMic, resizeTitle } from './helpers'
 
 
 // for tutorial maybe
 // https://reactnativeelements.com/docs/tooltip/
 
-
-// TODO find best settings for iOS
 // https://github.com/hyochan/react-native-audio-recorder-player/blob/master/index.ts
 const audioSet = {
   AudioEncoderAndroid: AudioEncoderAndroidType.HE_AAC, // AAC is slightly better quality but like 75% increase in size
@@ -53,6 +53,7 @@ type QuestionProps = {
 }
 
 const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompleteTutorial, onError }: QuestionProps) => {
+  const screenSize = React.useContext(SizeContext)
   const checklist = React.useRef()
   const [circles, setCircles] = React.useState({})
   const [currentTutorialElement, setCurrentTutorialElement] = React.useState("question")
@@ -151,6 +152,9 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
     }
   }, [])
 
+  // we call animateCircle from a scope that doesnt have access to recordTime, so we box the state here for it and update it each render
+  const recordTimeForCircles = React.useRef(0)
+  recordTimeForCircles.current = recordTime
   // while the user is recording, we make a cute animation behind the record button
   // create a circle that will fade out from the center in a random directon
   const animateCircle = () => {
@@ -167,12 +171,9 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       circlesCopy[id] = 
       (<Animated.View 
         key={id}
-        style={{
-          // TODO is this good color?
-          // TODO also this color is lighter for some reason than it should be. in fact "white" doesnt show at all.... doesnt matter too much, if we find a color that works then w.e
-          backgroundColor: "#ff617c",
-          height: 175,
-          width: 175,
+        style={[{
+          // time limit changes color of circles to be darker
+          backgroundColor: recordTimeForCircles.current < 240 ? "#ff617c" : '#880000',
           borderRadius: 999,
           position: "absolute",
           elevation: -1,
@@ -183,7 +184,8 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
             {translateY: Animated.multiply(Animated.multiply(anim, new Animated.Value(200)), new Animated.Value(Math.sin(rotation)))},
             {translateX: Animated.multiply(Animated.multiply(anim, new Animated.Value(200)), new Animated.Value(Math.cos(rotation)))}
           ]
-        }}
+        },
+        resizeAudioCircle(screenSize)]}
       />)
       // kick off the animation
       Animated.timing(anim, {
@@ -313,6 +315,12 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
     // validate checklist
     if (!checklist?.current?.areAllChecked()) {
       setModalText("Please make sure you addressed all points in the checklist before submitting (scroll if you have to)")
+      setModalConfirm(null)
+      setModalVisible(true)
+      return
+    }
+    if (recordTime < 15) {
+      setModalText("Please make sure you thoroughly answer the prompt (your answer was too short).")
       setModalConfirm(null)
       setModalVisible(true)
       return
@@ -464,7 +472,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
           calloutText={"This is the current question. A new one comes out every few days. Answer it to the best of your ability!"}
           calloutDistance={30}
         >
-          <Text style={styles.header}>
+          <Text style={[styles.header, resizeTitle(screenSize)]}>
             { question.text }
           </Text>
         </TutorialElement>
@@ -478,17 +486,17 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
           calloutText={"This is the recorder. You need to hold it down in order to record, not just press it! You have a 5 minute time limit. If you're speaking loud enough, it'll make pretty colors"}
           calloutDistance={33}
         >
-          <Shadow radius={175} style={{ marginTop: 30 }} disabled={isInTutorial && currentTutorialElement !== "record"}>
+          <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }} disabled={isInTutorial && currentTutorialElement !== "record"}>
             {Object.values(circles)}
             <TouchableOpacity
-              style={[styles.audioCircle, started ? (recording ? styles.redCircle : styles.yellowCircle) : styles.whiteCircle]}
+              style={[styles.audioCircle, resizeAudioCircle(screenSize), started ? (recording ? styles.redCircle : styles.yellowCircle) : styles.whiteCircle]}
               onPressIn={recordPressed}
               onPressOut={recordReleased}
               activeOpacity={1}
             >
               <Image
                 source={Mic}
-                style={{ width: 75 }}
+                style={{ width: resizeMic(screenSize) }}
                 resizeMode={'contain'}
               />
             </TouchableOpacity>
@@ -501,7 +509,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
           id={"record"}
           isInTutorial={isInTutorial}
         >
-          <Text style={styles.timer}>
+          <Text style={[styles.timer, recordTime < 240 ? {} : styles.timerWarning]}>
             { getConvertedRecordTime() } / 5:00
           </Text>
         </TutorialElement>
@@ -548,12 +556,11 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: 20,
     // TODO certain devices may need more padding if SafetyArea doesnt account for top bar
-    paddingTop: 20,
+    paddingTop: Platform.OS === "ios" ? 30 : 20,
     alignItems: 'center'
   },
 
   header: {
-    fontSize: 35,
     textAlign: 'center'
   },
 
@@ -564,10 +571,12 @@ const styles = StyleSheet.create({
     marginBottom: 10
   },
 
+  timerWarning: {
+    color: "#ff1f45"
+  },
+
   audioCircle: {
     borderRadius:999,
-    height: 175,
-    width: 175,
     alignItems: 'center',
     justifyContent: 'center'
   },

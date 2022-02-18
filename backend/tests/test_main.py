@@ -40,6 +40,7 @@ client = TestClient(app)
 #   - autouse for fixtures to be run before every test -> diff than session?
 #   - when to init test db w/ data if using dep inj override? in override_ functions, but only need/want to init it once per tseting session, not per endpoint call -> how to model? maybe do that top level in file, and return the init'd instance in override_
 # enumerate edge caes for each end point, decide which oens to write tests for
+# do i want to deploy a test micro, akin to a dev server the FE can test against?
 
 def test_get_question():
     # add a question to the drive (via file)

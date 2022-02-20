@@ -199,6 +199,12 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
     setPlaying(!playing)
   }
 
+  const informBeginPlaying = () => {
+    setModalText("You need to listen to the answer first!")
+    setModalConfirm(null)
+    setModalVisible(true)
+  }
+
   const shareAnswer = async () => {
     try {
       // note this method does not work with base64 files. we will have to convert the file to a normal mp3 or w.e and share it like that
@@ -388,10 +394,9 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
 
         <BottomButtons
           theme={"answer"}
-          xPressed={onDisapprove}
-          checkPressed={onApprove}
-          miscPressed={onPass}
-          disabled={!startedPerm.current}
+          xPressed={startedPerm ? onDisapprove : informBeginPlaying}
+          checkPressed={startedPerm ? onApprove : informBeginPlaying}
+          miscPressed={startedPerm ? onPass : informBeginPlaying}
           isInTutorial={isInTutorial}
           currentTutorialElement={currentTutorialElement}
           onTutorialPress={progressTutorial}

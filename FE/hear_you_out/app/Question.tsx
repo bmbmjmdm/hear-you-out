@@ -280,6 +280,13 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
     }
   }
 
+  const informBeginRecording = async () => {
+    if (lock.current) return
+    setModalText("You need to start a recording first!")
+    setModalConfirm(null)
+    setModalVisible(true)
+  }
+
   const restartRecording = async () => {
     if (lock.current || recording) return
     // user pressed first button, now they need to confirm
@@ -378,9 +385,8 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
     await RNFS.unlink(originalFile)
   }
   
-// TODO setup for ios
-// https://www.npmjs.com/package/react-native-ffmpeg
-// see 2.3.2 iOS to see about enabling audio package on iOS
+  // https://www.npmjs.com/package/react-native-ffmpeg
+  // see 2.3.2 iOS to see about enabling audio package on iOS
   // concat original file + additional file => original file
   // this may throw an error
   const stopRecorderAndConcat = async () => {
@@ -532,10 +538,9 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
 
         <BottomButtons
           theme={"question"}
-          xPressed={restartRecording}
-          checkPressed={submitRecording}
-          miscPressed={hearRecording}
-          disabled={!started}
+          xPressed={started ? restartRecording : informBeginRecording}
+          checkPressed={started ? submitRecording : informBeginRecording}
+          miscPressed={started ? hearRecording : informBeginRecording}
           isInTutorial={isInTutorial}
           currentTutorialElement={currentTutorialElement}
           onTutorialPress={progressTutorial}

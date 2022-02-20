@@ -18,28 +18,26 @@ import { getBBLargeSize, getBBSmallSize, resizeBBLarge, resizeBBSmall } from './
 
 type BottomButtonsProps = {
   theme: "answer" | "question",
-  xPressed: () => {},
-  miscPressed: () => {},
-  checkPressed: () => {},
-  disabled: boolean,
+  xPressed: () => void,
+  miscPressed: () => void,
+  checkPressed: () => void,
   isInTutorial: boolean,
   currentTutorialElement: string,
   onTutorialPress: () => void,
   submitting?: boolean
 }
 
-const BottomButtons = ({theme, disabled, xPressed, miscPressed, checkPressed, isInTutorial, currentTutorialElement, onTutorialPress, submitting}: BottomButtonsProps) => {
+const BottomButtons = ({theme, xPressed, miscPressed, checkPressed, isInTutorial, currentTutorialElement, onTutorialPress, submitting}: BottomButtonsProps) => {
   return (
     <View style={styles.container}>
-      <Button theme={theme} name={'x'} onPress={xPressed} disabled={disabled} isInTutorial={isInTutorial} currentTutorialElement={currentTutorialElement} onTutorialPress={onTutorialPress} />
-      <Button theme={theme} name={'misc'} onPress={miscPressed} disabled={disabled} isInTutorial={isInTutorial} currentTutorialElement={currentTutorialElement} onTutorialPress={onTutorialPress} />
-      <Button theme={theme} name={'check'} onPress={checkPressed} disabled={disabled} isInTutorial={isInTutorial} currentTutorialElement={currentTutorialElement} onTutorialPress={onTutorialPress} submitting={submitting} />
+      <Button theme={theme} name={'x'} onPress={xPressed} isInTutorial={isInTutorial} currentTutorialElement={currentTutorialElement} onTutorialPress={onTutorialPress} />
+      <Button theme={theme} name={'misc'} onPress={miscPressed} isInTutorial={isInTutorial} currentTutorialElement={currentTutorialElement} onTutorialPress={onTutorialPress} />
+      <Button theme={theme} name={'check'} onPress={checkPressed} isInTutorial={isInTutorial} currentTutorialElement={currentTutorialElement} onTutorialPress={onTutorialPress} submitting={submitting} />
     </View>
   )
 };
 
-// TODO disabled styles
-const Button = ({name, theme, onPress, disabled, isInTutorial, currentTutorialElement, onTutorialPress, submitting = false}) => {
+const Button = ({name, theme, onPress, isInTutorial, currentTutorialElement, onTutorialPress, submitting = false}) => {
   const screenSize = React.useContext(SizeContext)
   const [pressed, setPressed] = React.useState(false)
   let radius;
@@ -100,7 +98,7 @@ const Button = ({name, theme, onPress, disabled, isInTutorial, currentTutorialEl
           underlayColor={underlay}
           activeOpacity={1}
           style={style}
-          onPress={() => { if (!disabled) onPress() }}
+          onPress={onPress}
         >
           {submitting ? 
             <ActivityIndicator size="large" color="#111111" />

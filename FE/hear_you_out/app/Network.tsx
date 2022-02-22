@@ -54,7 +54,8 @@ export const submitAnswer = async (answer: APIAnswer): Promise<APIAnswerId> => {
 
 export type APIOthersAnswer = {
   audio_data: string,
-  answer_uuid: string
+  answer_uuid: string,
+  no_answers: boolean
 }
 
 // this temporary answer list is used to store answers loaded but not rated. When we fetch new answers, we need to check both lists

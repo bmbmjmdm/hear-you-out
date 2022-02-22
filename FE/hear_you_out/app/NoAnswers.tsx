@@ -12,14 +12,15 @@ import { resizeCat, resizeHeaderMargin, SizeContext } from './helpers';
 
 type NoAnswersProps = {
   setDisableSwipes: (toDisable: boolean) => void
+  isShown: boolean
 }
 
-const NoAnswers = ({setDisableSwipes}: NoAnswersProps) => {
+const NoAnswers = ({setDisableSwipes, isShown}: NoAnswersProps) => {
   const screenSize = React.useContext(SizeContext)
 
   React.useEffect(() => {
-    setDisableSwipes(false)
-  }, [])
+    if (isShown) setDisableSwipes(false)
+  }, [isShown])
   
   return (
     <LinearGradient

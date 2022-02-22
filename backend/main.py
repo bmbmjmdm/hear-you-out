@@ -40,6 +40,7 @@ except:
 if os.environ.get('DETA_RUNTIME') is None:
     load_dotenv(override=True)
 
+# TODO use fastapi's env var support for these
 Secret_key = os.environ.get('DETA_PROJECT_KEY')
 # TODO update micro env with deta update -e .env
 Discord_flag_url = os.environ.get('DISCORD_FLAG_WEBHOOK') # todo error if not set unless overridden
@@ -65,7 +66,7 @@ def get_drives():
             'answers': answers_drive}
 @lru_cache
 def get_dbs():
-    questions_db = Base('questions')
+    questions_db = Base('asked_questions')
     answers_db = Base('answers')
     return {'questions': questions_db,
             'answers': answers_db}
@@ -118,12 +119,6 @@ def gen_uuid(): # TODO
     good_enough = good_enough.replace(".","") # remove the dot
     return f"{good_enough}"
 
-# do something with each db and drive so it's accessible from deta dashboard gui
-def touch_backend(dbs, drives):
-    dbs['questions'].put('test')
-    dbs['answers'].put('test')
-    drives['questions'].put('test', 'test')
-    drives['answers'].put('test', 'test')
 
 # handle all exceptions thrown in code below with a 500 http response
 # todo test what happens when this isn't here
@@ -242,7 +237,12 @@ def calculate_popularity(num_agrees, num_disagrees):
 # skip past the banned ones
 # categorize popularity
 def filter_answers_from_db(items: List[AnswerTableSchema], question_uuid: str, seen_answer_uuids: List[str]):
-    pop = unpop = contro = seen_pop = seen_unpop = seen_contro = []
+    pop = []
+    unpop = []
+    contro = []
+    seen_pop = []
+    seen_unpop = []
+    seen_contro = []
     for item in items:
         print(item, question_uuid)
         if item.question_uuid != question_uuid:
@@ -254,7 +254,7 @@ def filter_answers_from_db(items: List[AnswerTableSchema], question_uuid: str, s
         popularity = calculate_popularity(item.num_agrees,
                                           item.num_disagrees)
                                           #item.num_serves)
-        
+
         if popularity < 0:
             if item.key in seen_answer_uuids:
                 seen_unpop.append(item)

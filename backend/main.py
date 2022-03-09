@@ -90,7 +90,7 @@ class AnswerListen(BaseModel):
     audio_data: bytes
     answer_uuid: str # TODO
     
-class NoAnswerListen(BaseModel):
+class NoAnswersResponse(BaseModel):
     no_answers = True
 
 class AnswerTableSchema(BaseModel):
@@ -112,7 +112,7 @@ class AnswerStats(BaseModel):
     num_disagrees: int = 0
     num_abstains: int = 0
     num_serves: int = 0
-    
+
 # utility
 def gen_uuid(): # TODO
     good_enough = str(uniform(0, 100)) # from random
@@ -278,7 +278,7 @@ def filter_answers_from_db(items: List[AnswerTableSchema], question_uuid: str, s
     return pop, unpop, contro, seen_pop, seen_unpop, seen_contro
 
 # returns diff data model if no answers found (2nd happy path)
-@app.post("/getAnswer", response_model=Union[AnswerListen,NoAnswerListen])
+@app.post("/getAnswer", response_model=Union[AnswerListen,NoAnswersResponse])
 async def get_answer(question_uuid: str,
                      seen_answer_uuids: List[str],
                      drive: dict = Depends(get_drives),
@@ -291,7 +291,7 @@ async def get_answer(question_uuid: str,
     res = db['answers'].fetch()
     #print(res, res.count)
     if res.count == 0:
-        return NoAnswerListen()
+        return NoAnswersResponse
 
     answers_items = [AnswerTableSchema(**item) for item in res.items]
     pop, unpop, contro, seen_pop, seen_unpop, seen_contro = filter_answers_from_db(answers_items, question_uuid, seen_answer_uuids)
@@ -307,7 +307,7 @@ async def get_answer(question_uuid: str,
         seen_contro += seen_contro2
 
     if len(pop+unpop+contro) == 0:
-        return NoAnswerListen()
+        return NoAnswersResponse
 
     # calculate distribution thus far from seen answers, since we want to take that into account.
     # TODO finish this
@@ -429,8 +429,8 @@ async def rate_answer(answer_uuid: str,
         
     return PlainTextResponse("rating recorded", status_code=200)
 
-@app.get("/getAnswerStats", response_model=AnswerStats)
+@app.get("/getAnswerStats", response_model=Union[AnswerStats,NoAnswersResponse])
 async def get_answer_stats(answer_uuid: str,
                            drive: dict = Depends(get_drives),
                            db: dict = Depends(get_dbs)):
-    pass
+    return NoAnswersResponse()

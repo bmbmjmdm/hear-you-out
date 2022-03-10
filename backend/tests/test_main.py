@@ -1,10 +1,10 @@
 import sys
-import time
 import yaml
+import pytest
 from deta import Drive, Base
 from fastapi.testclient import TestClient
 
-from ..main import app, get_dbs, get_drives, QuestionModel
+from ..main import app, get_dbs, get_drives, QuestionModel, NoAnswersResponse
 
 def get_test_drives():
     questions_drive = Drive("TEST_questions")
@@ -179,15 +179,22 @@ def test_submit_answer():
 
 ### getAnswerStats
 
+# this will delete all answers from the drive (evtl db)
+@pytest.fixture
+def teardown_answers():
+    yield
+    delete_all_test_answers()
+
 # this is more of an e2e test of user workflow
-def test_get_answer_stats():
+def test_get_answer_stats(teardown_answers):
+    qid = "testQ"
     # submit new answer and verify stats start at 0
     response = client.post("/submitAnswer",
                            json={"audio_data": "test data",
-                                 "question_uuid": "test question"})
+                                 "question_uuid": qid})
     answer_uuid = response.json()['answer_id']
     print(answer_uuid)
-    time.sleep(5)
+
     stats = client.get(f"/getAnswerStats?answer_uuid={answer_uuid}").json()
     print(stats)
     stat_keys = ['num_agrees', 'num_disagrees', 'num_abstains', 'num_serves']
@@ -196,9 +203,9 @@ def test_get_answer_stats():
 #    question_uuid = client.post("/getQuestion").json()['key']
     
     # get the answer to update the stats
-    aid = client.post("/getAnswer",
-                       json={"audio_data": "test data",
-                             "question_uuid": "test question"}).json()['answer_uuid']
+    response = client.post(f"/getAnswer?question_uuid={qid}", json=[]).json()
+    print(response)
+    aid = response['answer_uuid']
     stats = client.get(f"/getAnswerStats?answer_uuid={answer_uuid}").json()
     assert(stats['num_serves'] == 1)
 
@@ -207,7 +214,6 @@ def test_get_answer_stats():
     # changing rating each time ('agreement').
     # prob need to replace this when auth introduced.
     # - can just create func for the workflow loop instead
-
     response = client.get(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=1")
     response = client.get(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=-1")
     response = client.get(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=0")
@@ -219,15 +225,9 @@ def test_get_answer_stats():
     assert(stats['num_agrees'] == 2)
     assert(stats['num_abstains'] == 1)
     
-    # rate to update the stats
-    # todo call this even if prior assert fails by making it fixture and calling after the yield. consider doing it for adding and deleting questions too...
-    # LEFT OFF HERE
-    # then impl the func :D
-    delete_all_test_answers()
-
 def test_bad_answer_stats():
     response = client.get("/getAnswerStats")
-    assert response.status_code == 422 # haven't looked into 422 much
+    assert response.status_code == 422 # this is what fastapi returns by default i guess? 
 
 def test_no_answer_stats():
     response = client.get("/getAnswerStats?answer_uuid=2248634230063352")

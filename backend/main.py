@@ -132,6 +132,7 @@ async def validation_exception_handler(request, exc):
 async def root():
     return {'hey': 'world'}
 
+# return 500 if no questions (vs 200 with a FailState response model)
 @app.get("/getQuestion", response_model=QuestionModel)
 async def get_question(drive: dict = Depends(get_drives), db: dict = Depends(get_dbs)):
     # get today's question...how? from drive? from base? from internet endpoint? from file?/src
@@ -433,4 +434,17 @@ async def rate_answer(answer_uuid: str,
 async def get_answer_stats(answer_uuid: str,
                            drive: dict = Depends(get_drives),
                            db: dict = Depends(get_dbs)):
-    return NoAnswersResponse()
+    row = db['answers'].get(answer_uuid)
+    if row is None:
+        return NoAnswersResponse()
+    else:
+        # good way to AnswerStats(**row) while ignoring irrelevant keys?
+        # print(row)
+        # return AnswerStats().parse_obj_as(AnswerStats, row)
+        return AnswerStats(key = row['key'],
+                           num_serves = row['num_serves'],
+                           num_agrees = row['num_agrees'],
+                           num_abstains = row['num_abstains'],
+                           num_disagrees = row['num_disagrees'])
+    # LEFT OFF making test fn to delete_all_answers fetch everything from db and delete it -> modularize the fetch/last mechanism?
+

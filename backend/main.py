@@ -446,5 +446,4 @@ async def get_answer_stats(answer_uuid: str,
                            num_agrees = row['num_agrees'],
                            num_abstains = row['num_abstains'],
                            num_disagrees = row['num_disagrees'])
-    # LEFT OFF making test fn to delete_all_answers fetch everything from db and delete it -> modularize the fetch/last mechanism?
 

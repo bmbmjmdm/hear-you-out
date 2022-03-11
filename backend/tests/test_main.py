@@ -37,10 +37,16 @@ Qfilename = 'list of questions.yaml'
 # use the test drives and bases instead of prod drives and bases.
 # an alternative would be to just swap the project api
 # (and create the "test" deployment)
+# TODO put this in 'app' (better: 'client'?) fixture, and require it in test cases
+# - also look into asgi_lifespan.LifespanManager and httpx.AsyncClient
+# - - these replace the need to spin up an ASGI server - what does pytest do atm?
 app.dependency_overrides[get_dbs] = get_test_dbs
 app.dependency_overrides[get_drives] = get_test_drives
 
 client = TestClient(app)
+
+# todo - how can we parameterize which set of test questions we want to load
+#        into a given test?
 
 # key must be unique
 def set_question(key, text='none', category='n/a'):
@@ -91,18 +97,42 @@ def drive_get_all_files(drive):
     #print("all files:", all_files)
     return all_files
 
+def fetch_all_from_db(db):
+    res = db.fetch()
+
+    if res.count == 0:
+        return None
+
+    rows = res.items
+    while res.last:
+        res = db.fetch(last=res.last)
+        rows += res.items
+
+    return rows
+
+
 # this function is dangerous in that it will let you delete all answers from Drive and Db
 # without confirming. i only intend to pass in the test drive and db so far...
 def delete_all_test_answers():
     dbs = get_test_dbs()
     drives = get_test_drives()
     all_filenames = drive_get_all_files(drives['answers'])
-    print(f"deleting all answers: " + ', '.join(all_filenames))
+    print(f"deleting all answers in drive: " + ', '.join(all_filenames))
     drives['answers'].delete_many(all_filenames)
-    for key in all_filenames:
-        dbs['answers'].delete(key)
-    # todo need db_get_all_rows too and delete those...
-    
+    # for key in all_filenames:
+    #     dbs['answers'].delete(key)
+    rows = fetch_all_from_db(dbs['answers'])
+    print("deleting all answers in db: " + rows)
+    for row in rows:
+        dbs['answers'].delete(row.key)
+
+# this will delete all answers from the drive (evtl db)
+@pytest.fixture
+def teardown_answers():
+    yield
+    delete_all_test_answers()
+
+        
 ### TODO
 # happy paths for each endpoint
 # - need setup/teardown structure. need to learn pytest. fixtures i think
@@ -113,14 +143,9 @@ def delete_all_test_answers():
 # do i want to deploy a test micro, akin to a dev server the FE can test against?
 # - eventually, yeah, prob
 
-# @pytest.fixture()
-# def R():
-#     print("setup")
-#     yield "resource"
-#     print("teardown")
-
-# class TestResource:
-#     def test_that_depends_on_resource(self, resource):
+@pytest.fixture
+def getQuestion():
+    response = client.get("/getQuestion")
 
 def test_get_question():
     # todo turn set_question and delete_questions into context manager, have it default to true, and manually disable it for test_no_questions_available, the 1 test that wouldn't use it. but parameterize it by 
@@ -138,7 +163,7 @@ def test_get_question():
 
 def test_no_questions_available():
      response = client.get("/getQuestion")
-     assert response.status_code == 200
+     assert response.status_code == 500
 
 def test_submit_answer():
     response = client.post("/submitAnswer",
@@ -179,11 +204,17 @@ def test_submit_answer():
 
 ### getAnswerStats
 
-# this will delete all answers from the drive (evtl db)
-@pytest.fixture
-def teardown_answers():
-    yield
-    delete_all_test_answers()
+# could create fixtures and build user workflows out of them,
+# but wouldn't I want to paramterize them?
+# @pytest.fixture
+# def submit_answer(): # eg pass question_uuid as paramter here?
+# would I make submit_answer require getQuestion? that would be
+# proper workflow. would also want to test what happens in system
+# if that doesn't happen though. but can use fixtures to define
+# happy path while serving as scaffolding for downstream tests
+# LEFT OFF reading:
+# - on pytest fixtures: https://docs.pytest.org/en/6.2.x/fixture.html
+# - on testing fastapi with pytest: https://www.jeffastor.com/blog/testing-fastapi-endpoints-with-docker-and-pytest/
 
 # this is more of an e2e test of user workflow
 def test_get_answer_stats(teardown_answers):

@@ -3,54 +3,69 @@ import yaml
 import pytest
 from deta import Drive, Base
 from fastapi.testclient import TestClient
+from fastapi import FastAPI
 
-from ..main import app, get_dbs, get_drives, QuestionModel, NoAnswersResponse
+from ..main import QuestionModel, NoAnswersResponse
 
-def get_test_drives():
+@pytest.fixture(scope="session")
+def drives():
     questions_drive = Drive("TEST_questions")
     answers_drive = Drive("TEST_answers")
     return {'questions': questions_drive,
             'answers': answers_drive}
 
-def get_test_dbs():
+@pytest.fixture(scope="session")
+def dbs():
     questions_db = Base("TEST_questions")
     answers_db = Base("TEST_answers")
     return {'questions': questions_db,
             'answers': answers_db}
 
 # do something with each db and drive so it's accessible from deta dashboard gui
+@pytest.fixture(scope="session")
 def touch_backend(dbs, drives):
     dbs['questions'].put('test')
     dbs['answers'].put('test')
     drives['questions'].put('test', 'test')
     drives['answers'].put('test', 'test')
 
-Dbs = get_test_dbs()
-Drives = get_test_drives()
-touch_backend(Dbs, Drives)
+# Create a new application for testing
+@pytest.fixture
+def app(dbs, drives, touch_backend: None) -> FastAPI:
+    from ..main import app, get_dbs, get_drives
+    # all the tests in this file run against the prod deployment,
+    # and these two overrides make it so that all the endpoints
+    # use the test drives and bases instead of prod drives and bases.
+    # an alternative would be to just swap the project api
+    # (and create the "test" deployment)
+    app.dependency_overrides[get_dbs] = lambda: dbs
+    app.dependency_overrides[get_drives] = lambda: drives
+    return app
 
-# todo move to main.py / config
-Qfilename = 'list of questions.yaml'
+@pytest.fixture
+def client(app: FastAPI) -> TestClient:
+    return TestClient(app)
 
-# all the tests in this file run against the prod deployment,
-# and these two overrides make it so that all the endpoints
-# use the test drives and bases instead of prod drives and bases.
-# an alternative would be to just swap the project api
-# (and create the "test" deployment)
-# TODO put this in 'app' (better: 'client'?) fixture, and require it in test cases
-# - also look into asgi_lifespan.LifespanManager and httpx.AsyncClient
-# - - these replace the need to spin up an ASGI server - what does pytest do atm?
-app.dependency_overrides[get_dbs] = get_test_dbs
-app.dependency_overrides[get_drives] = get_test_drives
-
-client = TestClient(app)
+# we are doing set_1_question instead of this...for now
+# # Apply migrations at beginning and end of testing session
+# @pytest.fixture(scope="session")
+# def apply_migrations():
+#     warnings.filterwarnings("ignore", category=DeprecationWarning)
+#     os.environ["TESTING"] = "1"
+#     config = Config("alembic.ini")
+#     alembic.command.upgrade(config, "head")
+#     yield
+#     alembic.command.downgrade(config, "base")
 
 # todo - how can we parameterize which set of test questions we want to load
-#        into a given test?
+#        into a given test? (do we actually want to do this?)
 
-# key must be unique
-def set_question(key, text='none', category='n/a'):
+@pytest.fixture
+def set_1_question(dbs, drives) -> QuestionModel:
     # this doesn't add a q per se, it sets entire list to single q
+    key = '2'
+    text = 'none'
+    category = 'n/a'
 
     # yaml data model:
     # questions:
@@ -63,74 +78,65 @@ def set_question(key, text='none', category='n/a'):
     yaml_string = yaml.dump({'questions': [qm.dict()]}, sort_keys=False) # don't sort keys so key remains first
     print(yaml_string)
     
-    qfile = Drives['questions'].get(Qfilename)
+    qfilename = 'list of questions.yaml'
+    qfile = drives['questions'].get(qfilename)
     if qfile is None:
         # instead of using global, should...
-        Drives['questions'].put(Qfilename, yaml_string)
+        drives['questions'].put(qfilename, yaml_string)
     else:
-        raise Exception(f"{Qfilename} already in drive, not overwriting just in case")
+        raise Exception(f"{qfilename} already in drive, not overwriting just in case")
 
-# could merge with set_question and become a fixture, but what if
-# test case wants to add custom data?
-def delete_questions():
-    # instead of using global, should...
-    Drives['questions'].delete(Qfilename)
-    # todo delete questions db too
+    yield qm
+    drives['questions'].delete(qfilename)
+    # todo delete from db too
 
+# def drive_get_all_files(drive):
+#     result = drive.list()
 
-def drive_get_all_files(drive):
-    result = drive.list()
+#     all_files = result.get("names")
+#     paging = result.get("paging")
+#     last = paging.get("last") if paging else None
 
-    all_files = result.get("names")
-    paging = result.get("paging")
-    last = paging.get("last") if paging else None
+#     while (last):
+#         # provide last from previous call
+#         result = drive.list(last=last)
 
-    while (last):
-        # provide last from previous call
-        result = drive.list(last=last)
+#         all_files += result.get("names")
+#         # update last
+#         paging = result.get("paging")
+#         last = paging.get("last") if paging else None
 
-        all_files += result.get("names")
-        # update last
-        paging = result.get("paging")
-        last = paging.get("last") if paging else None
+#     #print("all files:", all_files)
+#     return all_files
 
-    #print("all files:", all_files)
-    return all_files
+# def fetch_all_from_db(db):
+#     res = db.fetch()
 
-def fetch_all_from_db(db):
-    res = db.fetch()
+#     if res.count == 0:
+#         return None
 
-    if res.count == 0:
-        return None
+#     rows = res.items
+#     while res.last:
+#         res = db.fetch(last=res.last)
+#         rows += res.items
 
-    rows = res.items
-    while res.last:
-        res = db.fetch(last=res.last)
-        rows += res.items
-
-    return rows
+#     return rows
 
 
-# this function is dangerous in that it will let you delete all answers from Drive and Db
-# without confirming. i only intend to pass in the test drive and db so far...
-def delete_all_test_answers():
-    dbs = get_test_dbs()
-    drives = get_test_drives()
-    all_filenames = drive_get_all_files(drives['answers'])
-    print(f"deleting all answers in drive: " + ', '.join(all_filenames))
-    drives['answers'].delete_many(all_filenames)
-    # for key in all_filenames:
-    #     dbs['answers'].delete(key)
-    rows = fetch_all_from_db(dbs['answers'])
-    print("deleting all answers in db: " + rows)
-    for row in rows:
-        dbs['answers'].delete(row.key)
-
-# this will delete all answers from the drive (evtl db)
-@pytest.fixture
-def teardown_answers():
-    yield
-    delete_all_test_answers()
+# # this function is dangerous in that it will let you delete all answers from Drive and Db
+# # without confirming. i only intend to pass in the test drive and db so far...
+# def delete_all_test_answers():
+#     dbs = get_test_dbs()
+#     drives = get_test_drives()
+#     all_filenames = drive_get_all_files(drives['answers'])
+#     print(f"deleting all answers in drive: " + ', '.join(all_filenames))
+#     drives['answers'].delete_many(all_filenames)
+#     # for key in all_filenames:
+#     #     dbs['answers'].delete(key)
+#     rows = fetch_all_from_db(dbs['answers'])
+#     print("deleting all answers in db: " + rows)
+#     for row in rows:
+#         dbs['answers'].delete(row.key)
 
         
 ### TODO
@@ -143,35 +149,25 @@ def teardown_answers():
 # do i want to deploy a test micro, akin to a dev server the FE can test against?
 # - eventually, yeah, prob
 
-@pytest.fixture
-def getQuestion():
-    response = client.get("/getQuestion")
+# could return QuestionModel here as a way to build up workflow?
+# @pytest.fixture
+# def getQuestion(client: TestClient) -> None:
+#     response = client.get("/getQuestion")
 
-def test_get_question():
-    # todo turn set_question and delete_questions into context manager, have it default to true, and manually disable it for test_no_questions_available, the 1 test that wouldn't use it. but parameterize it by 
-    set_question(2)
+def test_get_question(client: FastAPI, set_1_question: QuestionModel) -> None:
     # add a question to the drive (via file)
     response = client.get("/getQuestion")
     assert response.status_code == 200
     print(response.json())
-    delete_questions()
     # assert structure of response
     # assert types (uuid, str, int)
     # don't think it's worth checking content of str and int?
     # todo compare to class attribs?
     # assert response.json().keys == model.QuestionModel
 
-def test_no_questions_available():
+def test_no_questions_available(client: TestClient) -> None:
      response = client.get("/getQuestion")
      assert response.status_code == 500
-
-def test_submit_answer():
-    response = client.post("/submitAnswer",
-                           json={"audio_data": "test data",
-                                 "question_uuid": "test question"})
-    assert response.status_code == 200
-    # check the answer_uuid is a string of digits
-    #assert response.json 
 
 ### submitAnswer
 # - happy path results in entry appearing in drive, and entry and db
@@ -179,6 +175,21 @@ def test_submit_answer():
 # - drive is full error
 # - other drive errors? (overwriting?)
 # - db errors
+
+def test_submit_answer(client: TestClient, set_1_question: QuestionModel) -> None:
+    response = client.post("/submitAnswer",
+                           json={"audio_data": "test data",
+                                 "question_uuid": set_1_question.key})
+    assert response.status_code == 200
+    # check the answer_uuid is a string of digits
+    #assert response.json
+
+def test_submit_answer_wrong_qid(client: TestClient) -> None:
+    response = client.post("/submitAnswer",
+                           json={"audio_data": "test data",
+                                 "question_uuid": "key doesn't exist"})
+    assert response.status_code == 400 # what to return?
+    
 
 # workflow test: getAnswer -> no filtered answers -> submitAnswer -> getAnswer -> one
 
@@ -216,9 +227,10 @@ def test_submit_answer():
 # - on pytest fixtures: https://docs.pytest.org/en/6.2.x/fixture.html
 # - on testing fastapi with pytest: https://www.jeffastor.com/blog/testing-fastapi-endpoints-with-docker-and-pytest/
 
-# this is more of an e2e test of user workflow
-def test_get_answer_stats(teardown_answers):
-    qid = "testQ"
+def test_workflow_get_answer_stats(client: TestClient,
+                                   set_1_question: QuestionModel) -> None:
+    qid = set_1_question.key
+    
     # submit new answer and verify stats start at 0
     response = client.post("/submitAnswer",
                            json={"audio_data": "test data",
@@ -241,9 +253,8 @@ def test_get_answer_stats(teardown_answers):
     assert(stats['num_serves'] == 1)
 
     # rate answer few times, make sure db updates
-    # (rly should be getting answer every time i guess)
-    # changing rating each time ('agreement').
-    # prob need to replace this when auth introduced.
+    # rly should be getting answer every time i guess
+    # -> update when I introduce auth/proper workflows
     # - can just create func for the workflow loop instead
     response = client.get(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=1")
     response = client.get(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=-1")
@@ -255,12 +266,13 @@ def test_get_answer_stats(teardown_answers):
     assert(stats['num_disagrees'] == 3)
     assert(stats['num_agrees'] == 2)
     assert(stats['num_abstains'] == 1)
-    
-def test_bad_answer_stats():
+
+# do I need to test this?
+def test_bad_answer_stats(client: TestClient) -> None:
     response = client.get("/getAnswerStats")
     assert response.status_code == 422 # this is what fastapi returns by default i guess? 
 
-def test_no_answer_stats():
+def test_no_answer_stats(client: TestClient) -> None:
     response = client.get("/getAnswerStats?answer_uuid=2248634230063352")
     assert response.status_code == 200
     assert response.json() == NoAnswersResponse().dict()

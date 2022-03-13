@@ -1,4 +1,4 @@
 list of questions
 tests/
 *~
-venv/
+.venv/

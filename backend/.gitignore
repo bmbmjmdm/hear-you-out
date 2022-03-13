@@ -1,10 +1,12 @@
 list of questions
 cli.sh
 
-venv/
+.venv/
 .env
 .deta/
 __pycache__/
 
 *~
 *#*
+
+.projectile

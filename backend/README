@@ -1,7 +1,7 @@
 ## running locally in WSL2
 
 `ifconfig`
-activate venv
+activate .venv
 hear-you-out/backend$ `uvicorn --host <ip> main:app`
 web browse to <ip>:8000/docs
 

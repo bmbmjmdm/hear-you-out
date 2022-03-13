@@ -101,7 +101,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
         if (timing.current) {
           setRecordTime((prevTime) => {
             if (prevTime >= 300) {
-              recordReleased(true)
+              recordPaused(true)
               setModalVisible(true)
               setModalText("You have reached the max recording time")
               setModalConfirm(null)
@@ -206,7 +206,12 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
     })
   }
 
-  const recordPressed = async () => {
+  const recordPressed = () => {
+    if (recording) recordPaused()
+    else recordStartContinue()
+  }
+
+  const recordStartContinue = async () => {
     if (lock.current || recording) return
     if (recordTime >= 300) {
       setModalVisible(true)
@@ -252,12 +257,8 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   }
 
   // we use force when we can't rely on `recording` due to the setInterval timer not having updated variables
-  const recordReleased = async (force:boolean = false, retry:boolean = false) => {
-    if (lock.current) {
-      // if we ever wind up here, we dont want to miss the recordRelease event, so keep retrying
-      setTimeout(() => recordReleased(force), 50)
-      return
-    }
+  const recordPaused = async (force:boolean = false, retry:boolean = false) => {
+    if (lock.current) return
     lock.current = true
     try { 
       if (recording || force) {
@@ -275,7 +276,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       }
       else {
         lock.current = false
-        recordReleased(false, true)
+        recordPaused(false, true)
       }
     }
   }
@@ -475,7 +476,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
           id={"question"}
           isInTutorial={isInTutorial}
           calloutTheme={"question"}
-          calloutText={"This is the current question. A new one comes out every few days. Answer it to the best of your ability!"}
+          calloutText={"This is the current question; a new one comes out every few days. Answer it to the best of your ability. Tap me now!"}
           calloutDistance={30}
         >
           <Text style={[styles.header, resizeTitle(screenSize)]}>
@@ -489,15 +490,14 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
           id={"record"}
           isInTutorial={isInTutorial}
           calloutTheme={"question"}
-          calloutText={"This is the recorder. You need to hold it down in order to record, not just press it! You have a 5 minute time limit. If you're speaking loud enough, it'll make pretty colors"}
+          calloutText={"This is the recorder. After the tutorial ends you can press it to record your answer! Press it again to pause. You have a 5 minute time limit, so make sure to pause when you aren't speaking. If you're speaking loud enough, it'll make pretty colors!"}
           calloutDistance={33}
         >
           <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }} disabled={isInTutorial && currentTutorialElement !== "record"}>
             {Object.values(circles)}
             <TouchableOpacity
               style={[styles.audioCircle, resizeAudioCircle(screenSize), started ? (recording ? styles.redCircle : styles.yellowCircle) : styles.whiteCircle]}
-              onPressIn={recordPressed}
-              onPressOut={recordReleased}
+              onPress={recordPressed}
               activeOpacity={1}
             >
               <Image
@@ -527,7 +527,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
             id={"checklist"}
             isInTutorial={isInTutorial}
             calloutTheme={"question"}
-            calloutText={"This is a checklist to make sure you answer the question thoroughly. Make sure all of them are addressed before submitting!"}
+            calloutText={"This is a checklist to make sure you answer the question thoroughly. Make sure all of them are addressed and checked before submitting!"}
             calloutDistance={-230}
             measureDistanceFromBottom={false}
             inheritedFlex={1}

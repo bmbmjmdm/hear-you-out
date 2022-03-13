@@ -15,6 +15,22 @@ from ..main import QuestionModel, NoAnswersResponse
 # - parameterize fixtures to run all tests depending on them per parameter, for when components themselves can be configured multiple ways
 # - can use markers to run fixtures for all tests in a class/module when you don't need it's return value (eg @pytest.mark.usefixtures("cleandir"))
 # - can override fixtures, useful in big projects
+# - can run a series of tests incrementally if latter don't make sense to run when former fails: https://docs.pytest.org/en/6.2.x/example/simple.html#incremental-testing-test-steps
+# - best practices for organization, packaging: https://docs.pytest.org/en/6.2.x/goodpractices.html 
+
+# notes on pytest usage https://docs.pytest.org/en/6.2.x/usage.html
+# - specifying tests via module, directory ,keyword, note id, pytest.marker, pkg
+# - modifying traceback printing
+# - dropping to python debugger pdb
+# - profiling
+
+# notes on pytest parameterization https://docs.pytest.org/en/6.2.x/parametrize.html and https://docs.pytest.org/en/6.2.x/example/parametrize.html#paramexamples
+# - pytest.fixture() allows one to parametrize fixture functions (as discussed above)
+# - @pytest.mark.parametrize allows one to define multiple sets of arguments and fixtures at the test function or class
+# - - can dynamically generate them
+# - - can stack them on top of each other to get all combinations
+# - pytest_generate_tests allows one to define custom parametrization schemes or extensions
+
 
 @pytest.fixture(scope="session")
 def drives():
@@ -32,7 +48,8 @@ def dbs():
             'answers': answers_db}
 
 # do something with each db and drive so it's accessible from deta dashboard gui
-@pytest.fixture(scope="session")
+# todo make cli flag like `pytest --touch_backend`
+# or maybe make its own test so i can one-off call it when needed. which would be...rarely?
 def touch_backend(dbs, drives):
     dbs['questions'].put('test')
     dbs['answers'].put('test')
@@ -41,7 +58,7 @@ def touch_backend(dbs, drives):
 
 # Create a new application for testing
 @pytest.fixture
-def app(dbs, drives, touch_backend: None) -> FastAPI:
+def app(dbs, drives, touch_backend = False) -> FastAPI:
     from ..main import app, get_dbs, get_drives
     # all the tests in this file run against the prod deployment,
     # and these two overrides make it so that all the endpoints
@@ -50,6 +67,10 @@ def app(dbs, drives, touch_backend: None) -> FastAPI:
     # (and create the "test" deployment)
     app.dependency_overrides[get_dbs] = lambda: dbs
     app.dependency_overrides[get_drives] = lambda: drives
+
+    if touch_backend:
+        touch_backend(dbs, drives)
+        
     return app
 
 @pytest.fixture
@@ -157,7 +178,7 @@ def set_1_question(dbs, drives) -> QuestionModel:
 #   - when to init test db w/ data if using dep inj override? in override_ functions, but only need/want to init it once per tseting session, not per endpoint call -> how to model? maybe do that top level in file, and return the init'd instance in override_
 # enumerate edge caes for each end point, decide which oens to write tests for
 # do i want to deploy a test micro, akin to a dev server the FE can test against?
-# - eventually, yeah, prob
+# - eventually, yeah, prob. to do integration testing with FE eg
 
 # could return QuestionModel here as a way to build up workflow?
 # @pytest.fixture

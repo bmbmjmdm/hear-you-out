@@ -7,6 +7,15 @@ from fastapi import FastAPI
 
 from ..main import QuestionModel, NoAnswersResponse
 
+# notes on pytest https://docs.pytest.org/en/6.2.x/fixture.html
+# - to run multiple asserts safely,: All that’s needed is stepping up to a larger scope, then having the act step defined as an autouse fixture, and finally, making sure all the fixtures are targetting that highler level scope. 
+# - use markers to pass data to fixtures
+# - - example given is for scalar data. what about dict?
+# - “factory as fixture” pattern can help in situations where the result of a fixture is needed multiple times in a single test, parameterizable in test
+# - parameterize fixtures to run all tests depending on them per parameter, for when components themselves can be configured multiple ways
+# - can use markers to run fixtures for all tests in a class/module when you don't need it's return value (eg @pytest.mark.usefixtures("cleandir"))
+# - can override fixtures, useful in big projects
+
 @pytest.fixture(scope="session")
 def drives():
     questions_drive = Drive("TEST_questions")
@@ -14,6 +23,7 @@ def drives():
     return {'questions': questions_drive,
             'answers': answers_drive}
 
+# could turn these into pydantic Store object to pass them around as a single object since they are used together
 @pytest.fixture(scope="session")
 def dbs():
     questions_db = Base("TEST_questions")

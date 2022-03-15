@@ -170,6 +170,8 @@ async def submit_answer(ans: AnswerSubmission,
     # TODO put upper limit on amount of data?
     # - what is the default POST cap?
     # - create a unit test for an expected file size, and a file size over the POST cap
+
+    # TODO check if key exists and return...400 if not?
     
     # store audio in drive, then bookkeep in base
     try:
@@ -245,7 +247,7 @@ def filter_answers_from_db(items: List[AnswerTableSchema], question_uuid: str, s
     seen_unpop = []
     seen_contro = []
     for item in items:
-        print(item, question_uuid)
+        #print(item, question_uuid)
         if item.question_uuid != question_uuid:
             continue
         if item.is_banned:
@@ -407,11 +409,12 @@ async def unban_answer(answer_uuid: str,
 # doesn't seem terrribly hard to add user id and magic links for all of them. turn above into dependency injection.
 # can probably wait til after MVP...?
 # would be cool if the security nonce gen and lookup and be pre/post hooks for these path executions
-@app.post("/rateAnswer")
+@app.post("/rateAnswer") # why is this post? todo
 async def rate_answer(answer_uuid: str,
                       agreement: int,
                       db: dict = Depends(get_dbs)):
     # TODO do i need to supply their current value if i'm not modifying them?
+    print("rate", answer_uuid, agreement)
     try:
         if agreement > 0:
             db['answers'].update(key=answer_uuid,
@@ -435,6 +438,7 @@ async def get_answer_stats(answer_uuid: str,
                            drive: dict = Depends(get_drives),
                            db: dict = Depends(get_dbs)):
     row = db['answers'].get(answer_uuid)
+    print("get", row)
     if row is None:
         return NoAnswersResponse()
     else:

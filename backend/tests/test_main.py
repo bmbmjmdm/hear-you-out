@@ -7,6 +7,8 @@ from fastapi import FastAPI
 
 from ..main import QuestionModel, NoAnswersResponse
 
+# on testing fastapi with pytest: https://www.jeffastor.com/blog/testing-fastapi-endpoints-with-docker-and-pytest/
+
 # notes on pytest https://docs.pytest.org/en/6.2.x/fixture.html
 # - to run multiple asserts safely,: All that’s needed is stepping up to a larger scope, then having the act step defined as an autouse fixture, and finally, making sure all the fixtures are targetting that highler level scope. 
 # - use markers to pass data to fixtures
@@ -33,7 +35,7 @@ from ..main import QuestionModel, NoAnswersResponse
 
 
 @pytest.fixture(scope="session")
-def drives():
+def test_drives():
     questions_drive = Drive("TEST_questions")
     answers_drive = Drive("TEST_answers")
     return {'questions': questions_drive,
@@ -41,7 +43,7 @@ def drives():
 
 # could turn these into pydantic Store object to pass them around as a single object since they are used together
 @pytest.fixture(scope="session")
-def dbs():
+def test_dbs():
     questions_db = Base("TEST_questions")
     answers_db = Base("TEST_answers")
     return {'questions': questions_db,
@@ -50,26 +52,26 @@ def dbs():
 # do something with each db and drive so it's accessible from deta dashboard gui
 # todo make cli flag like `pytest --touch_backend`
 # or maybe make its own test so i can one-off call it when needed. which would be...rarely?
-def touch_backend(dbs, drives):
-    dbs['questions'].put('test')
-    dbs['answers'].put('test')
-    drives['questions'].put('test', 'test')
-    drives['answers'].put('test', 'test')
+def touch_backend(test_dbs, test_drives):
+    test_dbs['questions'].put('test')
+    test_dbs['answers'].put('test')
+    test_drives['questions'].put('test', 'test')
+    test_drives['answers'].put('test', 'test')
 
 # Create a new application for testing
 @pytest.fixture
-def app(dbs, drives, touch_backend = False) -> FastAPI:
+def app(test_dbs, test_drives, touch_backend = False) -> FastAPI:
     from ..main import app, get_dbs, get_drives
     # all the tests in this file run against the prod deployment,
     # and these two overrides make it so that all the endpoints
     # use the test drives and bases instead of prod drives and bases.
     # an alternative would be to just swap the project api
     # (and create the "test" deployment)
-    app.dependency_overrides[get_dbs] = lambda: dbs
-    app.dependency_overrides[get_drives] = lambda: drives
+    app.dependency_overrides[get_dbs] = lambda: test_dbs
+    app.dependency_overrides[get_drives] = lambda: test_drives
 
     if touch_backend:
-        touch_backend(dbs, drives)
+        touch_backend(test_dbs, test_drives)
         
     return app
 
@@ -92,9 +94,9 @@ def client(app: FastAPI) -> TestClient:
 #        into a given test? (do we actually want to do this?)
 
 @pytest.fixture
-def set_1_question(dbs, drives) -> QuestionModel:
+def set_1_question(test_dbs, test_drives) -> QuestionModel:
     # this doesn't add a q per se, it sets entire list to single q
-    key = '2'
+    key = 'set_1_question key'
     text = 'none'
     category = 'n/a'
 
@@ -107,21 +109,20 @@ def set_1_question(dbs, drives) -> QuestionModel:
     qm = QuestionModel(key=key, text=text, category=category)
     # model_dicts = [QuestionModel(*q).dict() for q in questions]
     yaml_string = yaml.dump({'questions': [qm.dict()]}, sort_keys=False) # don't sort keys so key remains first
-    print(yaml_string)
     
     qfilename = 'list of questions.yaml'
-    qfile = drives['questions'].get(qfilename)
+    qfile = test_drives['questions'].get(qfilename)
     if qfile is None:
         # instead of using global, should...
-        drives['questions'].put(qfilename, yaml_string)
+        test_drives['questions'].put(qfilename, yaml_string)
     else:
         raise Exception(f"{qfilename} already in drive, not overwriting just in case")
 
     yield qm
-    drives['questions'].delete(qfilename)
+    test_drives['questions'].delete(qfilename)
     # todo delete from db too
 
-# def drive_get_all_files(drive):
+# def fetch_all_from_drive(drive):
 #     result = drive.list()
 
 #     all_files = result.get("names")
@@ -153,13 +154,10 @@ def set_1_question(dbs, drives) -> QuestionModel:
 
 #     return rows
 
-
-# # this function is dangerous in that it will let you delete all answers from Drive and Db
-# # without confirming. i only intend to pass in the test drive and db so far...
 # def delete_all_test_answers():
-#     dbs = get_test_dbs()
-#     drives = get_test_drives()
-#     all_filenames = drive_get_all_files(drives['answers'])
+#     dbs = test_dbs()
+#     drives = test_drives()
+#     all_filenames = fetch_all_from_drive(drives['answers'])
 #     print(f"deleting all answers in drive: " + ', '.join(all_filenames))
 #     drives['answers'].delete_many(all_filenames)
 #     # for key in all_filenames:
@@ -169,13 +167,8 @@ def set_1_question(dbs, drives) -> QuestionModel:
 #     for row in rows:
 #         dbs['answers'].delete(row.key)
 
-        
 ### TODO
 # happy paths for each endpoint
-# - need setup/teardown structure. need to learn pytest. fixtures i think
-#   - load test_question drive with question list, use as precond for all...maybe as a module-level vs test/session
-#   - autouse for fixtures to be run before every test -> diff than session?
-#   - when to init test db w/ data if using dep inj override? in override_ functions, but only need/want to init it once per tseting session, not per endpoint call -> how to model? maybe do that top level in file, and return the init'd instance in override_
 # enumerate edge caes for each end point, decide which oens to write tests for
 # do i want to deploy a test micro, akin to a dev server the FE can test against?
 # - eventually, yeah, prob. to do integration testing with FE eg
@@ -189,7 +182,6 @@ def test_get_question(client: FastAPI, set_1_question: QuestionModel) -> None:
     # add a question to the drive (via file)
     response = client.get("/getQuestion")
     assert response.status_code == 200
-    print(response.json())
     # assert structure of response
     # assert types (uuid, str, int)
     # don't think it's worth checking content of str and int?
@@ -207,13 +199,22 @@ def test_no_questions_available(client: TestClient) -> None:
 # - other drive errors? (overwriting?)
 # - db errors
 
-def test_submit_answer(client: TestClient, set_1_question: QuestionModel) -> None:
+def test_submit_answer(client: TestClient,
+                       set_1_question: QuestionModel,
+                       test_dbs, test_drives) -> None:
     response = client.post("/submitAnswer",
                            json={"audio_data": "test data",
                                  "question_uuid": set_1_question.key})
     assert response.status_code == 200
     # check the answer_uuid is a string of digits
     #assert response.json
+    answer_uuid = response.json()['answer_id']
+    delete_answer(answer_uuid, test_dbs, test_drives)
+    
+def delete_answer(key, dbs, drives):
+    drives['answers'].delete(key)
+    dbs['answers'].delete(key)
+
 
 def test_submit_answer_wrong_qid(client: TestClient) -> None:
     response = client.post("/submitAnswer",
@@ -254,12 +255,11 @@ def test_submit_answer_wrong_qid(client: TestClient) -> None:
 # proper workflow. would also want to test what happens in system
 # if that doesn't happen though. but can use fixtures to define
 # happy path while serving as scaffolding for downstream tests
-# LEFT OFF reading:
-# - on pytest fixtures: https://docs.pytest.org/en/6.2.x/fixture.html
-# - on testing fastapi with pytest: https://www.jeffastor.com/blog/testing-fastapi-endpoints-with-docker-and-pytest/
 
 def test_workflow_get_answer_stats(client: TestClient,
-                                   set_1_question: QuestionModel) -> None:
+                                   set_1_question: QuestionModel,
+                                   test_dbs,
+                                   test_drives) -> None:
     qid = set_1_question.key
     
     # submit new answer and verify stats start at 0
@@ -267,10 +267,8 @@ def test_workflow_get_answer_stats(client: TestClient,
                            json={"audio_data": "test data",
                                  "question_uuid": qid})
     answer_uuid = response.json()['answer_id']
-    print(answer_uuid)
 
     stats = client.get(f"/getAnswerStats?answer_uuid={answer_uuid}").json()
-    print(stats)
     stat_keys = ['num_agrees', 'num_disagrees', 'num_abstains', 'num_serves']
     for stat in stat_keys:
         assert(stats[stat] == 0)
@@ -278,7 +276,6 @@ def test_workflow_get_answer_stats(client: TestClient,
     
     # get the answer to update the stats
     response = client.post(f"/getAnswer?question_uuid={qid}", json=[]).json()
-    print(response)
     aid = response['answer_uuid']
     stats = client.get(f"/getAnswerStats?answer_uuid={answer_uuid}").json()
     assert(stats['num_serves'] == 1)
@@ -287,21 +284,24 @@ def test_workflow_get_answer_stats(client: TestClient,
     # rly should be getting answer every time i guess
     # -> update when I introduce auth/proper workflows
     # - can just create func for the workflow loop instead
-    response = client.get(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=1")
-    response = client.get(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=-1")
-    response = client.get(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=0")
-    response = client.get(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=-1")
-    response = client.get(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=1")
-    response = client.get(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=-1")
+    response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=1")
+    response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=-1")
+    response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=0")
+    response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=-1")
+    response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=1")
+    response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=-1")
     stats = client.get(f"/getAnswerStats?answer_uuid={answer_uuid}").json()
+    print("test", stats)
     assert(stats['num_disagrees'] == 3)
     assert(stats['num_agrees'] == 2)
     assert(stats['num_abstains'] == 1)
 
+    delete_answer(aid, test_dbs, test_drives)
+
 # do I need to test this?
 def test_bad_answer_stats(client: TestClient) -> None:
     response = client.get("/getAnswerStats")
-    assert response.status_code == 422 # this is what fastapi returns by default i guess? 
+    assert response.status_code == 422 # this is what fastapi returns by default i guess 
 
 def test_no_answer_stats(client: TestClient) -> None:
     response = client.get("/getAnswerStats?answer_uuid=2248634230063352")

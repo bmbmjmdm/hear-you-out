@@ -1,9 +1,11 @@
 import sys
 import yaml
 import pytest
+
 from deta import Drive, Base
+
+from fastapi import FastAPI, Response
 from fastapi.testclient import TestClient
-from fastapi import FastAPI
 
 from ..main import QuestionModel, NoAnswersResponse
 
@@ -32,6 +34,8 @@ from ..main import QuestionModel, NoAnswersResponse
 # - - can dynamically generate them
 # - - can stack them on top of each other to get all combinations
 # - pytest_generate_tests allows one to define custom parametrization schemes or extensions
+# - stackOverflow Q on passing args to a fixture: https://stackoverflow.com/questions/44677426/can-i-pass-arguments-to-pytest-fixtures
+# - - explains indirect parameterization a bit more
 
 
 @pytest.fixture(scope="session")
@@ -173,24 +177,21 @@ def set_1_question(test_dbs, test_drives) -> QuestionModel:
 # do i want to deploy a test micro, akin to a dev server the FE can test against?
 # - eventually, yeah, prob. to do integration testing with FE eg
 
-# could return QuestionModel here as a way to build up workflow?
-# @pytest.fixture
-# def getQuestion(client: TestClient) -> None:
-#     response = client.get("/getQuestion")
+### getQuestion
 
-def test_get_question(client: FastAPI, set_1_question: QuestionModel) -> None:
-    # add a question to the drive (via file)
+@pytest.fixture
+def getQuestion(client: TestClient) -> Response:
     response = client.get("/getQuestion")
-    assert response.status_code == 200
-    # assert structure of response
-    # assert types (uuid, str, int)
-    # don't think it's worth checking content of str and int?
-    # todo compare to class attribs?
-    # assert response.json().keys == model.QuestionModel
+    yield response
 
-def test_no_questions_available(client: TestClient) -> None:
-     response = client.get("/getQuestion")
-     assert response.status_code == 500
+def test_get_question(set_1_question: QuestionModel, # Arrange
+                      getQuestion) -> None: # using this as the Act about which we Assert
+    
+    assert getQuestion.status_code == 200
+    assert getQuestion.json() == set_1_question.dict()
+
+def test_no_questions_available(getQuestion) -> None:
+     assert getQuestion.status_code == 500
 
 ### submitAnswer
 # - happy path results in entry appearing in drive, and entry and db
@@ -199,22 +200,47 @@ def test_no_questions_available(client: TestClient) -> None:
 # - other drive errors? (overwriting?)
 # - db errors
 
-def test_submit_answer(client: TestClient,
-                       set_1_question: QuestionModel,
-                       test_dbs, test_drives) -> None:
+@pytest.fixture
+def submitAnswer(client: TestClient,
+                 test_dbs, test_drives,
+                 getQuestion: Response, # Arrange
+                 request, # Arrange
+                 question_uuid: str = None # Arrange # TODO change to uuid
+                 ) -> Response:
+
+    assert getQuestion.status_code == 200
+    
+    audio_data = "test data" if request is None else request.param
+    # is it possible to put this in the arglist? ie, refer to other arg
+    question_uuid = getQuestion['key'] if question_uuid is None else question_uuid
+    
     response = client.post("/submitAnswer",
-                           json={"audio_data": "test data",
-                                 "question_uuid": set_1_question.key})
-    assert response.status_code == 200
+                           json={"audio_data": audio_data,
+                                 "question_uuid": question_uuid})
+    yield response
+
+    def delete_answer(key, dbs, drives):
+        drives['answers'].delete(key)
+        dbs['answers'].delete(key)
+
+    if response.status_code == 200:
+        delete_answer(response.json()['answer_id'], test_dbs, test_drives)
+
+@pytest.mark.parametrize('submitAnswer', [['test audio data']], indirect=['submitAnswer'])
+def test_submit_answer(client: TestClient,
+                       submitAnswer: Response, # Arrange and Act
+                       ) -> None:
+    assert submitAnswer.status_code == 200
     # check the answer_uuid is a string of digits
     #assert response.json
-    answer_uuid = response.json()['answer_id']
-    delete_answer(answer_uuid, test_dbs, test_drives)
-    
-def delete_answer(key, dbs, drives):
-    drives['answers'].delete(key)
-    dbs['answers'].delete(key)
+    answer_uuid = submitAnswer.json()['answer_id']
+    # check answer is now in db and drive and associated to correct qid, with
+    # audio data being exactly 'test audio data'
 
+    # ...do we want to explicitly test that this answer_id doesn't exist beforehand?
+    # bc if so, need to do an Assert before the Act...
+    # mb create 2nd test case for this? can we call fixture inside test case?
+    # or mb don't need to due to nature of arrange fixtures?
 
 def test_submit_answer_wrong_qid(client: TestClient) -> None:
     response = client.post("/submitAnswer",
@@ -223,9 +249,8 @@ def test_submit_answer_wrong_qid(client: TestClient) -> None:
     assert response.status_code == 400 # what to return?
     
 
-# workflow test: getAnswer -> no filtered answers -> submitAnswer -> getAnswer -> one
-
 ### getAnswer
+# - workflow test: getAnswer -> no filtered answers -> submitAnswer -> getAnswer -> one
 # - no answers to get
 # - no filtered answers to get
 # - answer is got
@@ -250,53 +275,55 @@ def test_submit_answer_wrong_qid(client: TestClient) -> None:
 # could create fixtures and build user workflows out of them,
 # but wouldn't I want to paramterize them?
 # @pytest.fixture
+
+
 # def submit_answer(): # eg pass question_uuid as paramter here?
 # would I make submit_answer require getQuestion? that would be
 # proper workflow. would also want to test what happens in system
 # if that doesn't happen though. but can use fixtures to define
 # happy path while serving as scaffolding for downstream tests
 
-def test_workflow_get_answer_stats(client: TestClient,
-                                   set_1_question: QuestionModel,
-                                   test_dbs,
-                                   test_drives) -> None:
-    qid = set_1_question.key
+# def test_workflow_get_answer_stats(client: TestClient,
+#                                    set_1_question: QuestionModel,
+#                                    test_dbs,
+#                                    test_drives) -> None:
+#     qid = set_1_question.key
     
-    # submit new answer and verify stats start at 0
-    response = client.post("/submitAnswer",
-                           json={"audio_data": "test data",
-                                 "question_uuid": qid})
-    answer_uuid = response.json()['answer_id']
+#     # submit new answer and verify stats start at 0
+#     response = client.post("/submitAnswer",
+#                            json={"audio_data": "test data",
+#                                  "question_uuid": qid})
+#     answer_uuid = response.json()['answer_id']
 
-    stats = client.get(f"/getAnswerStats?answer_uuid={answer_uuid}").json()
-    stat_keys = ['num_agrees', 'num_disagrees', 'num_abstains', 'num_serves']
-    for stat in stat_keys:
-        assert(stats[stat] == 0)
-#    question_uuid = client.post("/getQuestion").json()['key']
+#     stats = client.get(f"/getAnswerStats?answer_uuid={answer_uuid}").json()
+#     stat_keys = ['num_agrees', 'num_disagrees', 'num_abstains', 'num_serves']
+#     for stat in stat_keys:
+#         assert(stats[stat] == 0)
+# #    question_uuid = client.post("/getQuestion").json()['key']
     
-    # get the answer to update the stats
-    response = client.post(f"/getAnswer?question_uuid={qid}", json=[]).json()
-    aid = response['answer_uuid']
-    stats = client.get(f"/getAnswerStats?answer_uuid={answer_uuid}").json()
-    assert(stats['num_serves'] == 1)
+#     # get the answer to update the stats
+#     response = client.post(f"/getAnswer?question_uuid={qid}", json=[]).json()
+#     aid = response['answer_uuid']
+#     stats = client.get(f"/getAnswerStats?answer_uuid={answer_uuid}").json()
+#     assert(stats['num_serves'] == 1)
 
-    # rate answer few times, make sure db updates
-    # rly should be getting answer every time i guess
-    # -> update when I introduce auth/proper workflows
-    # - can just create func for the workflow loop instead
-    response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=1")
-    response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=-1")
-    response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=0")
-    response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=-1")
-    response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=1")
-    response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=-1")
-    stats = client.get(f"/getAnswerStats?answer_uuid={answer_uuid}").json()
-    print("test", stats)
-    assert(stats['num_disagrees'] == 3)
-    assert(stats['num_agrees'] == 2)
-    assert(stats['num_abstains'] == 1)
+#     # rate answer few times, make sure db updates
+#     # rly should be getting answer every time i guess
+#     # -> update when I introduce auth/proper workflows
+#     # - can just create func for the workflow loop instead
+#     response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=1")
+#     response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=-1")
+#     response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=0")
+#     response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=-1")
+#     response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=1")
+#     response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=-1")
+#     stats = client.get(f"/getAnswerStats?answer_uuid={answer_uuid}").json()
+#     print("test", stats)
+#     assert(stats['num_disagrees'] == 3)
+#     assert(stats['num_agrees'] == 2)
+#     assert(stats['num_abstains'] == 1)
 
-    delete_answer(aid, test_dbs, test_drives)
+#     delete_answer(aid, test_dbs, test_drives)
 
 # do I need to test this?
 def test_bad_answer_stats(client: TestClient) -> None:

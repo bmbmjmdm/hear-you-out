@@ -9,6 +9,8 @@ from fastapi.testclient import TestClient
 
 from ..main import QuestionModel, NoAnswersResponse
 
+# LEFT OFF: play with postman to construct flows, and tests
+
 # on testing fastapi with pytest: https://www.jeffastor.com/blog/testing-fastapi-endpoints-with-docker-and-pytest/
 
 # notes on pytest https://docs.pytest.org/en/6.2.x/fixture.html

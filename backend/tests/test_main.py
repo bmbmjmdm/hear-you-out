@@ -9,7 +9,11 @@ from fastapi.testclient import TestClient
 
 from ..main import QuestionModel, NoAnswersResponse
 
-# LEFT OFF: play with postman to construct flows, and tests
+# - want to play with postman to construct flows, and tests
+# - - and openAPI Links: https://swagger.io/docs/specification/links/
+# - AsyncAPI is for event-driven arch, not REST
+
+# ... should we bother being RESTful, or just do our own protocol over http?
 
 # on testing fastapi with pytest: https://www.jeffastor.com/blog/testing-fastapi-endpoints-with-docker-and-pytest/
 
@@ -205,8 +209,9 @@ def test_no_questions_available(getQuestion) -> None:
 @pytest.fixture
 def submitAnswer(client: TestClient,
                  test_dbs, test_drives,
+                 set_1_question, # Arrange for getQuestion
                  getQuestion: Response, # Arrange
-                 request, # Arrange
+                 request, # Arrange (parameterized for audio data)
                  question_uuid: str = None # Arrange # TODO change to uuid
                  ) -> Response:
 
@@ -214,7 +219,7 @@ def submitAnswer(client: TestClient,
     
     audio_data = "test data" if request is None else request.param
     # is it possible to put this in the arglist? ie, refer to other arg
-    question_uuid = getQuestion['key'] if question_uuid is None else question_uuid
+    question_uuid = getQuestion.json()['key'] if question_uuid is None else question_uuid
     
     response = client.post("/submitAnswer",
                            json={"audio_data": audio_data,
@@ -228,17 +233,23 @@ def submitAnswer(client: TestClient,
     if response.status_code == 200:
         delete_answer(response.json()['answer_id'], test_dbs, test_drives)
 
-@pytest.mark.parametrize('submitAnswer', [['test audio data']], indirect=['submitAnswer'])
+# parameterizing this instead of using default value so test case is clearer,
+# but maybe overly complicated to use fixture to auto delete_answer?
+@pytest.mark.parametrize('submitAnswer',
+                         ["test audio data"],
+                         indirect=['submitAnswer'])
 def test_submit_answer(client: TestClient,
                        submitAnswer: Response, # Arrange and Act
                        ) -> None:
+
     assert submitAnswer.status_code == 200
     # check the answer_uuid is a string of digits
     #assert response.json
     answer_uuid = submitAnswer.json()['answer_id']
     # check answer is now in db and drive and associated to correct qid, with
     # audio data being exactly 'test audio data'
-
+    # LEFT OFF here ^, and inserting/udpating db row upon getQuestion
+    
     # ...do we want to explicitly test that this answer_id doesn't exist beforehand?
     # bc if so, need to do an Assert before the Act...
     # mb create 2nd test case for this? can we call fixture inside test case?

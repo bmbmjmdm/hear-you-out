@@ -35,6 +35,7 @@ except:
 # - # improve api docs thusly: https://fastapi.tiangolo.com/tutorial/path-operation-configuration
 # - which endpoints should have associated pydantic models? all of them? 
 # - new endpoint for returning agrees, disagrees, abstains for a given answer ID
+# - add openAPI config info, see: https://lyz-code.github.io/blue-book/fastapi/
 
 # load local env if we're running locally
 if os.environ.get('DETA_RUNTIME') is None:
@@ -83,11 +84,11 @@ class QuestionModel(BaseModel):
 #    num_asks: int = 0
     
 class AnswerSubmission(BaseModel):
-    audio_data: bytes
+    audio_data: bytes # should this be str since its b64 encoded? maybe create new Type
     question_uuid: str # uuid.UUID
 
 class AnswerListen(BaseModel):
-    audio_data: bytes
+    audio_data: bytes # str?
     answer_uuid: str # TODO
     
 class NoAnswersResponse(BaseModel):
@@ -171,8 +172,10 @@ async def submit_answer(ans: AnswerSubmission,
     # - what is the default POST cap?
     # - create a unit test for an expected file size, and a file size over the POST cap
 
-    # TODO check if key exists and return...400 if not?
-    
+    # todo need to insert/update row in getQuestion before uncommenting this
+    # if db['questions'].get(question_uuid) is None:
+    #     return PlainTextResponse("question_uuid not found", status_code=404)
+        
     # store audio in drive, then bookkeep in base
     try:
         drive['answers'].put(answer_uuid, data, content_type='application/octet-stream')

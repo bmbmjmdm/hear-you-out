@@ -5,12 +5,14 @@ import {
   ScrollView,
   View,
   Text,
+  Platform,
 } from 'react-native';
 import CheckBox from '@react-native-community/checkbox';
 
 const Checklist = ({type}:{type:string}, ref) => {
   const allRefs = React.useRef({}).current
-  const itemList = checklist_map[type]
+  let itemList = checklist_map[type]
+  if (!itemList) itemList = checklist_map["other"]
   const itemComponents = []
 
   // expose a function that goes through all items in the checklist to see if theyre all checked
@@ -31,7 +33,13 @@ const Checklist = ({type}:{type:string}, ref) => {
   }
 
   return (
-    <ScrollView style={styles.checkList}>
+    <ScrollView
+      style={styles.checkList}
+      horizontal={false}
+      alwaysBounceHorizontal={false}
+      showsVerticalScrollIndicator={false}
+      showsHorizontalScrollIndicator={false}
+    >
       { itemComponents }
     </ScrollView>
   )
@@ -45,7 +53,7 @@ const checklist_map = {
     "Give your understanding of the Opposing argument(s) and why you think they're wrong"
   ],
   other: [
-    "Answer the question",
+    "Answer the question with as much detail as possible",
   ],
 }
 
@@ -66,7 +74,17 @@ const CheckItem = ({text}, ref) => {
         tintColors={{
           true: "#575757"
         }}
-        onFillColor={"#575757"}
+        onFillColor={Platform.OS === "android" ? "#575757" : undefined}
+        onCheckColor={"#222222"}
+        onTintColor={"#222222"}
+        tintColor={"#575757"}
+        onAnimationType={"one-stroke"}
+        offAnimationType={"one-stroke"}
+        style={Platform.OS === "android" ? {} : {
+          width: 25,
+          height: 25,
+          marginRight: 5
+        }}
       />
       <Text
         style={styles.text}
@@ -83,18 +101,22 @@ const CheckItemWithRef = forwardRef(CheckItem)
 
 const styles = StyleSheet.create({
   checkList: {
-    height: 300
+    width: "100%",
+    overflow: "hidden",
+    flex: 1,
   },
   checkItem: {
     alignItems: 'center',
     marginBottom: 10,
-    flexDirection: 'row'
+    flexDirection: 'row',
+    padding: 1,
   },
   text: {
     fontSize: 20,
-    marginLeft: 10,
+    paddingLeft: 10,
     marginBottom: 3,
-    maxWidth: 300
+    maxWidth: 310,
+    flexGrow: 1,
   }
 });
 

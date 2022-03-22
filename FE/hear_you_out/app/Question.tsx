@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Platform,
   Animated,
+  Alert,
 } from 'react-native';
 import Modal from "react-native-modal";
 // https://github.com/react-native-linear-gradient/react-native-linear-gradient
@@ -16,42 +17,43 @@ import Mic from './Mic.png';
 import Shadow from './Shadow'
 import Checklist from './Checklist'
 import BottomButtons from './BottomButtons'
-import AudioRecorderPlayer, { AudioEncoderAndroidType } from 'react-native-audio-recorder-player';
+import AudioRecorderPlayer, { AudioEncoderAndroidType, AVEncodingOption } from 'react-native-audio-recorder-player';
 import RNFS from 'react-native-fs'
 import { RNFFmpeg } from 'react-native-ffmpeg';
 import uuid from 'react-native-uuid';
 import { APIQuestion } from "./Network"
 import TutorialElement from './TutorialElement'
+import { SizeContext } from './helpers'
+import { getAudioCircleSize, resizeAudioCircle, resizeMic, resizeTitle } from './helpers'
 
 
 // for tutorial maybe
 // https://reactnativeelements.com/docs/tooltip/
 
-
-// TODO find best settings for iOS
 // https://github.com/hyochan/react-native-audio-recorder-player/blob/master/index.ts
 const audioSet = {
   AudioEncoderAndroid: AudioEncoderAndroidType.HE_AAC, // AAC is slightly better quality but like 75% increase in size
   AudioEncodingBitRateAndroid: 102400, // increase to 128000 if we get more storage
   AudioSamplingRateAndroid: 48000,
-  //AVSampleRateKeyIOS?: number;
-  //AVFormatIDKeyIOS?: AVEncodingType;
-  //AVNumberOfChannelsKeyIOS?: number;
-  //AVEncoderAudioQualityKeyIOS?: AVEncoderAudioQualityIOSType;
-  //AVLinearPCMBitDepthKeyIOS?: AVLinearPCMBitDepthKeyIOSType;
-  //AVLinearPCMIsBigEndianKeyIOS?: boolean;
-  //AVLinearPCMIsFloatKeyIOS?: boolean;
-  //AVLinearPCMIsNonInterleavedIOS?: boolean;
+  AVFormatIDKeyIOS: AVEncodingOption.aac, // 7% size of alac
+  AVSampleRateKeyIOS: 22050, // half the default, half the size
+  AVNumberOfChannelsKeyIOS: 1, // half the default, 2/3 the size
 }
 
 type QuestionProps = {
+  // contains the text of the question to answer as well as the type which informs our checklist content
   question: APIQuestion,
   submitAnswerAndProceed: (data:string) => void,
+  // whether they completed tutorial or not
   completedTutorial: boolean,
+  // tell the parent we completed the tutorial, which will update the above value
   onCompleteTutorial: () => void
+  // an un-recoverable error has occured and we need to reload the app
+  onError: () => void
 }
 
-const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompleteTutorial }: QuestionProps) => {
+const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompleteTutorial, onError }: QuestionProps) => {
+  const screenSize = React.useContext(SizeContext)
   const checklist = React.useRef()
   const [circles, setCircles] = React.useState({})
   const [currentTutorialElement, setCurrentTutorialElement] = React.useState("question")
@@ -62,7 +64,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   // modal
   const [modalVisible, setModalVisible] = React.useState(false)
   const [modalText, setModalText] = React.useState("")
-  const [modalConfirm, setModalConfirm] = React.useState(() => {})
+  const [modalConfirm, setModalConfirm] = React.useState(null)
 
   // timer
   const [recordTime, setRecordTime] = React.useState(0)
@@ -85,10 +87,11 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   // if we stop a recording that isnt the original file, concat it with the original file 
   const needsConcat = React.useRef(false)
   const extention = Platform.OS === 'android' ? ".mp4" : ".m4a"
-  const originalFile = RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention
-  const additionalFile = RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordAdditional" + extention
-  const concatFile = RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordConcated" + extention
-  const fileList = RNFS.CachesDirectoryPath + '/' + "fileList.txt"
+  const prepend = Platform.OS === 'android' ? "" : "file://"
+  const originalFile = prepend + RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordOriginal" + extention
+  const additionalFile = prepend + RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordAdditional" + extention
+  const concatFile = prepend + RNFS.CachesDirectoryPath + '/' + "HearYouOutRecordConcated" + extention
+  const fileList = prepend + RNFS.CachesDirectoryPath + '/' + "fileList.txt"
 
   // run this effect ONCE when this component mounts
   React.useEffect(() => {
@@ -98,7 +101,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
         if (timing.current) {
           setRecordTime((prevTime) => {
             if (prevTime >= 300) {
-              recordReleased(true)
+              recordPaused(true)
               setModalVisible(true)
               setModalText("You have reached the max recording time")
               setModalConfirm(null)
@@ -111,8 +114,9 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       // add a playback listener for recording animations
       recorder.setSubscriptionDuration(0.2)
       recorder.addRecordBackListener(({ currentMetering }) => {
-        // TODO test this level on other devices, incl iOS
-        if (currentMetering > -20) animateCircle()
+        // TODO test this level on other devices
+        const minMeter = Platform.OS === "android" ? -20 : -23
+        if (currentMetering > minMeter) animateCircle()
       })
       // we make a text file with our audio file paths listed for later concatenation
       const paths = [originalFile, additionalFile]
@@ -124,16 +128,33 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
         await RNFS.writeFile(fileList, listContent, 'utf8')
         setReady(true)
       } catch (error) {
+        // if we can't even write our filelist, something's seriously wrong. 
+        Alert.alert("Cannot write files. Please contact support if this keeps happening.")
+        onError()
       }
     }
     // call all the above + cleanup later
     asyncFun()
     return () => {
-      clearInterval(interval.current)
-      deleteCurrentFile()
+      const asyncFunRet = async () => {
+        clearInterval(interval.current)
+        try {
+          recorder.removeRecordBackListener()
+          await stopRecorderAndConcat()
+          await deleteCurrentFile()
+        }
+        catch (e) {
+          console.log("failed to stop/unlink question on unmount")
+          // we're unmounting, don't bother handling error
+        }
+      }
+      asyncFunRet()
     }
   }, [])
 
+  // we call animateCircle from a scope that doesnt have access to recordTime, so we box the state here for it and update it each render
+  const recordTimeForCircles = React.useRef(0)
+  recordTimeForCircles.current = recordTime
   // while the user is recording, we make a cute animation behind the record button
   // create a circle that will fade out from the center in a random directon
   const animateCircle = () => {
@@ -150,12 +171,9 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       circlesCopy[id] = 
       (<Animated.View 
         key={id}
-        style={{
-          // TODO is this good color?
-          // TODO also this color is lighter for some reason than it should be. in fact "white" doesnt show at all.... doesnt matter too much, if we find a color that works then w.e
-          backgroundColor: "#ff617c",
-          height: 175,
-          width: 175,
+        style={[{
+          // time limit changes color of circles to be darker
+          backgroundColor: recordTimeForCircles.current < 240 ? "#ff617c" : '#880000',
           borderRadius: 999,
           position: "absolute",
           elevation: -1,
@@ -166,7 +184,8 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
             {translateY: Animated.multiply(Animated.multiply(anim, new Animated.Value(200)), new Animated.Value(Math.sin(rotation)))},
             {translateX: Animated.multiply(Animated.multiply(anim, new Animated.Value(200)), new Animated.Value(Math.cos(rotation)))}
           ]
-        }}
+        },
+        resizeAudioCircle(screenSize)]}
       />)
       // kick off the animation
       Animated.timing(anim, {
@@ -187,9 +206,12 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
     })
   }
 
-  // TODO error handling on all these
+  const recordPressed = () => {
+    if (recording) recordPaused()
+    else recordStartContinue()
+  }
 
-  const recordPressed = async () => {
+  const recordStartContinue = async () => {
     if (lock.current || recording) return
     if (recordTime >= 300) {
       setModalVisible(true)
@@ -227,17 +249,16 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       }
     }
     catch (e) {
-      
+      // Writing files or accessing the recorder must have failed, but I don't know why. Reset everything
+      Alert.alert("Recording failed. Please contact support if this keeps happening.")
+      onError()
     }
     lock.current = false
   }
 
-  const recordReleased = async (force:boolean) => {
-    if (lock.current) {
-      // if we ever wind up here, we dont want to miss the recordRelease event, so keep retrying
-      setTimeout(() => recordReleased(force), 50)
-      return
-    }
+  // we use force when we can't rely on `recording` due to the setInterval timer not having updated variables
+  const recordPaused = async (force:boolean = false, retry:boolean = false) => {
+    if (lock.current) return
     lock.current = true
     try { 
       if (recording || force) {
@@ -245,11 +266,26 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
         timing.current = false
         await recorder.pauseRecorder()
       }
+      lock.current = false
     }
     catch (e) {
-      
+      // Pausing failed. Re-attempt without forcing. If we wind up here again, error out.
+      if (retry) {
+        Alert.alert("Pausing failed. Please contact support if this keeps happening.")
+        onError()
+      }
+      else {
+        lock.current = false
+        recordPaused(false, true)
+      }
     }
-    lock.current = false
+  }
+
+  const informBeginRecording = async () => {
+    if (lock.current) return
+    setModalText("You need to start a recording first!")
+    setModalConfirm(null)
+    setModalVisible(true)
   }
 
   const restartRecording = async () => {
@@ -271,15 +307,13 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       setStarted(false)
       setRecordTime(0)
       await stopRecorderAndConcat()
-      
-      // when we're ready to measure iOS file sizes
-      // console.log((await RNFS.stat(originalFile)).size)
-  
       await deleteCurrentFile()
       setModalVisible(false)
     }
     catch (e) {
-
+      // Similar to recording failed, we dont know what went wrong but it's pretty serious and un-recoverable
+      Alert.alert("Restarting failed. Please contact support if this keeps happening.")
+      onError()
     }
     lock.current = false
   }
@@ -288,7 +322,13 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
     if (lock.current || recording) return
     // validate checklist
     if (!checklist?.current?.areAllChecked()) {
-      setModalText("Please make sure you addressed all points in the checklist before submitting")
+      setModalText("Please make sure you addressed all points in the checklist before submitting (scroll if you have to)")
+      setModalConfirm(null)
+      setModalVisible(true)
+      return
+    }
+    if (recordTime < 15) {
+      setModalText("Please make sure you thoroughly answer the prompt (your answer was too short).")
       setModalConfirm(null)
       setModalVisible(true)
       return
@@ -312,11 +352,12 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       setModalVisible(false)
       // convert file to base64 to pass it to the backend
       await submitAnswerAndProceed(await RNFS.readFile(originalFile, 'base64'))
-      await deleteCurrentFile()
       // we dont even care about cleaning up the states because we're gonna move on from this screen
     }
     catch (e) {
-
+      // they'll be able to re-answer the question since this wasn't a network error
+      Alert.alert("Error during submission. Please contact support if this keeps happening.")
+      onError()
     }
   }
 
@@ -333,30 +374,27 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       await recorder.startPlayer(originalFile)
     }
     catch (e) {
+      // Don't throw the user out for this. They can still record, restart, and submit possibly
+      Alert.alert("Error during playback. Please contact support if this keeps happening.")
 
     }
     lock.current = false
   }
 
+  // this may throw an error, handle it
   const deleteCurrentFile = async () => {
-    try {
-      await RNFS.unlink(originalFile)
-    }
-    catch (e) {
-      console.log("delete failed")
-    }
+    await RNFS.unlink(originalFile)
   }
   
-// TODO setup for ios
-// https://www.npmjs.com/package/react-native-ffmpeg
-// see 2.3.2 iOS to see about enabling audio package on iOS
+  // https://www.npmjs.com/package/react-native-ffmpeg
+  // see 2.3.2 iOS to see about enabling audio package on iOS
   // concat original file + additional file => original file
+  // this may throw an error
   const stopRecorderAndConcat = async () => {
     await recorder.stopRecorder()
     if (needsConcat.current) {
       // concat
-      const result = await RNFFmpeg.execute(`-f concat -safe 0 -i ${fileList} -c copy ${concatFile}`)
-      console.log(`FFmpeg process exited with rc=${result}.`)
+      await RNFFmpeg.execute(`-f concat -safe 0 -i ${fileList} -c copy ${concatFile}`)
       // delete old files and rename the new one appropriately
       await RNFS.unlink(originalFile)
       await RNFS.unlink(additionalFile)
@@ -438,10 +476,10 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
           id={"question"}
           isInTutorial={isInTutorial}
           calloutTheme={"question"}
-          calloutText={"This is the current question. A new one comes out every few days. Answer it to the best of your ability!"}
+          calloutText={"This is the current question; a new one comes out every few days. Answer it to the best of your ability. Tap me now!"}
           calloutDistance={30}
         >
-          <Text style={styles.header}>
+          <Text style={[styles.header, resizeTitle(screenSize)]}>
             { question.text }
           </Text>
         </TutorialElement>
@@ -452,20 +490,19 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
           id={"record"}
           isInTutorial={isInTutorial}
           calloutTheme={"question"}
-          calloutText={"This is the recorder. You need to hold it down in order to record, not just press it! You have a 5 minute time limit. If you're speaking loud enough, it'll make pretty colors"}
+          calloutText={"This is the recorder. After the tutorial ends you can press it to record your answer! Press it again to pause. You have a 5 minute time limit, so make sure to pause when you aren't speaking. If you're speaking loud enough, it'll make pretty colors!"}
           calloutDistance={33}
         >
-          <Shadow radius={175} style={{ marginTop: 30 }} disabled={isInTutorial && currentTutorialElement !== "record"}>
+          <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }} disabled={isInTutorial && currentTutorialElement !== "record"}>
             {Object.values(circles)}
             <TouchableOpacity
-              style={[styles.audioCircle, started ? (recording ? styles.redCircle : styles.yellowCircle) : styles.whiteCircle]}
-              onPressIn={recordPressed}
-              onPressOut={recordReleased}
+              style={[styles.audioCircle, resizeAudioCircle(screenSize), started ? (recording ? styles.redCircle : styles.yellowCircle) : styles.whiteCircle]}
+              onPress={recordPressed}
               activeOpacity={1}
             >
               <Image
                 source={Mic}
-                style={{ width: 75 }}
+                style={{ width: resizeMic(screenSize) }}
                 resizeMode={'contain'}
               />
             </TouchableOpacity>
@@ -478,29 +515,32 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
           id={"record"}
           isInTutorial={isInTutorial}
         >
-          <Text style={styles.timer}>
+          <Text style={[styles.timer, recordTime < 240 ? {} : styles.timerWarning]}>
             { getConvertedRecordTime() } / 5:00
           </Text>
         </TutorialElement>
         
-        <TutorialElement
-          onPress={progressTutorial}
-          currentElement={currentTutorialElement}
-          id={"checklist"}
-          isInTutorial={isInTutorial}
-          calloutTheme={"question"}
-          calloutText={"This is a checklist to make sure you answer the question thoroughly. Make sure all of them are addressed before submitting!"}
-          calloutDistance={-530}
-        >
-          <Checklist type={question.category} ref={checklist} />
-        </TutorialElement>
+        <View style={{flex: 1}}>
+          <TutorialElement
+            onPress={progressTutorial}
+            currentElement={currentTutorialElement}
+            id={"checklist"}
+            isInTutorial={isInTutorial}
+            calloutTheme={"question"}
+            calloutText={"This is a checklist to make sure you answer the question thoroughly. Make sure all of them are addressed and checked before submitting!"}
+            calloutDistance={-230}
+            measureDistanceFromBottom={false}
+            inheritedFlex={1}
+          >
+            <Checklist type={question.category} ref={checklist} />
+          </TutorialElement>
+        </View>
 
         <BottomButtons
           theme={"question"}
-          xPressed={restartRecording}
-          checkPressed={submitRecording}
-          miscPressed={hearRecording}
-          disabled={!started}
+          xPressed={started ? restartRecording : informBeginRecording}
+          checkPressed={started ? submitRecording : informBeginRecording}
+          miscPressed={started ? hearRecording : informBeginRecording}
           isInTutorial={isInTutorial}
           currentTutorialElement={currentTutorialElement}
           onTutorialPress={progressTutorial}
@@ -519,12 +559,13 @@ const styles = StyleSheet.create({
 
   container: {
     flex: 1,
-    padding: 20,
+    paddingHorizontal: 20,
+    // TODO certain devices may need more padding if SafetyArea doesnt account for top bar
+    paddingTop: Platform.OS === "ios" ? 30 : 20,
     alignItems: 'center'
   },
 
   header: {
-    fontSize: 35,
     textAlign: 'center'
   },
 
@@ -535,10 +576,12 @@ const styles = StyleSheet.create({
     marginBottom: 10
   },
 
+  timerWarning: {
+    color: "#ff1f45"
+  },
+
   audioCircle: {
     borderRadius:999,
-    height: 175,
-    width: 175,
     alignItems: 'center',
     justifyContent: 'center'
   },
@@ -571,6 +614,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     backgroundColor: 'rgb(255, 212, 198)',
     borderRadius: 20,
+    overflow: "hidden",
     padding: 10,
     paddingVertical: 15,
     borderColor: '#FFADBB',

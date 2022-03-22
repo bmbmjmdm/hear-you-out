@@ -8,26 +8,30 @@ import {
 
 import cat from './cat.png'
 import LinearGradient from 'react-native-linear-gradient';
+import { resizeCat, resizeHeaderMargin, SizeContext } from './helpers';
 
 type NoAnswersProps = {
   setDisableSwipes: (toDisable: boolean) => void
+  isShown: boolean
 }
 
-const NoAnswers = ({setDisableSwipes}: NoAnswersProps) => {
+const NoAnswers = ({setDisableSwipes, isShown}: NoAnswersProps) => {
+  const screenSize = React.useContext(SizeContext)
+
   React.useEffect(() => {
-    setDisableSwipes(false)
-  }, [])
+    if (isShown) setDisableSwipes(false)
+  }, [isShown])
   
   return (
     <LinearGradient
       style={styles.container}
       colors={['white', 'grey']}
     >
-      <Text style={styles.header}>
+      <Text style={[styles.header, resizeHeaderMargin(screenSize)]}>
         No more answers available right now, check back later!
       </Text>
       <Image
-        style={styles.cat}
+        style={[styles.cat, resizeCat(screenSize)]}
         resizeMode='contain'
         source={cat}
       />
@@ -43,14 +47,11 @@ const styles = StyleSheet.create({
   header: {
     fontSize: 35,
     textAlign: 'center',
-    marginTop: 150,
-    paddingHorizontal: 15
+    paddingHorizontal: 15,
   },
   
   cat: {
-    width: 350,
     alignSelf: 'flex-end',
-    marginTop: 25
   }
 });
 

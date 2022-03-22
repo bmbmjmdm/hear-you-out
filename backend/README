@@ -1,0 +1,11 @@
+## running locally in WSL2
+
+`ifconfig`
+activate venv
+hear-you-out/backend$ `uvicorn --host <ip> main:app`
+web browse to <ip>:8000/docs
+
+### running tests
+
+hear-you-out/backend$ `pytest`
+

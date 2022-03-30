@@ -26,6 +26,7 @@ import { APIQuestion } from "./Network"
 import TutorialElement from './TutorialElement'
 import { SizeContext } from './helpers'
 import { getAudioCircleSize, resizeAudioCircle, resizePlayPause, resizeTitle } from './helpers'
+import ShakeElement from './ShakeElement';
 
 type AnswerProps = {
   setDisableSwipes: (val: boolean) => void,
@@ -59,6 +60,8 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
   const [modalVisible, setModalVisible] = React.useState(false)
   const [modalText, setModalText] = React.useState("")
   const [modalConfirm, setModalConfirm] = React.useState<() => void>(() => {})
+  const playerShaker = React.useRef()
+  const [shookPlayer, setShookPlayer] = React.useState(false)
 
   // initialize the player and setup callbacks
   const player = React.useRef(new AudioRecorderPlayer()).current
@@ -201,12 +204,23 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
   }
 
   const informBeginPlaying = () => {
-    setModalText("You need to listen to the answer first!")
-    setModalConfirm(null)
-    setModalVisible(true)
+    if (!shookPlayer) {
+      playerShaker?.current?.shake()
+      setShookPlayer(true)
+    }
+    else {
+      setModalText("You need to listen to the answer first!")
+      setModalConfirm(null)
+      setModalVisible(true)
+      setShookPlayer(false)
+    }
   }
 
   const shareAnswer = async () => {
+    if (!startedPerm.current) {
+      informBeginPlaying();
+      return;
+    }
     try {
       // note this method does not work with base64 files. we will have to convert the file to a normal mp3 or w.e and share it like that
       const options = {
@@ -222,6 +236,10 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
   }
 
   const reportAnswer = () => {
+    if (!startedPerm.current) {
+      informBeginPlaying();
+      return;
+    }
     // user pressed first button, now they need to confirm
     setModalText("Report innapropriate answer?")
     setModalConfirm(() => confirmReportAnswer)
@@ -272,14 +290,22 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
           <View style={styles.modalOuter}>
             <View style={styles.modalInner}>
               <Text style={styles.modalText}>{modalText}</Text>
-              <View style={styles.modalButtons}>
-                <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
-                  <Text style={styles.buttonText}>No</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.confirmButton} activeOpacity={0.3} onPress={modalConfirm}>
-                  <Text style={styles.buttonText}>Yes</Text>
-                </TouchableOpacity>
-              </View>
+              {modalConfirm ? (
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
+                    <Text style={styles.buttonText}>No</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.confirmButton} activeOpacity={0.3} onPress={modalConfirm}>
+                    <Text style={styles.buttonText}>Yes</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.modalOneButton}>
+                  <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
+                    <Text style={styles.buttonText}>Ok</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           </View>
         </Modal>
@@ -307,19 +333,21 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
           calloutText={"Use these to play, pause, fast-forward, and rewind"}
           calloutDistance={0}
         >
-          <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }} disabled={isInTutorial && currentTutorialElement !== 'play'}>
-            <TouchableOpacity
-              style={[styles.audioCircle, resizeAudioCircle(screenSize), playing ? styles.yellowCircle : styles.whiteCircle]}
-              onPress={playPressed}
-              activeOpacity={1}
-            >
-              <Image
-                source={playing ? Pause : Play}
-                style={{ width: resizePlayPause(screenSize) }}
-                resizeMode={'contain'}
-              />
-            </TouchableOpacity>
-          </Shadow>
+          <ShakeElement ref={playerShaker}>
+            <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }} disabled={isInTutorial && currentTutorialElement !== 'play'}>
+              <TouchableOpacity
+                style={[styles.audioCircle, resizeAudioCircle(screenSize), playing ? styles.yellowCircle : styles.whiteCircle]}
+                onPress={playPressed}
+                activeOpacity={1}
+              >
+                <Image
+                  source={playing ? Pause : Play}
+                  style={{ width: resizePlayPause(screenSize) }}
+                  resizeMode={'contain'}
+                />
+              </TouchableOpacity>
+            </Shadow>
+          </ShakeElement>
         </TutorialElement>
 
         <View style={styles.miscButtons}>
@@ -385,19 +413,21 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
                 />
                 :
                 // we cannot change the maximumValue of Slider once its rendered, so we render a fake slider until we know length
-                <View style={{ width: 300, height: 40, alignItems: "center", justifyContent: "center", flexDirection: "row" }}>
-                  <View style={{ height: 30, width: 30, borderRadius: 999, backgroundColor:"#000000" }} />
-                  <View style={{ width:270, height: 8, borderTopRightRadius: 99, borderBottomRightRadius: 99, backgroundColor: "#FFFFFF" }} />
-                </View>
+                <TouchableOpacity activeOpacity={1} onPress={informBeginPlaying}>
+                  <View style={{ width: 300, height: 40, alignItems: "center", justifyContent: "center", flexDirection: "row" }}>
+                    <View style={{ height: 30, width: 30, borderRadius: 999, backgroundColor:"#000000" }} />
+                    <View style={{ width:270, height: 8, borderTopRightRadius: 99, borderBottomRightRadius: 99, backgroundColor: "#FFFFFF" }} />
+                  </View>
+                </TouchableOpacity>
               }
           </TutorialElement>
         </View>
 
         <BottomButtons
           theme={"answer"}
-          xPressed={startedPerm ? onDisapprove : informBeginPlaying}
-          checkPressed={startedPerm ? onApprove : informBeginPlaying}
-          miscPressed={startedPerm ? onPass : informBeginPlaying}
+          xPressed={startedPerm.current ? onDisapprove : informBeginPlaying}
+          checkPressed={startedPerm.current ? onApprove : informBeginPlaying}
+          miscPressed={startedPerm.current ? onPass : informBeginPlaying}
           isInTutorial={isInTutorial}
           currentTutorialElement={currentTutorialElement}
           onTutorialPress={progressTutorial}
@@ -504,6 +534,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     flexDirection: 'row',
+    marginTop: 30
+  },
+
+  modalOneButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 30
   }
 });

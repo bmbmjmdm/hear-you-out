@@ -25,6 +25,7 @@ import { APIQuestion } from "./Network"
 import TutorialElement from './TutorialElement'
 import { SizeContext } from './helpers'
 import { getAudioCircleSize, resizeAudioCircle, resizeMic, resizeTitle } from './helpers'
+import ShakeElement from './ShakeElement';
 
 
 // for tutorial maybe
@@ -55,6 +56,7 @@ type QuestionProps = {
 const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompleteTutorial, onError }: QuestionProps) => {
   const screenSize = React.useContext(SizeContext)
   const checklist = React.useRef()
+  const recorderShaker = React.useRef()
   const [circles, setCircles] = React.useState({})
   const [currentTutorialElement, setCurrentTutorialElement] = React.useState("question")
   const [isInTutorial, setIsInTutorial] = React.useState(!completedTutorial)
@@ -65,6 +67,8 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   const [modalVisible, setModalVisible] = React.useState(false)
   const [modalText, setModalText] = React.useState("")
   const [modalConfirm, setModalConfirm] = React.useState(null)
+  const [shookChecklist, setShookChecklist] = React.useState(false)
+  const [shookRecorder, setShookRecorder] = React.useState(false)
 
   // timer
   const [recordTime, setRecordTime] = React.useState(0)
@@ -283,9 +287,16 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
 
   const informBeginRecording = async () => {
     if (lock.current) return
-    setModalText("You need to start a recording first!")
-    setModalConfirm(null)
-    setModalVisible(true)
+    if (!shookRecorder) {
+      recorderShaker?.current?.shake()
+      setShookRecorder(true)
+    }
+    else {
+      setModalText("You need to start a recording first!")
+      setModalConfirm(null)
+      setModalVisible(true)
+      setShookRecorder(false)
+    }
   }
 
   const restartRecording = async () => {
@@ -322,13 +333,20 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
     if (lock.current || recording) return
     // validate checklist
     if (!checklist?.current?.areAllChecked()) {
-      setModalText("Please make sure you addressed all points in the checklist before submitting (scroll if you have to)")
-      setModalConfirm(null)
-      setModalVisible(true)
+      if (!shookChecklist) {
+        checklist?.current?.shake()
+        setShookChecklist(true)
+      }
+      else {
+        setModalText("Please address all points in the checklist (scroll if you have to)")
+        setModalConfirm(null)
+        setModalVisible(true)
+        setShookChecklist(false)
+      }
       return
     }
     if (recordTime < 15) {
-      setModalText("Please make sure you thoroughly answer the prompt (your answer was too short).")
+      setModalText("Please thoroughly answer the prompt (your answer was too short).")
       setModalConfirm(null)
       setModalVisible(true)
       return
@@ -493,20 +511,22 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
           calloutText={"This is the recorder. After the tutorial ends you can press it to record your answer! Press it again to pause. You have a 5 minute time limit, so make sure to pause when you aren't speaking. If you're speaking loud enough, it'll make pretty colors!"}
           calloutDistance={33}
         >
-          <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }} disabled={isInTutorial && currentTutorialElement !== "record"}>
-            {Object.values(circles)}
-            <TouchableOpacity
-              style={[styles.audioCircle, resizeAudioCircle(screenSize), started ? (recording ? styles.redCircle : styles.yellowCircle) : styles.whiteCircle]}
-              onPress={recordPressed}
-              activeOpacity={1}
-            >
-              <Image
-                source={Mic}
-                style={{ width: resizeMic(screenSize) }}
-                resizeMode={'contain'}
-              />
-            </TouchableOpacity>
-          </Shadow>
+          <ShakeElement ref={recorderShaker}>
+            <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }} disabled={isInTutorial && currentTutorialElement !== "record"}>
+              {Object.values(circles)}
+              <TouchableOpacity
+                style={[styles.audioCircle, resizeAudioCircle(screenSize), started ? (recording ? styles.redCircle : styles.yellowCircle) : styles.whiteCircle]}
+                onPress={recordPressed}
+                activeOpacity={1}
+              >
+                <Image
+                  source={Mic}
+                  style={{ width: resizeMic(screenSize) }}
+                  resizeMode={'contain'}
+                />
+              </TouchableOpacity>
+            </Shadow>
+          </ShakeElement>
         </TutorialElement>
         
         <TutorialElement
@@ -532,7 +552,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
             measureDistanceFromBottom={false}
             inheritedFlex={1}
           >
-            <Checklist type={question.category} ref={checklist} />
+            <Checklist type={question.category} ref={checklist} disabledPress={started ? undefined : informBeginRecording} />
           </TutorialElement>
         </View>
 

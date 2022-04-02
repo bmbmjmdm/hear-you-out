@@ -10,7 +10,6 @@ const ShakeElement = ({ children } : ShakeElementProps, ref) => {
 
   useImperativeHandle(ref, () => ({
     shake: () => {
-      console.log("hello")
       Animated.sequence([
         Animated.timing(xTranslate, {
           duration: 25,

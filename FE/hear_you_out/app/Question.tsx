@@ -25,6 +25,7 @@ import { APIQuestion } from "./Network"
 import { SizeContext } from './helpers'
 import { getAudioCircleSize, resizeAudioCircle, resizeMic, resizeTitle } from './helpers'
 import ShakeElement from './ShakeElement';
+import FadeInElement from './FadeInElement'
 
 // https://github.com/hyochan/react-native-audio-recorder-player/blob/master/index.ts
 const audioSet = {
@@ -54,7 +55,6 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   const recorderShaker = React.useRef()
   const [circles, setCircles] = React.useState({})
   const [currentTutorialElement, setCurrentTutorialElement] = React.useState("question")
-  const [isInTutorial, setIsInTutorial] = React.useState(!completedTutorial)
   // TODO set disabled styles on everything when submitting?
   const [submitting, setSubmitting] = React.useState(false)
 
@@ -419,15 +419,20 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   const progressTutorial = () => {
     if (currentTutorialElement === 'question') setCurrentTutorialElement('record')
     if (currentTutorialElement === 'record') setCurrentTutorialElement('checklist')
-    if (currentTutorialElement === 'checklist') setCurrentTutorialElement('misc')
-    if (currentTutorialElement === 'misc') setCurrentTutorialElement('x')
-    if (currentTutorialElement === 'x') setCurrentTutorialElement('check')
-    if (currentTutorialElement === 'check') onCompleteTutorial()
+    if (currentTutorialElement === 'checklist') setCurrentTutorialElement('bottom')
+    if (currentTutorialElement === 'bottom') onCompleteTutorial()
   }
 
   React.useEffect(() => {
-    setIsInTutorial(!completedTutorial)
-  }, [completedTutorial])
+    // dumb way of progressing through tutorial, but a good place to start
+    // TODO make more interactive
+    if (!completedTutorial) {
+      setTimeout(progressTutorial, 2500) // 2 seconds to read the question
+      setTimeout(progressTutorial, 16500) // 16 seconds to press button and answer
+      setTimeout(progressTutorial, 4500) // 4 seconds to read checklist
+      setTimeout(progressTutorial, 750) // make sure bottom buttons are fully faded in before marking tutorial complete
+    }
+  }, [])
 
   const getConvertedRecordTime = () => {
     const minutes = Math.floor(recordTime / 60)
@@ -483,42 +488,63 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
           </View>
         </Modal>
         
-        <Text style={[styles.header, resizeTitle(screenSize)]}>
-          { question.text }
-        </Text>
+        <FadeInElement
+          shouldFadeIn={currentTutorialElement === "question"}
+          isVisibleWithoutAnimation={completedTutorial}
+        >
+          <Text style={[styles.header, resizeTitle(screenSize)]}>
+            { question.text }
+          </Text>
+        </FadeInElement>
         
-        <ShakeElement ref={recorderShaker}>
-          <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }}>
-            {Object.values(circles)}
-            <TouchableOpacity
-              style={[styles.audioCircle, resizeAudioCircle(screenSize), started ? (recording ? styles.redCircle : styles.yellowCircle) : styles.whiteCircle]}
-              onPress={recordPressed}
-              activeOpacity={1}
-            >
-              <Image
-                source={Mic}
-                style={{ width: resizeMic(screenSize) }}
-                resizeMode={'contain'}
-              />
-            </TouchableOpacity>
-          </Shadow>
-        </ShakeElement>
-      
-        <Text style={[styles.timer, recordTime < 240 ? {} : styles.timerWarning]}>
-          { getConvertedRecordTime() } / 5:00
-        </Text>
+        <FadeInElement
+          shouldFadeIn={currentTutorialElement === "record"}
+          isVisibleWithoutAnimation={completedTutorial}
+        >
+          <ShakeElement ref={recorderShaker}>
+            <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }}>
+              {Object.values(circles)}
+              <TouchableOpacity
+                style={[styles.audioCircle, resizeAudioCircle(screenSize), started ? (recording ? styles.redCircle : styles.yellowCircle) : styles.whiteCircle]}
+                onPress={recordPressed}
+                activeOpacity={1}
+              >
+                <Image
+                  source={Mic}
+                  style={{ width: resizeMic(screenSize) }}
+                  resizeMode={'contain'}
+                />
+              </TouchableOpacity>
+            </Shadow>
+          </ShakeElement>
+
+          <Text style={[styles.timer, recordTime < 240 ? {} : styles.timerWarning]}>
+            { getConvertedRecordTime() } / 5:00
+          </Text>
+        </FadeInElement>
         
         <View style={{flex: 1}}>
-          <Checklist type={question.category} ref={checklist} disabledPress={started ? undefined : informBeginRecording} />
+          <FadeInElement
+            shouldFadeIn={currentTutorialElement === "checklist"}
+            isVisibleWithoutAnimation={completedTutorial}
+            inheritedFlex={1}
+          >
+            <Checklist type={question.category} ref={checklist} disabledPress={started ? undefined : informBeginRecording} />
+          </FadeInElement>
         </View>
 
-        <BottomButtons
-          theme={"question"}
-          xPressed={started ? restartRecording : informBeginRecording}
-          checkPressed={started ? submitRecording : informBeginRecording}
-          miscPressed={started ? hearRecording : informBeginRecording}
-          submitting={submitting}
-        />
+        <FadeInElement
+          shouldFadeIn={currentTutorialElement === "bottom"}
+          isVisibleWithoutAnimation={completedTutorial}
+        >
+          <BottomButtons
+            theme={"question"}
+            xPressed={started ? restartRecording : informBeginRecording}
+            checkPressed={started ? submitRecording : informBeginRecording}
+            miscPressed={started ? hearRecording : informBeginRecording}
+            submitting={submitting}
+          />
+        </FadeInElement>
       </LinearGradient>
     </View>
   );

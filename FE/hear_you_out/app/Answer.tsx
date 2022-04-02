@@ -25,6 +25,7 @@ import RNShare from 'react-native-share'
 import { SizeContext } from './helpers'
 import { getAudioCircleSize, resizeAudioCircle, resizePlayPause, resizeTitle } from './helpers'
 import ShakeElement from './ShakeElement';
+import FadeInElement from './FadeInElement'
 
 type AnswerProps = {
   setDisableSwipes: (val: boolean) => void,
@@ -51,8 +52,7 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
   const started = React.useRef(false)
   const startedPerm = React.useRef(false)
   const [ready, setReady] = React.useState(false)
-  const [currentTutorialElement, setCurrentTutorialElement] = React.useState("question")
-  const [isInTutorial, setIsInTutorial] = React.useState(!completedTutorial)
+  const [currentTutorialElement, setCurrentTutorialElement] = React.useState("")
 
   // modal
   const [modalVisible, setModalVisible] = React.useState(false)
@@ -250,18 +250,25 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
   }
 
   const progressTutorial = () => {
+    if (currentTutorialElement === '') setCurrentTutorialElement('question')
     if (currentTutorialElement === 'question') setCurrentTutorialElement('play')
-    if (currentTutorialElement === 'play') setCurrentTutorialElement('flag')
-    if (currentTutorialElement === 'flag') setCurrentTutorialElement('share')
-    if (currentTutorialElement === 'share') setCurrentTutorialElement('check')
-    if (currentTutorialElement === 'check') setCurrentTutorialElement('x')
-    if (currentTutorialElement === 'x') setCurrentTutorialElement('misc')
-    if (currentTutorialElement === 'misc') onCompleteTutorial()
+    if (currentTutorialElement === 'play') setCurrentTutorialElement('misc')
+    if (currentTutorialElement === 'misc') setCurrentTutorialElement('bottom')
+    if (currentTutorialElement === 'bottom') onCompleteTutorial()
   }
 
   React.useEffect(() => {
-    setIsInTutorial(!completedTutorial)
-  }, [completedTutorial])
+    // dumb way of progressing through tutorial, but a good place to start
+    // TODO make more interactive
+    // TODO fix this running behind the question card
+    if (!completedTutorial) {
+      setTimeout(progressTutorial, 250) // let past card finish animating out before fading in question
+      setTimeout(progressTutorial, 2500) // 2 seconds to read the question
+      setTimeout(progressTutorial, 16500) // 16 seconds to press button and listen to some of the answer
+      setTimeout(progressTutorial, 2500) // 2 seconds to see misc buttons
+      setTimeout(progressTutorial, 750) // make sure bottom buttons are fully faded in before marking tutorial complete
+    }
+  }, [])
 
   if (!ready) return (
     <View style={styles.whiteBackdrop}>
@@ -308,76 +315,101 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
           </View>
         </Modal>
         
-        <Text style={[styles.header, resizeTitle(screenSize)]}>
-          { question }
-        </Text>
+        <FadeInElement
+          shouldFadeIn={currentTutorialElement === "question"}
+          isVisibleWithoutAnimation={completedTutorial}
+        >
+          <Text style={[styles.header, resizeTitle(screenSize)]}>
+            { question }
+          </Text>
+        </FadeInElement>
 
-        <ShakeElement ref={playerShaker}>
-          <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }}>
-            <TouchableOpacity
-              style={[styles.audioCircle, resizeAudioCircle(screenSize), playing ? styles.yellowCircle : styles.whiteCircle]}
-              onPress={playPressed}
-              activeOpacity={1}
-            >
+        <FadeInElement
+          shouldFadeIn={currentTutorialElement === "play"}
+          isVisibleWithoutAnimation={completedTutorial}
+        >
+          <ShakeElement ref={playerShaker}>
+            <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }}>
+              <TouchableOpacity
+                style={[styles.audioCircle, resizeAudioCircle(screenSize), playing ? styles.yellowCircle : styles.whiteCircle]}
+                onPress={playPressed}
+                activeOpacity={1}
+              >
+                <Image
+                  source={playing ? Pause : Play}
+                  style={{ width: resizePlayPause(screenSize) }}
+                  resizeMode={'contain'}
+                />
+              </TouchableOpacity>
+            </Shadow>
+          </ShakeElement>
+        </FadeInElement>
+
+        <FadeInElement
+          shouldFadeIn={currentTutorialElement === "misc"}
+          isVisibleWithoutAnimation={completedTutorial}
+        >
+          <View style={styles.miscButtons}>
+            <TouchableOpacity onPress={reportAnswer}>
               <Image
-                source={playing ? Pause : Play}
-                style={{ width: resizePlayPause(screenSize) }}
+                source={Flag}
+                style={{ width: 35, marginRight: 20 }}
                 resizeMode={'contain'}
               />
             </TouchableOpacity>
-          </Shadow>
-        </ShakeElement>
-
-        <View style={styles.miscButtons}>
-          <TouchableOpacity onPress={reportAnswer}>
-            <Image
-              source={Flag}
-              style={{ width: 35, marginRight: 20 }}
-              resizeMode={'contain'}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={shareAnswer}>
-            <Image
-              source={Share}
-              style={{ width: 35, marginLeft: 20 }}
-              resizeMode={'contain'}
-            />
-          </TouchableOpacity>
-        </View>
-
-        <View style={{flex: 1}}>
-          {length ? 
-            <Slider
-              style={{width: 300, height: 40}}
-              minimumValue={0}
-              maximumValue={length}
-              minimumTrackTintColor="#888888"
-              maximumTrackTintColor="#FFFFFF"
-              allowTouchTrack={true}
-              thumbTintColor="#000000"
-              value={sliderValue}
-              onSlidingComplete={onSlidingComplete}
-              onSlidingStart={onSlidingStart}
-              thumbStyle={{ height: 30, width: 30 }}
-              trackStyle={{ height: 8, borderRadius: 99 }}
-            />
-            :
-            // we cannot change the maximumValue of Slider once its rendered, so we render a fake slider until we know length
-            <TouchableOpacity activeOpacity={1} onPress={informBeginPlaying}>
-              <View style={{ width: 300, height: 40, alignItems: "center", justifyContent: "center", flexDirection: "row" }}>
-                <View style={{ height: 30, width: 30, borderRadius: 999, backgroundColor:"#000000" }} />
-                <View style={{ width:270, height: 8, borderTopRightRadius: 99, borderBottomRightRadius: 99, backgroundColor: "#FFFFFF" }} />
-              </View>
+            <TouchableOpacity onPress={shareAnswer}>
+              <Image
+                source={Share}
+                style={{ width: 35, marginLeft: 20 }}
+                resizeMode={'contain'}
+              />
             </TouchableOpacity>
-          }
-        </View>
+          </View>
+        </FadeInElement>
 
-        <BottomButtons
-          theme={"answer"}
-          xPressed={startedPerm.current ? onDisapprove : informBeginPlaying}
-          checkPressed={startedPerm.current ? onApprove : informBeginPlaying}
-          miscPressed={startedPerm.current ? onPass : informBeginPlaying}
-        />
+        <FadeInElement
+          shouldFadeIn={currentTutorialElement === "play"}
+          isVisibleWithoutAnimation={completedTutorial}
+        >
+          <View style={{flex: 1}}>
+            {length ? 
+              <Slider
+                style={{width: 300, height: 40}}
+                minimumValue={0}
+                maximumValue={length}
+                minimumTrackTintColor="#888888"
+                maximumTrackTintColor="#FFFFFF"
+                allowTouchTrack={true}
+                thumbTintColor="#000000"
+                value={sliderValue}
+                onSlidingComplete={onSlidingComplete}
+                onSlidingStart={onSlidingStart}
+                thumbStyle={{ height: 30, width: 30 }}
+                trackStyle={{ height: 8, borderRadius: 99 }}
+              />
+              :
+              // we cannot change the maximumValue of Slider once its rendered, so we render a fake slider until we know length
+              <TouchableOpacity activeOpacity={1} onPress={informBeginPlaying}>
+                <View style={{ width: 300, height: 40, alignItems: "center", justifyContent: "center", flexDirection: "row" }}>
+                  <View style={{ height: 30, width: 30, borderRadius: 999, backgroundColor:"#000000" }} />
+                  <View style={{ width:270, height: 8, borderTopRightRadius: 99, borderBottomRightRadius: 99, backgroundColor: "#FFFFFF" }} />
+                </View>
+              </TouchableOpacity>
+            }
+          </View>
+        </FadeInElement>
+
+        <FadeInElement
+          shouldFadeIn={currentTutorialElement === "bottom"}
+          isVisibleWithoutAnimation={completedTutorial}
+        >
+          <BottomButtons
+            theme={"answer"}
+            xPressed={startedPerm.current ? onDisapprove : informBeginPlaying}
+            checkPressed={startedPerm.current ? onApprove : informBeginPlaying}
+            miscPressed={startedPerm.current ? onPass : informBeginPlaying}
+          />
+        </FadeInElement>
       </LinearGradient>
     </View>
   );

@@ -22,14 +22,9 @@ import RNFS from 'react-native-fs'
 import { RNFFmpeg } from 'react-native-ffmpeg';
 import uuid from 'react-native-uuid';
 import { APIQuestion } from "./Network"
-import TutorialElement from './TutorialElement'
 import { SizeContext } from './helpers'
 import { getAudioCircleSize, resizeAudioCircle, resizeMic, resizeTitle } from './helpers'
 import ShakeElement from './ShakeElement';
-
-
-// for tutorial maybe
-// https://reactnativeelements.com/docs/tooltip/
 
 // https://github.com/hyochan/react-native-audio-recorder-player/blob/master/index.ts
 const audioSet = {
@@ -456,7 +451,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       <LinearGradient
         style={styles.container}
         // alternatively rgba(255,0,138,0.25)
-        colors={isInTutorial ? ['#FFADBB99', 'rgba(255,181,38,0.1)'] : ['#FFADBB', 'rgba(255,181,38,0.25)']}
+        colors={['#FFADBB', 'rgba(255,181,38,0.25)']}
       >
         <Modal
           isVisible={modalVisible}
@@ -488,72 +483,33 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
           </View>
         </Modal>
         
-        <TutorialElement
-          onPress={progressTutorial}
-          currentElement={currentTutorialElement}
-          id={"question"}
-          isInTutorial={isInTutorial}
-          calloutTheme={"question"}
-          calloutText={"This is the current question; a new one comes out every few days. Answer it to the best of your ability. Tap me now!"}
-          calloutDistance={30}
-        >
-          <Text style={[styles.header, resizeTitle(screenSize)]}>
-            { question.text }
-          </Text>
-        </TutorialElement>
+        <Text style={[styles.header, resizeTitle(screenSize)]}>
+          { question.text }
+        </Text>
         
-        <TutorialElement
-          onPress={progressTutorial}
-          currentElement={currentTutorialElement}
-          id={"record"}
-          isInTutorial={isInTutorial}
-          calloutTheme={"question"}
-          calloutText={"This is the recorder. After the tutorial ends you can press it to record your answer! Press it again to pause. You have a 5 minute time limit, so make sure to pause when you aren't speaking. If you're speaking loud enough, it'll make pretty colors!"}
-          calloutDistance={33}
-        >
-          <ShakeElement ref={recorderShaker}>
-            <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }} disabled={isInTutorial && currentTutorialElement !== "record"}>
-              {Object.values(circles)}
-              <TouchableOpacity
-                style={[styles.audioCircle, resizeAudioCircle(screenSize), started ? (recording ? styles.redCircle : styles.yellowCircle) : styles.whiteCircle]}
-                onPress={recordPressed}
-                activeOpacity={1}
-              >
-                <Image
-                  source={Mic}
-                  style={{ width: resizeMic(screenSize) }}
-                  resizeMode={'contain'}
-                />
-              </TouchableOpacity>
-            </Shadow>
-          </ShakeElement>
-        </TutorialElement>
-        
-        <TutorialElement
-          onPress={progressTutorial}
-          currentElement={currentTutorialElement}
-          id={"record"}
-          isInTutorial={isInTutorial}
-        >
-          <Text style={[styles.timer, recordTime < 240 ? {} : styles.timerWarning]}>
-            { getConvertedRecordTime() } / 5:00
-          </Text>
-        </TutorialElement>
+        <ShakeElement ref={recorderShaker}>
+          <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }}>
+            {Object.values(circles)}
+            <TouchableOpacity
+              style={[styles.audioCircle, resizeAudioCircle(screenSize), started ? (recording ? styles.redCircle : styles.yellowCircle) : styles.whiteCircle]}
+              onPress={recordPressed}
+              activeOpacity={1}
+            >
+              <Image
+                source={Mic}
+                style={{ width: resizeMic(screenSize) }}
+                resizeMode={'contain'}
+              />
+            </TouchableOpacity>
+          </Shadow>
+        </ShakeElement>
+      
+        <Text style={[styles.timer, recordTime < 240 ? {} : styles.timerWarning]}>
+          { getConvertedRecordTime() } / 5:00
+        </Text>
         
         <View style={{flex: 1}}>
-          <TutorialElement
-            onPress={progressTutorial}
-            currentElement={currentTutorialElement}
-            id={"checklist"}
-            isInTutorial={isInTutorial}
-            calloutTheme={"question"}
-            calloutText={"This is a checklist to make sure you answer the question thoroughly. Make sure all of them are addressed and checked before submitting!"}
-            calloutDistance={-230}
-            measureDistanceFromBottom={false}
-            inheritedFlex={1}
-          >
-            <Checklist type={question.category} ref={checklist} disabledPress={started ? undefined : informBeginRecording} />
-          </TutorialElement>
+          <Checklist type={question.category} ref={checklist} disabledPress={started ? undefined : informBeginRecording} />
         </View>
 
         <BottomButtons
@@ -561,9 +517,6 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
           xPressed={started ? restartRecording : informBeginRecording}
           checkPressed={started ? submitRecording : informBeginRecording}
           miscPressed={started ? hearRecording : informBeginRecording}
-          isInTutorial={isInTutorial}
-          currentTutorialElement={currentTutorialElement}
-          onTutorialPress={progressTutorial}
           submitting={submitting}
         />
       </LinearGradient>

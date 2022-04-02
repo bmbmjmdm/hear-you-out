@@ -60,7 +60,7 @@ const Button = ({name, theme, onPress, isInTutorial, currentTutorialElement, onT
     underlay = pressedColor
     style = [styles.bigCircle, resizeBBLarge(screenSize), {backgroundColor: pressed ? underlay : bgColor}, pressed ? styles.depth : {}]
     image = theme === "question" ? RightArrow : ThumbsUp
-    imageSize = theme === "question" ? (14/20) * radius : (13/20) * radius
+    imageSize = theme === "question" ? (12/20) * radius : (12/20) * radius
     calloutText = theme === 'question' ? "When you're ready to submit you answer, press this!" : "When you're ready to proceed to the next answer, you can use one of these bottom buttons or swipe. Use this button or swipe right if you agree with the answer"
     calloutDistance = theme === 'question' ? -300 : -400
   }
@@ -71,7 +71,7 @@ const Button = ({name, theme, onPress, isInTutorial, currentTutorialElement, onT
     underlay = pressedColor
     style = [styles.bigCircle, resizeBBLarge(screenSize), {backgroundColor: pressed ? underlay : bgColor}, pressed ? styles.depth : {}]
     image = theme === "question" ? Garbage : ThumbsDown
-    imageSize = theme === "question" ? (12/20) * radius : (13/20) * radius
+    imageSize = theme === "question" ? (10/20) * radius : (12/20) * radius
     calloutText = theme === 'question' ? "If you don't like what you've recorded, press this to delete your recording and start over" : "Use this button or swipe left if you disagree with the answer"
     calloutDistance = xCalloutDistance
   }
@@ -80,7 +80,7 @@ const Button = ({name, theme, onPress, isInTutorial, currentTutorialElement, onT
     underlay = '#918a64'
     style = [styles.littleCircle, resizeBBSmall(screenSize), pressed ? {backgroundColor: underlay} : {}, pressed ? styles.depthSmall : {}]
     image = theme == "question" ? Speaker : Skip;
-    imageSize =  theme === "question" ? (2/3) * radius : (3/4) * radius 
+    imageSize =  theme === "question" ? (3/5) * radius : (2/3) * radius
     calloutText = theme === 'question' ? "To hear back what you've already recorded, press here" : "Use this button if you aren't sure whether you agree or not"
     calloutDistance = xCalloutDistance + (getBBLargeSize(screenSize) - getBBSmallSize(screenSize)) / 2
   }

@@ -80,17 +80,22 @@ class QuestionModel(BaseModel):
     text: str
     category: str
 
-#class QuestionTableSchema(QuestionModel):
-#    num_asks: int = 0
+class QuestionDB(QuestionModel):
+    num_asks: int = 0
     
-class AnswerSubmission(BaseModel):
+class SubmitAnswerPost(BaseModel):
     audio_data: bytes # should this be str since its b64 encoded? maybe create new Type
     question_uuid: str # uuid.UUID
+
+class SubmitAnswerResponse(BaseModel):
+    answer_id: str # TODO
+    question_id: str # TODO # TODO inconsistent with AnswerListen answer_uuid name
+    entry_timestamp: str
 
 class AnswerListen(BaseModel):
     audio_data: bytes # str?
     answer_uuid: str # TODO
-    
+
 class NoAnswersResponse(BaseModel):
     no_answers = True
 
@@ -106,8 +111,8 @@ class AnswerTableSchema(BaseModel):
     num_disagrees: int = 0
     num_abstains: int = 0
     num_serves: int = 0
-
-class AnswerStats(BaseModel):
+    
+class AnswerStatsResponse(BaseModel):
     key: str # TODO uuid; # answer_uuid
     num_agrees: int = 0
     num_disagrees: int = 0
@@ -119,7 +124,6 @@ def gen_uuid(): # TODO
     good_enough = str(uniform(0, 100)) # from random
     good_enough = good_enough.replace(".","") # remove the dot
     return f"{good_enough}"
-
 
 # handle all exceptions thrown in code below with a 500 http response
 # todo test what happens when this isn't here
@@ -152,17 +156,19 @@ async def get_question(drive: dict = Depends(get_drives), db: dict = Depends(get
     q = choice(questions)
     #q = questions[1]
 
-    # TODO keep track of questions asked so far
-    # - and how many responses they got?
-    #q_tschema = QuestionTableSchema(q)
-    #db['questions'].insert(q.dict())
-    #db['questions'].update(key=q['key'],
-    #                    updates={"num_asks": db['questions'].util.increment(1)})
+    # make sure row exists for question in db
+    if db['questions'].get(q['key']) is None:
+        q_schema = QuestionDB(q)
+        db['questions'].insert(q_schema.dict())
+
+    # regardless of first time being asked or not (=0), increment num_asks
+    db['questions'].update(key=q['key'],
+                           updates={"num_asks": db['questions'].util.increment(1)})
 
     return {"text": q['text'], "key": q['key'], "category": q["category"]}
 
-@app.post("/submitAnswer")
-async def submit_answer(ans: AnswerSubmission,
+@app.post("/submitAnswer", response_model=SubmitAnswerResponse)
+async def submit_answer(ans: SubmitAnswerPost,
                         drive: dict = Depends(get_drives),
                         db: dict = Depends(get_dbs)):
     answer_uuid = gen_uuid()
@@ -192,7 +198,9 @@ async def submit_answer(ans: AnswerSubmission,
                                 entry_timestamp=ts)
     db['answers'].insert(new_row.dict())
 
-    return {'answer_id': answer_uuid}
+    return {'answer_id': answer_uuid,
+            'question_id': question_uuid,
+            'entry_timestamp': ts}
 
 # button meanings:
 # dis/like or dis/agree?
@@ -436,7 +444,7 @@ async def rate_answer(answer_uuid: str,
         
     return PlainTextResponse("rating recorded", status_code=200)
 
-@app.get("/getAnswerStats", response_model=Union[AnswerStats,NoAnswersResponse])
+@app.get("/getAnswerStats", response_model=Union[AnswerStatsResponse,NoAnswersResponse])
 async def get_answer_stats(answer_uuid: str,
                            drive: dict = Depends(get_drives),
                            db: dict = Depends(get_dbs)):
@@ -445,12 +453,13 @@ async def get_answer_stats(answer_uuid: str,
     if row is None:
         return NoAnswersResponse()
     else:
-        # good way to AnswerStats(**row) while ignoring irrelevant keys?
+        # good way to AnswerStatsResponse(**row) while ignoring irrelevant keys?
         # print(row)
-        # return AnswerStats().parse_obj_as(AnswerStats, row)
-        return AnswerStats(key = row['key'],
-                           num_serves = row['num_serves'],
-                           num_agrees = row['num_agrees'],
-                           num_abstains = row['num_abstains'],
-                           num_disagrees = row['num_disagrees'])
+        # return AnswerStatsResponse().parse_obj_as(AnswerStatsResponse, row)
+        return AnswerStatsResponse(
+            key = row['key'],
+            num_serves = row['num_serves'],
+            num_agrees = row['num_agrees'],
+            num_abstains = row['num_abstains'],
+            num_disagrees = row['num_disagrees'])
 

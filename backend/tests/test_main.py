@@ -9,6 +9,8 @@ from fastapi.testclient import TestClient
 
 from ..main import QuestionModel, NoAnswersResponse
 
+# check out pytest.monkeypatch? eg https://testdriven.io/blog/fastapi-crud/
+
 # - want to play with postman to construct flows, and tests
 # - - and openAPI Links: https://swagger.io/docs/specification/links/
 # - AsyncAPI is for event-driven arch, not REST
@@ -233,22 +235,45 @@ def submitAnswer(client: TestClient,
     if response.status_code == 200:
         delete_answer(response.json()['answer_id'], test_dbs, test_drives)
 
-# parameterizing this instead of using default value so test case is clearer,
+# parameterizing this instead of using default value so test case itself is clearer,
 # but maybe overly complicated to use fixture to auto delete_answer?
 @pytest.mark.parametrize('submitAnswer',
                          ["test audio data"],
                          indirect=['submitAnswer'])
 def test_submit_answer(client: TestClient,
                        submitAnswer: Response, # Arrange and Act
+                       test_dbs, test_drives,
                        ) -> None:
-
     assert submitAnswer.status_code == 200
     # check the answer_uuid is a string of digits
-    #assert response.json
+
+    question_uuid = submitAnswer.json()['question_id']
     answer_uuid = submitAnswer.json()['answer_id']
-    # check answer is now in db and drive and associated to correct qid, with
+    metadata = test_dbs['answers'].get(answer_uuid)
+    document = test_drives['answers'].get(answer_uuid)
+    contents = document.read()
+
     # audio data being exactly 'test audio data'
-    # LEFT OFF here ^, and inserting/udpating db row upon getQuestion
+    assert b"test audio data" == contents
+
+    # answer db metadata at initial state
+    assert len(metadata.keys()) == 11 # reminder to update if we add new keys
+    assert metadata['key'] == answer_uuid
+    assert metadata['entry_timestamp'] == submitAnswer.json()['entry_timestamp']
+    assert metadata['question_uuid'] == question_uuid
+    assert metadata['num_flags'] == 0
+    assert metadata['is_banned'] is False
+    assert metadata['unban_token'] == ''
+    assert metadata['was_banned'] is False
+    assert metadata['num_agrees'] == 0
+    assert metadata['num_disagrees'] == 0
+    assert metadata['num_abstains'] == 0
+    assert metadata['num_serves'] == 0
+
+    # question metadata updated since flow includes question ask
+    # - LEFT OFF apparently flow doesnt' incldue resetnig questions
+    question_metadata = test_dbs['questions'].get(question_uuid)
+    assert question_metadata['num_asks'] == 1 # from submitAnswer fixture
     
     # ...do we want to explicitly test that this answer_id doesn't exist beforehand?
     # bc if so, need to do an Assert before the Act...
@@ -260,7 +285,6 @@ def test_submit_answer_wrong_qid(client: TestClient) -> None:
                            json={"audio_data": "test data",
                                  "question_uuid": "key doesn't exist"})
     assert response.status_code == 400 # what to return?
-    
 
 ### getAnswer
 # - workflow test: getAnswer -> no filtered answers -> submitAnswer -> getAnswer -> one

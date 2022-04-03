@@ -179,9 +179,8 @@ async def submit_answer(ans: SubmitAnswerPost,
     # - what is the default POST cap?
     # - create a unit test for an expected file size, and a file size over the POST cap
 
-    # todo need to insert/update row in getQuestion before uncommenting this
-    # if db['questions'].get(question_uuid) is None:
-    #     return PlainTextResponse("question_uuid not found", status_code=404)
+    if db['questions'].get(question_uuid) is None:
+        return PlainTextResponse("question_uuid not found", status_code=404)
         
     # store audio in drive, then bookkeep in base
     try:
@@ -306,7 +305,7 @@ async def get_answer(question_uuid: str,
     res = db['answers'].fetch()
     #print(res, res.count)
     if res.count == 0:
-        return NoAnswersResponse
+        return NoAnswersResponse()
 
     answers_items = [AnswerTableSchema(**item) for item in res.items]
     pop, unpop, contro, seen_pop, seen_unpop, seen_contro = filter_answers_from_db(answers_items, question_uuid, seen_answer_uuids)
@@ -322,7 +321,7 @@ async def get_answer(question_uuid: str,
         seen_contro += seen_contro2
 
     if len(pop+unpop+contro) == 0:
-        return NoAnswersResponse
+        return NoAnswersResponse()
 
     # calculate distribution thus far from seen answers, since we want to take that into account.
     # TODO finish this

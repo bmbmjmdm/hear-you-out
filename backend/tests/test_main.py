@@ -2,6 +2,8 @@ import sys
 import yaml
 import pytest
 
+from typing import Callable
+
 from deta import Drive, Base
 
 from fastapi import FastAPI, Response
@@ -125,12 +127,12 @@ def set_1_question(test_dbs, test_drives) -> QuestionModel:
     qfilename = 'list of questions.yaml'
     qfile = test_drives['questions'].get(qfilename)
     if qfile is None:
-        # instead of using global, should...
         test_drives['questions'].put(qfilename, yaml_string)
     else:
         raise Exception(f"{qfilename} already in drive, not overwriting just in case")
 
     yield qm
+    
     test_drives['questions'].delete(qfilename)
     test_dbs['questions'].delete(key)
 
@@ -187,19 +189,38 @@ def set_1_question(test_dbs, test_drives) -> QuestionModel:
 
 ### getQuestion
 
+# returns a function so we can call it more than once in a test case
 @pytest.fixture
 def getQuestion(client: TestClient) -> Response:
-    response = client.get("/getQuestion")
-    yield response
+    def _getQuestion():
+        response = client.get("/getQuestion")
+        return response
+    yield _getQuestion
+    # could decrement num_asks in db to 100% revert state I guess
+    # err, don't know how many times it's been asked, so need to copy
+    # state from before yielding insteadd.
 
 def test_get_question(set_1_question: QuestionModel, # Arrange
-                      getQuestion) -> None: # using this as the Act about which we Assert
-    
-    assert getQuestion.status_code == 200
-    assert getQuestion.json() == set_1_question.dict()
+                      test_dbs,
+                      getQuestion: Callable) -> None:
 
-def test_no_questions_available(getQuestion) -> None:
-     assert getQuestion.status_code == 500
+    # (gets input into DB during first ask)
+    assert test_dbs['questions'].get(set_1_question.key) is None
+
+    qresponse = getQuestion() # Act
+
+    assert qresponse.status_code == 200
+    assert qresponse.json() == set_1_question.dict()
+    assert test_dbs['questions'].get(set_1_question.key)['num_asks'] == 1
+
+    getQuestion() # Act again
+
+    # make sure it incremented
+    assert test_dbs['questions'].get(set_1_question.key)['num_asks'] == 2
+
+def test_no_questions_available(getQuestion: Callable) -> None:
+    qresponse = getQuestion()
+    assert qresponse.status_code == 500
 
 ### submitAnswer
 # - happy path results in entry appearing in drive, and entry and db
@@ -212,54 +233,62 @@ def test_no_questions_available(getQuestion) -> None:
 def submitAnswer(client: TestClient,
                  test_dbs, test_drives,
                  set_1_question, # Arrange for getQuestion
-                 getQuestion: Response, # Arrange
-                 request, # Arrange (parameterized for audio data)
-                 question_uuid: str = None # Arrange # TODO change to uuid
+                 getQuestion: Callable, # Arrange
                  ) -> Response:
 
-    assert getQuestion.status_code == 200
-    
-    audio_data = "test data" if request is None else request.param
-    # is it possible to put this in the arglist? ie, refer to other arg
-    question_uuid = getQuestion.json()['key'] if question_uuid is None else question_uuid
-    
-    response = client.post("/submitAnswer",
-                           json={"audio_data": audio_data,
-                                 "question_uuid": question_uuid})
-    yield response
+    qresponse = getQuestion()
+    assert qresponse.status_code == 200
+
+    responses = []
+    def _submitAnswer(audio_data = "test data", question_uuid = qresponse.json()['key']):
+        response = client.post("/submitAnswer",
+                               json={"audio_data": audio_data,
+                                     "question_uuid": question_uuid})
+        responses.append(response)
+        return response
+        
+    yield _submitAnswer
 
     def delete_answer(key, dbs, drives):
         drives['answers'].delete(key)
         dbs['answers'].delete(key)
 
-    if response.status_code == 200:
-        delete_answer(response.json()['answer_id'], test_dbs, test_drives)
+    for response in responses:
+        if response.status_code == 200:
+            delete_answer(response.json()['answer_id'], test_dbs, test_drives)
 
-# parameterizing this instead of using default value so test case itself is clearer,
-# but maybe overly complicated to use fixture to auto delete_answer?
-@pytest.mark.parametrize('submitAnswer',
-                         ["test audio data"],
-                         indirect=['submitAnswer'])
 def test_submit_answer(client: TestClient,
-                       submitAnswer: Response, # Arrange and Act
+                       submitAnswer: Callable, # Arrange and Act
                        test_dbs, test_drives,
                        ) -> None:
-    assert submitAnswer.status_code == 200
-    # check the answer_uuid is a string of digits
 
-    question_uuid = submitAnswer.json()['question_id']
-    answer_uuid = submitAnswer.json()['answer_id']
+    # no answers in the store before we submitAnswer
+    assert len(test_drives['answers'].list()['names']) == 0
+    assert len(test_dbs['answers'].fetch().items) == 0
+
+    testdata = "test audio data"
+
+    # Act
+    aresponse = submitAnswer(testdata)
+
+    # this is set from set_1_question called from submitAnswer
+    question_uuid = aresponse.json()['question_id']
+    
+    assert aresponse.status_code == 200
+    # check the answer_uuid is a uuid?
+
+    answer_uuid = aresponse.json()['answer_id']
     metadata = test_dbs['answers'].get(answer_uuid)
     document = test_drives['answers'].get(answer_uuid)
     contents = document.read()
 
     # audio data being exactly 'test audio data'
-    assert b"test audio data" == contents
+    assert testdata.encode('utf-8') == contents
 
     # answer db metadata at initial state
     assert len(metadata.keys()) == 11 # reminder to update if we add new keys
     assert metadata['key'] == answer_uuid
-    assert metadata['entry_timestamp'] == submitAnswer.json()['entry_timestamp']
+    assert metadata['entry_timestamp'] == aresponse.json()['entry_timestamp']
     assert metadata['question_uuid'] == question_uuid
     assert metadata['num_flags'] == 0
     assert metadata['is_banned'] is False
@@ -269,22 +298,16 @@ def test_submit_answer(client: TestClient,
     assert metadata['num_disagrees'] == 0
     assert metadata['num_abstains'] == 0
     assert metadata['num_serves'] == 0
-
-    # question metadata updated since flow includes question ask
-    # - LEFT OFF apparently flow doesnt' incldue resetnig questions
-    question_metadata = test_dbs['questions'].get(question_uuid)
-    assert question_metadata['num_asks'] == 1 # from submitAnswer fixture
     
     # ...do we want to explicitly test that this answer_id doesn't exist beforehand?
     # bc if so, need to do an Assert before the Act...
     # mb create 2nd test case for this? can we call fixture inside test case?
     # or mb don't need to due to nature of arrange fixtures?
 
-def test_submit_answer_wrong_qid(client: TestClient) -> None:
-    response = client.post("/submitAnswer",
-                           json={"audio_data": "test data",
-                                 "question_uuid": "key doesn't exist"})
-    assert response.status_code == 400 # what to return?
+def test_submit_answer_wrong_qid(client: TestClient,
+                                 submitAnswer) -> None:
+    response = submitAnswer(question_uuid = "key doesn't exist")
+    assert response.status_code == 404
 
 ### getAnswer
 # - workflow test: getAnswer -> no filtered answers -> submitAnswer -> getAnswer -> one
@@ -296,6 +319,37 @@ def test_submit_answer_wrong_qid(client: TestClient) -> None:
 # - - test distribution from each category? and seeing randomness from within each category
 # - - - test for round robin delivery, 1 from each category
 # - question not found error
+
+
+def test_get_answer_wrong_qid(client: TestClient) -> None:
+    qid = "keydoesntexist"
+
+    #response = client.post(f"/getAnswer?question_uuid={qid}")
+    # response = client.post("/getAnswer",
+    #                        json={"audio_data": "test data",
+    #                              "question_uuid": "key doesn't exist"})
+    #getAnswer
+    
+    assert response.status_code == 422
+
+
+def test_get_answer_no_answers(client: TestClient,
+                               set_1_question,
+                               ) -> None:
+
+    #response = client.post(f"/getAnswer?question_uuid={set_1_question.key}")
+    
+    assert response.status_code == 200
+    assert response.json() == NoAnswersResponse.dict()
+
+@pytest.fixture
+def getAnswer(client: TestClient,
+              test_dbs, test_drives,
+              set_1_question, # Arrange
+              # don't need to: getQuestion
+              submitAnswer: Response, # Arrange
+              ) -> Response:
+    pass
 
 
 ### flagAnswer

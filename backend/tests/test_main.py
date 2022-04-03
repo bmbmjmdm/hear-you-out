@@ -132,7 +132,7 @@ def set_1_question(test_dbs, test_drives) -> QuestionModel:
 
     yield qm
     test_drives['questions'].delete(qfilename)
-    # todo delete from db too
+    test_dbs['questions'].delete(key)
 
 # def fetch_all_from_drive(drive):
 #     result = drive.list()

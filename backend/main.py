@@ -154,18 +154,19 @@ async def get_question(drive: dict = Depends(get_drives), db: dict = Depends(get
     data_loaded = yaml.safe_load(data_streamed)
     questions = data_loaded['questions']
     q = choice(questions)
+    q_model = QuestionModel(**q)
     #q = questions[1]
 
     # make sure row exists for question in db
     if db['questions'].get(q['key']) is None:
-        q_schema = QuestionDB(q)
-        db['questions'].insert(q_schema.dict())
+        q_db = QuestionDB(**q_model.dict()) #TODO better way? look at pydantic model docs
+        db['questions'].insert(q_db.dict())
 
     # regardless of first time being asked or not (=0), increment num_asks
     db['questions'].update(key=q['key'],
                            updates={"num_asks": db['questions'].util.increment(1)})
 
-    return {"text": q['text'], "key": q['key'], "category": q["category"]}
+    return q_model.dict()
 
 @app.post("/submitAnswer", response_model=SubmitAnswerResponse)
 async def submit_answer(ans: SubmitAnswerPost,
@@ -456,7 +457,7 @@ async def get_answer_stats(answer_uuid: str,
         # good way to AnswerStatsResponse(**row) while ignoring irrelevant keys?
         # print(row)
         # return AnswerStatsResponse().parse_obj_as(AnswerStatsResponse, row)
-        return AnswerStatsResponse(
+        return AnswerStatsResponse( # replace following lines with **row?
             key = row['key'],
             num_serves = row['num_serves'],
             num_agrees = row['num_agrees'],

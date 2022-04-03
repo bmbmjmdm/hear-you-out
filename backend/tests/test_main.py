@@ -47,7 +47,6 @@ from ..main import QuestionModel, NoAnswersResponse
 # - stackOverflow Q on passing args to a fixture: https://stackoverflow.com/questions/44677426/can-i-pass-arguments-to-pytest-fixtures
 # - - explains indirect parameterization a bit more
 
-
 @pytest.fixture(scope="session")
 def test_drives():
     questions_drive = Drive("TEST_questions")
@@ -187,9 +186,17 @@ def set_1_question(test_dbs, test_drives) -> QuestionModel:
 # do i want to deploy a test micro, akin to a dev server the FE can test against?
 # - eventually, yeah, prob. to do integration testing with FE eg
 
+## a note on path fixtures
+# some fixtures are teh same name as paths in the api
+# these are intended to be used as both:
+# - Act step in a test specific for that rpc call
+# - Arrange step for another rpc call as part of a longer flow
+
+
 ### getQuestion
 
-# returns a function so we can call it more than once in a test case
+# returns a function so we can call it more than once in a test case.
+
 @pytest.fixture
 def getQuestion(client: TestClient) -> Response:
     def _getQuestion():
@@ -223,8 +230,8 @@ def test_no_questions_available(getQuestion: Callable) -> None:
     assert qresponse.status_code == 500
 
 ### submitAnswer
-# - happy path results in entry appearing in drive, and entry and db
-# - - create a drive+db for our test cases? or mock them out would be better
+
+# TODO test cases for:
 # - drive is full error
 # - other drive errors? (overwriting?)
 # - db errors
@@ -318,38 +325,52 @@ def test_submit_answer_wrong_qid(client: TestClient,
 # - - with and without a seen_before list
 # - - test distribution from each category? and seeing randomness from within each category
 # - - - test for round robin delivery, 1 from each category
-# - question not found error
 
 
-def test_get_answer_wrong_qid(client: TestClient) -> None:
-    qid = "keydoesntexist"
-
-    #response = client.post(f"/getAnswer?question_uuid={qid}")
-    # response = client.post("/getAnswer",
-    #                        json={"audio_data": "test data",
-    #                              "question_uuid": "key doesn't exist"})
-    #getAnswer
+def test_get_answer_wrong_qid(client: TestClient,
+                              getAnswer: Callable) -> None:
+    response = getAnswer(question_uuid='keynotfound')
     
-    assert response.status_code == 422
+    assert response.status_code == 404 # LEFT OFF - fix this broken test
 
 
 def test_get_answer_no_answers(client: TestClient,
-                               set_1_question,
+                               getAnswer: Callable,
                                ) -> None:
 
-    #response = client.post(f"/getAnswer?question_uuid={set_1_question.key}")
-    
-    assert response.status_code == 200
-    assert response.json() == NoAnswersResponse.dict()
+    response = getAnswer() # LEFT OFF -- this calls submitAnswer; need to post manually?
 
+    assert response.status_code == 200
+    assert response.json() == NoAnswersResponse().dict()
+
+# LEFT OFF -- writing this fixture and then the main tests as described above
+    
 @pytest.fixture
 def getAnswer(client: TestClient,
               test_dbs, test_drives,
               set_1_question, # Arrange
-              # don't need to: getQuestion
               submitAnswer: Response, # Arrange
               ) -> Response:
-    pass
+
+    submitAnswer() # Arrange
+    
+    seen_answers = [] # avoiding that bug of using [] as default arg
+    responses = []
+    def _getAnswer(seen_answers=seen_answers, question_uuid=set_1_question.key):
+        response = client.post(f"/getAnswer?question_uuid={question_uuid}",
+                               json=seen_answers)
+        responses.append(response)
+        return response
+
+    yield _getAnswer
+
+    for response in responses:
+        pass
+        # LEFT OFF - the NoResponseAnswers are also 200...how to filter?
+        # if response.status_code == 200: # prob a fair assumption
+        #     test_dbs['answers'].update(
+        #         {"num_serves": test_dbs['answers'].util.increment(-1)},
+        #         response.json()['answer_uuid'])
 
 
 ### flagAnswer

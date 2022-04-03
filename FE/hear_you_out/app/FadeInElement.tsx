@@ -5,10 +5,9 @@ type FadeInElementProps = {
   children: React.ReactElement | React.ReactElement[],
   shouldFadeIn: boolean,
   isVisibleWithoutAnimation?: boolean,
-  inheritedFlex?: number
 }
 
-const FadeInElement = ({ children, shouldFadeIn, isVisibleWithoutAnimation = false, inheritedFlex } : FadeInElementProps) => {
+const FadeInElement = ({ children, shouldFadeIn, isVisibleWithoutAnimation = false } : FadeInElementProps) => {
   const curOpacity = React.useRef(new Animated.Value(0)).current
 
   React.useEffect(() => {
@@ -22,8 +21,8 @@ const FadeInElement = ({ children, shouldFadeIn, isVisibleWithoutAnimation = fal
   }, [shouldFadeIn])
 
   return (
-    <Animated.View style={{opacity: isVisibleWithoutAnimation ? 1 : curOpacity, flex: inheritedFlex}}>
-      <View style={styles.disableClicks} />
+    <Animated.View style={{opacity: isVisibleWithoutAnimation ? 1 : curOpacity}}>
+      <View style={shouldFadeIn || isVisibleWithoutAnimation ? {} : styles.disableClicks} />
       { children }
     </Animated.View>
   )

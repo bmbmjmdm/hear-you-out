@@ -39,10 +39,11 @@ type AnswerProps = {
   completedTutorial: boolean,
   onCompleteTutorial: () => void,
   // an un-recoverable error has occured and we need to reload the app
-  onError: () => void
+  onError: () => void,
+  isShown: boolean
 }
 
-const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, onApprove, onPass, onReport, completedTutorial, onCompleteTutorial, onError}: AnswerProps) => {
+const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, onApprove, onPass, onReport, completedTutorial, onCompleteTutorial, onError, isShown}: AnswerProps) => {
   const screenSize = React.useContext(SizeContext)
   const [sliderValue, setSliderValue] = React.useState(0)
   const [length, setLength] = React.useState(0)
@@ -249,26 +250,22 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
     onReport()
   }
 
-  const progressTutorial = () => {
-    if (currentTutorialElement === '') setCurrentTutorialElement('question')
-    if (currentTutorialElement === 'question') setCurrentTutorialElement('play')
-    if (currentTutorialElement === 'play') setCurrentTutorialElement('misc')
-    if (currentTutorialElement === 'misc') setCurrentTutorialElement('bottom')
-    if (currentTutorialElement === 'bottom') onCompleteTutorial()
-  }
-
   React.useEffect(() => {
     // dumb way of progressing through tutorial, but a good place to start
     // TODO make more interactive
-    // TODO fix this running behind the question card
-    if (!completedTutorial) {
-      setTimeout(progressTutorial, 250) // let past card finish animating out before fading in question
-      setTimeout(progressTutorial, 2500) // 2 seconds to read the question
-      setTimeout(progressTutorial, 16500) // 16 seconds to press button and listen to some of the answer
-      setTimeout(progressTutorial, 2500) // 2 seconds to see misc buttons
-      setTimeout(progressTutorial, 750) // make sure bottom buttons are fully faded in before marking tutorial complete
+    if (!completedTutorial && isShown) {
+      let waitTime = 500
+      setTimeout(() => setCurrentTutorialElement('question'), waitTime) // let past card finish animating out before fading in question
+      waitTime += 2500
+      setTimeout(() => setCurrentTutorialElement('play'), waitTime) // 2 seconds to read the question
+      waitTime += 16500
+      setTimeout(() => setCurrentTutorialElement('misc'), waitTime) // 16 seconds to press button and listen to some of the answer
+      waitTime += 2500
+      setTimeout(() => setCurrentTutorialElement('bottom'), waitTime) // 2 seconds to see misc buttons
+      waitTime += 750
+      setTimeout(onCompleteTutorial, waitTime) // make sure bottom buttons are fully faded in before marking tutorial complete
     }
-  }, [])
+  }, [isShown])
 
   if (!ready) return (
     <View style={styles.whiteBackdrop}>
@@ -367,11 +364,11 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
           </View>
         </FadeInElement>
 
-        <FadeInElement
-          shouldFadeIn={currentTutorialElement === "play"}
-          isVisibleWithoutAnimation={completedTutorial}
-        >
-          <View style={{flex: 1}}>
+        <View style={{flex: 1}}>
+          <FadeInElement
+            shouldFadeIn={currentTutorialElement === "play"}
+            isVisibleWithoutAnimation={completedTutorial}
+          >
             {length ? 
               <Slider
                 style={{width: 300, height: 40}}
@@ -396,8 +393,8 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
                 </View>
               </TouchableOpacity>
             }
-          </View>
-        </FadeInElement>
+          </FadeInElement>
+        </View>
 
         <FadeInElement
           shouldFadeIn={currentTutorialElement === "bottom"}

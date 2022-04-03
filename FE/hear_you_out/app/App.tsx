@@ -309,7 +309,7 @@ const App = () => {
                 return <NoAnswers setDisableSwipes={setDisableSwipes} isShown={topStack === 1} />
               }
               else {
-                return <Answer setDisableSwipes={setDisableSwipes} answerAudioData={card.data} id={card.id} question={card.questionText} completedTutorial={completedAnswerTutorial} onCompleteTutorial={onCompleteAnswerTutorial} onApprove={() => swiper1.current.swipeRight()} onDisapprove={() => swiper1.current.swipeLeft()} onPass={() => swiper1.current.swipeTop()} onReport={() => swiper1.current.swipeBottom()} onError={reloadStacks} />
+                return <Answer setDisableSwipes={setDisableSwipes} answerAudioData={card.data} id={card.id} question={card.questionText} completedTutorial={completedAnswerTutorial} onCompleteTutorial={onCompleteAnswerTutorial} onApprove={() => swiper1.current.swipeRight()} onDisapprove={() => swiper1.current.swipeLeft()} onPass={() => swiper1.current.swipeTop()} onReport={() => swiper1.current.swipeBottom()} onError={reloadStacks} isShown={topStack === 1} />
               }
             }}
             onSwiped={() => {}}
@@ -369,7 +369,7 @@ const App = () => {
                 return <NoAnswers setDisableSwipes={setDisableSwipes} isShown={topStack === 2} />
               }
               else {
-                return <Answer setDisableSwipes={setDisableSwipes} answerAudioData={card.data} id={card.id} question={card.questionText} completedTutorial={completedAnswerTutorial} onCompleteTutorial={onCompleteAnswerTutorial} onApprove={() => swiper2.current.swipeRight()} onDisapprove={() => swiper2.current.swipeLeft()} onPass={() => swiper2.current.swipeTop()} onReport={() => swiper2.current.swipeBottom()} onError={reloadStacks} />
+                return <Answer setDisableSwipes={setDisableSwipes} answerAudioData={card.data} id={card.id} question={card.questionText} completedTutorial={completedAnswerTutorial} onCompleteTutorial={onCompleteAnswerTutorial} onApprove={() => swiper2.current.swipeRight()} onDisapprove={() => swiper2.current.swipeLeft()} onPass={() => swiper2.current.swipeTop()} onReport={() => swiper2.current.swipeBottom()} onError={reloadStacks} isShown={topStack === 2} />
               }
             }}
             onSwiped={() => {}}

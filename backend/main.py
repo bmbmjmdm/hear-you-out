@@ -127,10 +127,12 @@ def gen_uuid(): # TODO
 
 # handle all exceptions thrown in code below with a 500 http response
 # todo test what happens when this isn't here
-@app.exception_handler(Exception)
-async def validation_exception_handler(request, exc):
-    print(str(exc))
-    return PlainTextResponse("uh oh, something unexpected happened", status_code=500)
+# todo maybe do this in prod but not dev?
+# @app.exception_handler(Exception)
+# async def validation_exception_handler(request, exc):
+#     print(str(exc))
+#     return PlainTextResponse("uh oh, something unexpected happened", stat
+#                           us_code=500)
 
 # todo turn off caching per docs?
 @app.get("/")

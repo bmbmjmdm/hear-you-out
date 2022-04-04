@@ -22,16 +22,16 @@ import { Slider } from 'react-native-elements';
 import RNFS from 'react-native-fs'
 import AudioRecorderPlayer from 'react-native-audio-recorder-player';
 import RNShare from 'react-native-share'
-import { APIQuestion } from "./Network"
-import TutorialElement from './TutorialElement'
 import { SizeContext } from './helpers'
 import { getAudioCircleSize, resizeAudioCircle, resizePlayPause, resizeTitle } from './helpers'
+import ShakeElement from './ShakeElement';
+import FadeInElement from './FadeInElement'
 
 type AnswerProps = {
   setDisableSwipes: (val: boolean) => void,
   id: string,
   answerAudioData: string,
-  question: APIQuestion,
+  question: string,
   onApprove: () => {},
   onDisapprove: () => {},
   onPass: () => {},
@@ -52,19 +52,21 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
   const started = React.useRef(false)
   const startedPerm = React.useRef(false)
   const [ready, setReady] = React.useState(false)
-  const [currentTutorialElement, setCurrentTutorialElement] = React.useState("question")
-  const [isInTutorial, setIsInTutorial] = React.useState(!completedTutorial)
+  const [currentTutorialElement, setCurrentTutorialElement] = React.useState("")
 
   // modal
   const [modalVisible, setModalVisible] = React.useState(false)
   const [modalText, setModalText] = React.useState("")
   const [modalConfirm, setModalConfirm] = React.useState<() => void>(() => {})
+  const playerShaker = React.useRef()
+  const [shookPlayer, setShookPlayer] = React.useState(false)
 
   // initialize the player and setup callbacks
   const player = React.useRef(new AudioRecorderPlayer()).current
   const extention = Platform.OS === 'android' ? ".mp4" : ".m4a"
   const prepend = Platform.OS === 'android' ? "" : "file://"
-  const filepath = prepend + RNFS.CachesDirectoryPath + '/' + "CoolAnswer" + id + extention
+  const filepathRaw = RNFS.CachesDirectoryPath + '/' + "CoolAnswer" + id + extention
+  const filepath = prepend + filepathRaw
 
   const playbackListener = ({currentPosition, duration}) => {
     // if length is set more than once it'll break the slider
@@ -200,16 +202,27 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
   }
 
   const informBeginPlaying = () => {
-    setModalText("You need to listen to the answer first!")
-    setModalConfirm(null)
-    setModalVisible(true)
+    if (!shookPlayer) {
+      playerShaker?.current?.shake()
+      setShookPlayer(true)
+    }
+    else {
+      setModalText("You need to listen to the answer first!")
+      setModalConfirm(null)
+      setModalVisible(true)
+      setShookPlayer(false)
+    }
   }
 
   const shareAnswer = async () => {
+    if (!startedPerm.current) {
+      informBeginPlaying();
+      return;
+    }
     try {
       // note this method does not work with base64 files. we will have to convert the file to a normal mp3 or w.e and share it like that
       const options = {
-        url: filepath
+        url: "file://" + filepathRaw
       }
       await RNShare.open(options)
     }
@@ -221,6 +234,10 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
   }
 
   const reportAnswer = () => {
+    if (!startedPerm.current) {
+      informBeginPlaying();
+      return;
+    }
     // user pressed first button, now they need to confirm
     setModalText("Report innapropriate answer?")
     setModalConfirm(() => confirmReportAnswer)
@@ -233,18 +250,25 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
   }
 
   const progressTutorial = () => {
+    if (currentTutorialElement === '') setCurrentTutorialElement('question')
     if (currentTutorialElement === 'question') setCurrentTutorialElement('play')
-    if (currentTutorialElement === 'play') setCurrentTutorialElement('flag')
-    if (currentTutorialElement === 'flag') setCurrentTutorialElement('share')
-    if (currentTutorialElement === 'share') setCurrentTutorialElement('check')
-    if (currentTutorialElement === 'check') setCurrentTutorialElement('x')
-    if (currentTutorialElement === 'x') setCurrentTutorialElement('misc')
-    if (currentTutorialElement === 'misc') onCompleteTutorial()
+    if (currentTutorialElement === 'play') setCurrentTutorialElement('misc')
+    if (currentTutorialElement === 'misc') setCurrentTutorialElement('bottom')
+    if (currentTutorialElement === 'bottom') onCompleteTutorial()
   }
 
   React.useEffect(() => {
-    setIsInTutorial(!completedTutorial)
-  }, [completedTutorial])
+    // dumb way of progressing through tutorial, but a good place to start
+    // TODO make more interactive
+    // TODO fix this running behind the question card
+    if (!completedTutorial) {
+      setTimeout(progressTutorial, 250) // let past card finish animating out before fading in question
+      setTimeout(progressTutorial, 2500) // 2 seconds to read the question
+      setTimeout(progressTutorial, 16500) // 16 seconds to press button and listen to some of the answer
+      setTimeout(progressTutorial, 2500) // 2 seconds to see misc buttons
+      setTimeout(progressTutorial, 750) // make sure bottom buttons are fully faded in before marking tutorial complete
+    }
+  }, [])
 
   if (!ready) return (
     <View style={styles.whiteBackdrop}>
@@ -259,7 +283,7 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
     <View style={styles.whiteBackdrop}>
       <LinearGradient
         style={styles.container}
-        colors={isInTutorial ? ['rgba(0,255,117,0.1)', 'rgba(0,74,217,0.1)'] : ['rgba(0,255,117,0.25)', 'rgba(0,74,217,0.25)']}
+        colors={['rgba(0,255,117,0.25)', 'rgba(0,74,217,0.25)']}
       >
         <Modal
           isVisible={modalVisible}
@@ -271,67 +295,61 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
           <View style={styles.modalOuter}>
             <View style={styles.modalInner}>
               <Text style={styles.modalText}>{modalText}</Text>
-              <View style={styles.modalButtons}>
-                <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
-                  <Text style={styles.buttonText}>No</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.confirmButton} activeOpacity={0.3} onPress={modalConfirm}>
-                  <Text style={styles.buttonText}>Yes</Text>
-                </TouchableOpacity>
-              </View>
+              {modalConfirm ? (
+                <View style={styles.modalButtons}>
+                  <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
+                    <Text style={styles.buttonText}>No</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles.confirmButton} activeOpacity={0.3} onPress={modalConfirm}>
+                    <Text style={styles.buttonText}>Yes</Text>
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.modalOneButton}>
+                  <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
+                    <Text style={styles.buttonText}>Ok</Text>
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
           </View>
         </Modal>
         
-        <TutorialElement
-          onPress={progressTutorial}
-          currentElement={currentTutorialElement}
-          id={"question"}
-          isInTutorial={isInTutorial}
-          calloutTheme={"answer"}
-          calloutText={"Now you'll see answers by other people. They'll be answering the same question you just did."}
-          calloutDistance={30}
+        <FadeInElement
+          shouldFadeIn={currentTutorialElement === "question"}
+          isVisibleWithoutAnimation={completedTutorial}
         >
           <Text style={[styles.header, resizeTitle(screenSize)]}>
-            { question.text }
+            { question }
           </Text>
-        </TutorialElement>
+        </FadeInElement>
 
-        <TutorialElement
-          onPress={progressTutorial}
-          currentElement={currentTutorialElement}
-          id={"play"}
-          isInTutorial={isInTutorial}
-          calloutTheme={"answer"}
-          calloutText={"Use these to play, pause, fast-forward, and rewind"}
-          calloutDistance={0}
+        <FadeInElement
+          shouldFadeIn={currentTutorialElement === "play"}
+          isVisibleWithoutAnimation={completedTutorial}
         >
-          <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }} disabled={isInTutorial && currentTutorialElement !== 'play'}>
-            <TouchableOpacity
-              style={[styles.audioCircle, resizeAudioCircle(screenSize), playing ? styles.yellowCircle : styles.whiteCircle]}
-              onPress={playPressed}
-              activeOpacity={1}
-            >
-              <Image
-                source={playing ? Pause : Play}
-                style={{ width: resizePlayPause(screenSize) }}
-                resizeMode={'contain'}
-              />
-            </TouchableOpacity>
-          </Shadow>
-        </TutorialElement>
+          <ShakeElement ref={playerShaker}>
+            <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }}>
+              <TouchableOpacity
+                style={[styles.audioCircle, resizeAudioCircle(screenSize), playing ? styles.yellowCircle : styles.whiteCircle]}
+                onPress={playPressed}
+                activeOpacity={1}
+              >
+                <Image
+                  source={playing ? Pause : Play}
+                  style={{ width: resizePlayPause(screenSize) }}
+                  resizeMode={'contain'}
+                />
+              </TouchableOpacity>
+            </Shadow>
+          </ShakeElement>
+        </FadeInElement>
 
-        <View style={styles.miscButtons}>
-          <TutorialElement
-            onPress={progressTutorial}
-            currentElement={currentTutorialElement}
-            id={"flag"}
-            isInTutorial={isInTutorial}
-            calloutTheme={"answer"}
-            calloutText={"If the answer does not address the question or the various bullet points you did before, flag it here"}
-            calloutDistance={-150}
-            measureDistanceFromBottom={false}
-          >
+        <FadeInElement
+          shouldFadeIn={currentTutorialElement === "misc"}
+          isVisibleWithoutAnimation={completedTutorial}
+        >
+          <View style={styles.miscButtons}>
             <TouchableOpacity onPress={reportAnswer}>
               <Image
                 source={Flag}
@@ -339,17 +357,6 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
                 resizeMode={'contain'}
               />
             </TouchableOpacity>
-          </TutorialElement>
-          <TutorialElement
-            onPress={progressTutorial}
-            currentElement={currentTutorialElement}
-            id={"share"}
-            isInTutorial={isInTutorial}
-            calloutTheme={"answer"}
-            calloutText={"If you find this answer worth sharing, use this"}
-            calloutDistance={-100}
-            measureDistanceFromBottom={false}
-          >
             <TouchableOpacity onPress={shareAnswer}>
               <Image
                 source={Share}
@@ -357,50 +364,52 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
                 resizeMode={'contain'}
               />
             </TouchableOpacity>
-          </TutorialElement>
-        </View>
+          </View>
+        </FadeInElement>
 
-        <View style={{flex: 1}}>
-          <TutorialElement
-            onPress={progressTutorial}
-            currentElement={currentTutorialElement}
-            id={"play"}
-            isInTutorial={isInTutorial}
-          >
-              {length ? 
-                <Slider
-                  style={{width: 300, height: 40}}
-                  minimumValue={0}
-                  maximumValue={length}
-                  minimumTrackTintColor="#888888"
-                  maximumTrackTintColor="#FFFFFF"
-                  allowTouchTrack={true}
-                  thumbTintColor="#000000"
-                  value={sliderValue}
-                  onSlidingComplete={onSlidingComplete}
-                  onSlidingStart={onSlidingStart}
-                  thumbStyle={{ height: 30, width: 30 }}
-                  trackStyle={{ height: 8, borderRadius: 99 }}
-                />
-                :
-                // we cannot change the maximumValue of Slider once its rendered, so we render a fake slider until we know length
+        <FadeInElement
+          shouldFadeIn={currentTutorialElement === "play"}
+          isVisibleWithoutAnimation={completedTutorial}
+        >
+          <View style={{flex: 1}}>
+            {length ? 
+              <Slider
+                style={{width: 300, height: 40}}
+                minimumValue={0}
+                maximumValue={length}
+                minimumTrackTintColor="#888888"
+                maximumTrackTintColor="#FFFFFF"
+                allowTouchTrack={true}
+                thumbTintColor="#000000"
+                value={sliderValue}
+                onSlidingComplete={onSlidingComplete}
+                onSlidingStart={onSlidingStart}
+                thumbStyle={{ height: 30, width: 30 }}
+                trackStyle={{ height: 8, borderRadius: 99 }}
+              />
+              :
+              // we cannot change the maximumValue of Slider once its rendered, so we render a fake slider until we know length
+              <TouchableOpacity activeOpacity={1} onPress={informBeginPlaying}>
                 <View style={{ width: 300, height: 40, alignItems: "center", justifyContent: "center", flexDirection: "row" }}>
                   <View style={{ height: 30, width: 30, borderRadius: 999, backgroundColor:"#000000" }} />
                   <View style={{ width:270, height: 8, borderTopRightRadius: 99, borderBottomRightRadius: 99, backgroundColor: "#FFFFFF" }} />
                 </View>
-              }
-          </TutorialElement>
-        </View>
+              </TouchableOpacity>
+            }
+          </View>
+        </FadeInElement>
 
-        <BottomButtons
-          theme={"answer"}
-          xPressed={startedPerm ? onDisapprove : informBeginPlaying}
-          checkPressed={startedPerm ? onApprove : informBeginPlaying}
-          miscPressed={startedPerm ? onPass : informBeginPlaying}
-          isInTutorial={isInTutorial}
-          currentTutorialElement={currentTutorialElement}
-          onTutorialPress={progressTutorial}
-        />
+        <FadeInElement
+          shouldFadeIn={currentTutorialElement === "bottom"}
+          isVisibleWithoutAnimation={completedTutorial}
+        >
+          <BottomButtons
+            theme={"answer"}
+            xPressed={startedPerm.current ? onDisapprove : informBeginPlaying}
+            checkPressed={startedPerm.current ? onApprove : informBeginPlaying}
+            miscPressed={startedPerm.current ? onPass : informBeginPlaying}
+          />
+        </FadeInElement>
       </LinearGradient>
     </View>
   );
@@ -503,6 +512,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     flexDirection: 'row',
+    marginTop: 30
+  },
+
+  modalOneButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
     marginTop: 30
   }
 });

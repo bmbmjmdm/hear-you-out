@@ -8,8 +8,9 @@ import {
   Platform,
 } from 'react-native';
 import CheckBox from '@react-native-community/checkbox';
+import ShakeElement from "./ShakeElement"
 
-const Checklist = ({type}:{type:string}, ref) => {
+const Checklist = ({type, disabledPress} : {type:string, disabledPress?: Function}, ref) => {
   const allRefs = React.useRef({}).current
   let itemList = checklist_map[type]
   if (!itemList) itemList = checklist_map["other"]
@@ -22,13 +23,18 @@ const Checklist = ({type}:{type:string}, ref) => {
         if (!allRefs[i].isChecked()) return false
       }
       return true
+    },
+    shake: () => {
+      for (const i in allRefs) {
+        allRefs[i].shake()
+      }
     }
   }))
   
   // construct our checklist items from our known checklist map + type
   for (const i in itemList) {
     itemComponents.push(
-      <CheckItemWithRef text={itemList[i]} key={i} ref={curRef => allRefs[i] = curRef} />
+      <CheckItemWithRef text={itemList[i]} key={i} ref={curRef => allRefs[i] = curRef} disabledPress={disabledPress} />
     )
   }
 
@@ -58,37 +64,49 @@ const checklist_map = {
 }
 
 // a single item with a check and text
-const CheckItem = ({text}, ref) => {
+const CheckItem = ({text, disabledPress}, ref) => {
   const [val, setVal] = React.useState(false)
+  const shakeRef = React.useRef(null)
   
   // expose our checked value to the parent
   useImperativeHandle(ref, () => ({
-    isChecked: () => val
+    isChecked: () => val,
+    shake: () => {
+      if (!val) shakeRef.current.shake()
+    }
   }))
 
   return (
     <View style={styles.checkItem}>
-      <CheckBox
-        value={val}
-        onValueChange={setVal}
-        tintColors={{
-          true: "#575757"
-        }}
-        onFillColor={Platform.OS === "android" ? "#575757" : undefined}
-        onCheckColor={"#222222"}
-        onTintColor={"#222222"}
-        tintColor={"#575757"}
-        onAnimationType={"one-stroke"}
-        offAnimationType={"one-stroke"}
-        style={Platform.OS === "android" ? {} : {
-          width: 25,
-          height: 25,
-          marginRight: 5
-        }}
-      />
+      <ShakeElement ref={shakeRefNew => shakeRef.current = shakeRefNew}>
+        <CheckBox
+          value={val}
+          onValueChange={newVal => {
+            if (disabledPress) disabledPress()
+            else setVal(newVal)
+          }}
+          tintColors={{
+            true: "#575757"
+          }}
+          onFillColor={Platform.OS === "android" ? "#575757" : undefined}
+          onCheckColor={"#222222"}
+          onTintColor={"#222222"}
+          tintColor={"#575757"}
+          onAnimationType={"one-stroke"}
+          offAnimationType={"one-stroke"}
+          style={Platform.OS === "android" ? {} : {
+            width: 25,
+            height: 25,
+            marginRight: 5
+          }}
+        />
+      </ShakeElement>
       <Text
         style={styles.text}
-        onPress={() => setVal(!val)}
+        onPress={() => {
+          if (disabledPress) disabledPress()
+          else setVal(!val)
+        }}
       >
         {text}
       </Text>

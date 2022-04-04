@@ -22,13 +22,10 @@ import RNFS from 'react-native-fs'
 import { RNFFmpeg } from 'react-native-ffmpeg';
 import uuid from 'react-native-uuid';
 import { APIQuestion } from "./Network"
-import TutorialElement from './TutorialElement'
 import { SizeContext } from './helpers'
 import { getAudioCircleSize, resizeAudioCircle, resizeMic, resizeTitle } from './helpers'
-
-
-// for tutorial maybe
-// https://reactnativeelements.com/docs/tooltip/
+import ShakeElement from './ShakeElement';
+import FadeInElement from './FadeInElement'
 
 // https://github.com/hyochan/react-native-audio-recorder-player/blob/master/index.ts
 const audioSet = {
@@ -55,9 +52,9 @@ type QuestionProps = {
 const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompleteTutorial, onError }: QuestionProps) => {
   const screenSize = React.useContext(SizeContext)
   const checklist = React.useRef()
+  const recorderShaker = React.useRef()
   const [circles, setCircles] = React.useState({})
   const [currentTutorialElement, setCurrentTutorialElement] = React.useState("question")
-  const [isInTutorial, setIsInTutorial] = React.useState(!completedTutorial)
   // TODO set disabled styles on everything when submitting?
   const [submitting, setSubmitting] = React.useState(false)
 
@@ -65,6 +62,8 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   const [modalVisible, setModalVisible] = React.useState(false)
   const [modalText, setModalText] = React.useState("")
   const [modalConfirm, setModalConfirm] = React.useState(null)
+  const [shookChecklist, setShookChecklist] = React.useState(false)
+  const [shookRecorder, setShookRecorder] = React.useState(false)
 
   // timer
   const [recordTime, setRecordTime] = React.useState(0)
@@ -101,7 +100,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
         if (timing.current) {
           setRecordTime((prevTime) => {
             if (prevTime >= 300) {
-              recordReleased(true)
+              recordPaused(true)
               setModalVisible(true)
               setModalText("You have reached the max recording time")
               setModalConfirm(null)
@@ -206,7 +205,12 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
     })
   }
 
-  const recordPressed = async () => {
+  const recordPressed = () => {
+    if (recording) recordPaused()
+    else recordStartContinue()
+  }
+
+  const recordStartContinue = async () => {
     if (lock.current || recording) return
     if (recordTime >= 300) {
       setModalVisible(true)
@@ -252,12 +256,8 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   }
 
   // we use force when we can't rely on `recording` due to the setInterval timer not having updated variables
-  const recordReleased = async (force:boolean = false, retry:boolean = false) => {
-    if (lock.current) {
-      // if we ever wind up here, we dont want to miss the recordRelease event, so keep retrying
-      setTimeout(() => recordReleased(force), 50)
-      return
-    }
+  const recordPaused = async (force:boolean = false, retry:boolean = false) => {
+    if (lock.current) return
     lock.current = true
     try { 
       if (recording || force) {
@@ -275,16 +275,23 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       }
       else {
         lock.current = false
-        recordReleased(false, true)
+        recordPaused(false, true)
       }
     }
   }
 
   const informBeginRecording = async () => {
     if (lock.current) return
-    setModalText("You need to start a recording first!")
-    setModalConfirm(null)
-    setModalVisible(true)
+    if (!shookRecorder) {
+      recorderShaker?.current?.shake()
+      setShookRecorder(true)
+    }
+    else {
+      setModalText("You need to start a recording first!")
+      setModalConfirm(null)
+      setModalVisible(true)
+      setShookRecorder(false)
+    }
   }
 
   const restartRecording = async () => {
@@ -321,13 +328,20 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
     if (lock.current || recording) return
     // validate checklist
     if (!checklist?.current?.areAllChecked()) {
-      setModalText("Please make sure you addressed all points in the checklist before submitting (scroll if you have to)")
-      setModalConfirm(null)
-      setModalVisible(true)
+      if (!shookChecklist) {
+        checklist?.current?.shake()
+        setShookChecklist(true)
+      }
+      else {
+        setModalText("Please address all points in the checklist (scroll if you have to)")
+        setModalConfirm(null)
+        setModalVisible(true)
+        setShookChecklist(false)
+      }
       return
     }
     if (recordTime < 15) {
-      setModalText("Please make sure you thoroughly answer the prompt (your answer was too short).")
+      setModalText("Please thoroughly answer the prompt (your answer was too short).")
       setModalConfirm(null)
       setModalVisible(true)
       return
@@ -405,15 +419,20 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   const progressTutorial = () => {
     if (currentTutorialElement === 'question') setCurrentTutorialElement('record')
     if (currentTutorialElement === 'record') setCurrentTutorialElement('checklist')
-    if (currentTutorialElement === 'checklist') setCurrentTutorialElement('misc')
-    if (currentTutorialElement === 'misc') setCurrentTutorialElement('x')
-    if (currentTutorialElement === 'x') setCurrentTutorialElement('check')
-    if (currentTutorialElement === 'check') onCompleteTutorial()
+    if (currentTutorialElement === 'checklist') setCurrentTutorialElement('bottom')
+    if (currentTutorialElement === 'bottom') onCompleteTutorial()
   }
 
   React.useEffect(() => {
-    setIsInTutorial(!completedTutorial)
-  }, [completedTutorial])
+    // dumb way of progressing through tutorial, but a good place to start
+    // TODO make more interactive
+    if (!completedTutorial) {
+      setTimeout(progressTutorial, 2500) // 2 seconds to read the question
+      setTimeout(progressTutorial, 16500) // 16 seconds to press button and answer
+      setTimeout(progressTutorial, 4500) // 4 seconds to read checklist
+      setTimeout(progressTutorial, 750) // make sure bottom buttons are fully faded in before marking tutorial complete
+    }
+  }, [])
 
   const getConvertedRecordTime = () => {
     const minutes = Math.floor(recordTime / 60)
@@ -437,7 +456,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       <LinearGradient
         style={styles.container}
         // alternatively rgba(255,0,138,0.25)
-        colors={isInTutorial ? ['#FFADBB99', 'rgba(255,181,38,0.1)'] : ['#FFADBB', 'rgba(255,181,38,0.25)']}
+        colors={['#FFADBB', 'rgba(255,181,38,0.25)']}
       >
         <Modal
           isVisible={modalVisible}
@@ -469,83 +488,63 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
           </View>
         </Modal>
         
-        <TutorialElement
-          onPress={progressTutorial}
-          currentElement={currentTutorialElement}
-          id={"question"}
-          isInTutorial={isInTutorial}
-          calloutTheme={"question"}
-          calloutText={"This is the current question. A new one comes out every few days. Answer it to the best of your ability!"}
-          calloutDistance={30}
+        <FadeInElement
+          shouldFadeIn={currentTutorialElement === "question"}
+          isVisibleWithoutAnimation={completedTutorial}
         >
           <Text style={[styles.header, resizeTitle(screenSize)]}>
             { question.text }
           </Text>
-        </TutorialElement>
+        </FadeInElement>
         
-        <TutorialElement
-          onPress={progressTutorial}
-          currentElement={currentTutorialElement}
-          id={"record"}
-          isInTutorial={isInTutorial}
-          calloutTheme={"question"}
-          calloutText={"This is the recorder. You need to hold it down in order to record, not just press it! You have a 5 minute time limit. If you're speaking loud enough, it'll make pretty colors"}
-          calloutDistance={33}
+        <FadeInElement
+          shouldFadeIn={currentTutorialElement === "record"}
+          isVisibleWithoutAnimation={completedTutorial}
         >
-          <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }} disabled={isInTutorial && currentTutorialElement !== "record"}>
-            {Object.values(circles)}
-            <TouchableOpacity
-              style={[styles.audioCircle, resizeAudioCircle(screenSize), started ? (recording ? styles.redCircle : styles.yellowCircle) : styles.whiteCircle]}
-              onPressIn={recordPressed}
-              onPressOut={recordReleased}
-              activeOpacity={1}
-            >
-              <Image
-                source={Mic}
-                style={{ width: resizeMic(screenSize) }}
-                resizeMode={'contain'}
-              />
-            </TouchableOpacity>
-          </Shadow>
-        </TutorialElement>
-        
-        <TutorialElement
-          onPress={progressTutorial}
-          currentElement={currentTutorialElement}
-          id={"record"}
-          isInTutorial={isInTutorial}
-        >
+          <ShakeElement ref={recorderShaker}>
+            <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }}>
+              {Object.values(circles)}
+              <TouchableOpacity
+                style={[styles.audioCircle, resizeAudioCircle(screenSize), started ? (recording ? styles.redCircle : styles.yellowCircle) : styles.whiteCircle]}
+                onPress={recordPressed}
+                activeOpacity={1}
+              >
+                <Image
+                  source={Mic}
+                  style={{ width: resizeMic(screenSize) }}
+                  resizeMode={'contain'}
+                />
+              </TouchableOpacity>
+            </Shadow>
+          </ShakeElement>
+
           <Text style={[styles.timer, recordTime < 240 ? {} : styles.timerWarning]}>
             { getConvertedRecordTime() } / 5:00
           </Text>
-        </TutorialElement>
+        </FadeInElement>
         
         <View style={{flex: 1}}>
-          <TutorialElement
-            onPress={progressTutorial}
-            currentElement={currentTutorialElement}
-            id={"checklist"}
-            isInTutorial={isInTutorial}
-            calloutTheme={"question"}
-            calloutText={"This is a checklist to make sure you answer the question thoroughly. Make sure all of them are addressed before submitting!"}
-            calloutDistance={-230}
-            measureDistanceFromBottom={false}
+          <FadeInElement
+            shouldFadeIn={currentTutorialElement === "checklist"}
+            isVisibleWithoutAnimation={completedTutorial}
             inheritedFlex={1}
           >
-            <Checklist type={question.category} ref={checklist} />
-          </TutorialElement>
+            <Checklist type={question.category} ref={checklist} disabledPress={started ? undefined : informBeginRecording} />
+          </FadeInElement>
         </View>
 
-        <BottomButtons
-          theme={"question"}
-          xPressed={started ? restartRecording : informBeginRecording}
-          checkPressed={started ? submitRecording : informBeginRecording}
-          miscPressed={started ? hearRecording : informBeginRecording}
-          isInTutorial={isInTutorial}
-          currentTutorialElement={currentTutorialElement}
-          onTutorialPress={progressTutorial}
-          submitting={submitting}
-        />
+        <FadeInElement
+          shouldFadeIn={currentTutorialElement === "bottom"}
+          isVisibleWithoutAnimation={completedTutorial}
+        >
+          <BottomButtons
+            theme={"question"}
+            xPressed={started ? restartRecording : informBeginRecording}
+            checkPressed={started ? submitRecording : informBeginRecording}
+            miscPressed={started ? hearRecording : informBeginRecording}
+            submitting={submitting}
+          />
+        </FadeInElement>
       </LinearGradient>
     </View>
   );

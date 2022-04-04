@@ -449,7 +449,6 @@ async def get_answer_stats(answer_uuid: str,
                            drive: dict = Depends(get_drives),
                            db: dict = Depends(get_dbs)):
     row = db['answers'].get(answer_uuid)
-    print("get", row)
     if row is None:
         return NoAnswersResponse()
     else:

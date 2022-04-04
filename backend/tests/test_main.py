@@ -16,36 +16,9 @@ from ..main import QuestionModel, NoAnswersResponse, AnswerListen
 # - want to play with postman to construct flows, and tests
 # - - and openAPI Links: https://swagger.io/docs/specification/links/
 # - AsyncAPI is for event-driven arch, not REST
-
-# ... should we bother being RESTful, or just do our own protocol over http?
-
-# on testing fastapi with pytest: https://www.jeffastor.com/blog/testing-fastapi-endpoints-with-docker-and-pytest/
-
-# notes on pytest https://docs.pytest.org/en/6.2.x/fixture.html
-# - to run multiple asserts safely,: All that’s needed is stepping up to a larger scope, then having the act step defined as an autouse fixture, and finally, making sure all the fixtures are targetting that highler level scope. 
-# - use markers to pass data to fixtures
-# - - example given is for scalar data. what about dict?
-# - “factory as fixture” pattern can help in situations where the result of a fixture is needed multiple times in a single test, parameterizable in test
-# - parameterize fixtures to run all tests depending on them per parameter, for when components themselves can be configured multiple ways
-# - can use markers to run fixtures for all tests in a class/module when you don't need it's return value (eg @pytest.mark.usefixtures("cleandir"))
-# - can override fixtures, useful in big projects
-# - can run a series of tests incrementally if latter don't make sense to run when former fails: https://docs.pytest.org/en/6.2.x/example/simple.html#incremental-testing-test-steps
-# - best practices for organization, packaging: https://docs.pytest.org/en/6.2.x/goodpractices.html 
-
-# notes on pytest usage https://docs.pytest.org/en/6.2.x/usage.html
-# - specifying tests via module, directory ,keyword, note id, pytest.marker, pkg
-# - modifying traceback printing
-# - dropping to python debugger pdb
-# - profiling
-
-# notes on pytest parameterization https://docs.pytest.org/en/6.2.x/parametrize.html and https://docs.pytest.org/en/6.2.x/example/parametrize.html#paramexamples
-# - pytest.fixture() allows one to parametrize fixture functions (as discussed above)
-# - @pytest.mark.parametrize allows one to define multiple sets of arguments and fixtures at the test function or class
-# - - can dynamically generate them
-# - - can stack them on top of each other to get all combinations
-# - pytest_generate_tests allows one to define custom parametrization schemes or extensions
-# - stackOverflow Q on passing args to a fixture: https://stackoverflow.com/questions/44677426/can-i-pass-arguments-to-pytest-fixtures
-# - - explains indirect parameterization a bit more
+# - feels like I am essentially doing property-based testing in some of these
+#   flows. so, maybe `deal` lib could be a good fit? feels like i shouldn't even
+#   need tosspecify the impl given precise enough tests...
 
 @pytest.fixture(scope="session")
 def test_drives():
@@ -105,6 +78,7 @@ def client(app: FastAPI) -> TestClient:
 
 # todo - how can we parameterize which set of test questions we want to load
 #        into a given test? (do we actually want to do this?)
+#   - could do this by returning parameterized closure!
 
 @pytest.fixture
 def set_1_question(test_dbs, test_drives) -> QuestionModel:
@@ -135,6 +109,8 @@ def set_1_question(test_dbs, test_drives) -> QuestionModel:
     test_drives['questions'].delete(qfilename)
     test_dbs['questions'].delete(key)
 
+# keeping these around for if I ever want one-off mass-delete functionality
+    
 # def fetch_all_from_drive(drive):
 #     result = drive.list()
 
@@ -181,7 +157,7 @@ def set_1_question(test_dbs, test_drives) -> QuestionModel:
 #         dbs['answers'].delete(row.key)
 
 ### TODO
-# happy paths for each endpoint
+# remaining happy paths for each endpoint
 # enumerate edge caes for each end point, decide which oens to write tests for
 # do i want to deploy a test micro, akin to a dev server the FE can test against?
 # - eventually, yeah, prob. to do integration testing with FE eg
@@ -242,12 +218,12 @@ def submitAnswer(client: TestClient,
                  set_1_question, # Arrange for getQuestion
                  getQuestion: Callable, # Arrange
                  ) -> Callable:
-
-    qresponse = getQuestion()
-    assert qresponse.status_code == 200
-
     responses = []
-    def _submitAnswer(audio_data = "test data", question_uuid = qresponse.json()['key']):
+    def _submitAnswer(audio_data = "test data", question_uuid = ''):
+        if question_uuid == '':
+            qresponse = getQuestion()
+            question_uuid = qresponse.json()['key']
+            
         response = client.post("/submitAnswer",
                                json={"audio_data": audio_data,
                                      "question_uuid": question_uuid})
@@ -412,21 +388,19 @@ def test_get_no_banned_answer(client: TestClient,
 # - error answer not found
 
 ### rateAnswer and getAnswerStats
-# - 3 happy paths: abstain, disagree, agree
-# - TODO error case of unknown answer_uuid
 
 @pytest.fixture
 def rateAnswer(client: TestClient,
                test_dbs, test_drives,
                getAnswer: Callable, # Arrange
                ) -> Callable:
-
-    response = getAnswer()
-    assert response.status_code == 200
-    answer_uuid = response.json()['answer_uuid'] # TODO inconsistent get submitAnswer i think
-
     responses = []
-    def _rateAnswer(answer_uuid=answer_uuid, agreement=0):
+    def _rateAnswer(answer_uuid='', agreement=0):
+        if answer_uuid == '':
+            response = getAnswer()
+            assert response.status_code == 200
+            answer_uuid = response.json()['answer_uuid'] # TODO inconsistent get submitAnswer i think
+
         response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement={agreement}")
         responses.append(response)
         return response
@@ -442,13 +416,14 @@ def getAnswerStats(client: TestClient,
                    test_dbs, test_drives,
                    getAnswer: Callable, # Arrange
                    ) -> Callable:
-    response = getAnswer()
-    assert response.status_code == 200
-    answer_uuid = response.json()['answer_uuid']
-
     responses = []
-    def _getAnswerStats(answer_uuid=answer_uuid):
-        response = client.get(f"/getAnswerStats?answer_uuid={answer_uuid}").json()
+    def _getAnswerStats(answer_uuid=''):
+        if answer_uuid == '':
+            response = getAnswer()
+            assert response.status_code == 200
+            answer_uuid = response.json()['answer_uuid'] 
+
+        response = client.get(f"/getAnswerStats?answer_uuid={answer_uuid}")
         responses.append(response)
         return response
 
@@ -457,51 +432,30 @@ def getAnswerStats(client: TestClient,
     for response in responses:
         pass # no side effects of this endpoint
 
-def test_rate_and_stats(getAnswer,
-                        rateAnswer,
-                        getAnswerStats):
-#     qid = set_1_question.key
-    
-#     # submit new answer and verify stats start at 0
-#     response = client.post("/submitAnswer",
-#                            json={"audio_data": "test data",
-#                                  "question_uuid": qid})
-    response = getAnswer()
-    answer_uuid = response.json()['answer_uuid']
-    # LEFT OFF here
+def test_rate_and_stats(rateAnswer: Callable,
+                        getAnswerStats: Callable):
 
-    # - num_serves should be 1, the rest 0
-    
-#     stats = client.get(f"/getAnswerStats?answer_uuid={answer_uuid}").json()
-    # stat_keys = ['num_agrees', 'num_disagrees', 'num_abstains', 'num_serves']
-    # for stat in stat_keys:
-    #     assert(stats[stat] == 0)
+    # getAnswerStats calls getAnswer as part of the flow alraedy
+    stats = getAnswerStats().json()
+    assert stats['num_serves'] == 1
+    assert stats['num_agrees'] == 0
+    assert stats['num_abstains'] == 0
+    assert stats['num_disagrees'] == 0
 
-# #    question_uuid = client.post("/getQuestion").json()['key']
-    
-     # get the answer to update the stats
-#     response = client.post(f"/getAnswer?question_uuid={qid}", json=[]).json()
-#     aid = response['answer_uuid']
-#     stats = client.get(f"/getAnswerStats?answer_uuid={answer_uuid}").json()
-#     assert(stats['num_serves'] == 1)
+    # rateAnswer calls getAnswer as part of the flow already
+    rateAnswer(agreement=1) 
+    rateAnswer(agreement=-1)
+    rateAnswer(agreement=0)
+    rateAnswer(agreement=-1)
+    rateAnswer(agreement=1)
+    rateAnswer(agreement=-1)
 
-#     # rate answer few times, make sure db updates
-#     # rly should be getting answer every time i guess
-#     # -> update when I introduce auth/proper workflows
-#     # - can just create func for the workflow loop instead
-#     response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=1")
-#     response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=-1")
-#     response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=0")
-#     response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=-1")
-#     response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=1")
-#     response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement=-1")
-#     stats = client.get(f"/getAnswerStats?answer_uuid={answer_uuid}").json()
-#     print("test", stats)
-#     assert(stats['num_disagrees'] == 3)
-#     assert(stats['num_agrees'] == 2)
-#     assert(stats['num_abstains'] == 1)
-
-#     delete_answer(aid, test_dbs, test_drives)
+    # this calls getAnswer, hence 8 serves total so far
+    stats = getAnswerStats().json()
+    assert stats['num_abstains'] == 1
+    assert stats['num_agrees'] == 2
+    assert stats['num_disagrees'] == 3
+    assert stats['num_serves'] == 8
 
 # do I need to test this?
 def test_bad_answer_stats(client: TestClient) -> None:

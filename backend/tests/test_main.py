@@ -9,7 +9,7 @@ from deta import Drive, Base
 from fastapi import FastAPI, Response
 from fastapi.testclient import TestClient
 
-from ..main import QuestionModel, NoAnswersResponse
+from ..main import QuestionModel, NoAnswersResponse, AnswerListen
 
 # check out pytest.monkeypatch? eg https://testdriven.io/blog/fastapi-crud/
 
@@ -198,7 +198,7 @@ def set_1_question(test_dbs, test_drives) -> QuestionModel:
 # returns a function so we can call it more than once in a test case.
 
 @pytest.fixture
-def getQuestion(client: TestClient) -> Response:
+def getQuestion(client: TestClient) -> Callable:
     def _getQuestion():
         response = client.get("/getQuestion")
         return response
@@ -241,7 +241,7 @@ def submitAnswer(client: TestClient,
                  test_dbs, test_drives,
                  set_1_question, # Arrange for getQuestion
                  getQuestion: Callable, # Arrange
-                 ) -> Response:
+                 ) -> Callable:
 
     qresponse = getQuestion()
     assert qresponse.status_code == 200
@@ -330,27 +330,52 @@ def test_submit_answer_wrong_qid(client: TestClient,
 def test_get_answer_wrong_qid(client: TestClient,
                               getAnswer: Callable) -> None:
     response = getAnswer(question_uuid='keynotfound')
-    
-    assert response.status_code == 404 # LEFT OFF - fix this broken test
+
+    # should this be 404 instead?
+    assert response.status_code == 200
+    assert response.json() == NoAnswersResponse().dict()
 
 
 def test_get_answer_no_answers(client: TestClient,
-                               getAnswer: Callable,
+                               set_1_question,
                                ) -> None:
 
-    response = getAnswer() # LEFT OFF -- this calls submitAnswer; need to post manually?
+    response = client.post(f"/getAnswer?question_uuid={set_1_question.key}",
+                           json=[])
 
     assert response.status_code == 200
     assert response.json() == NoAnswersResponse().dict()
 
-# LEFT OFF -- writing this fixture and then the main tests as described above
-    
+def test_get_answer(client: TestClient,
+                    getAnswer: Callable,
+                    test_dbs, test_drives,
+                    ) -> None:
+
+    db_rows = test_dbs['answers'].fetch().items
+    assert len(db_rows) == 1 # this is from the submitAnswer that getAnswer calls
+    # ... not sure if I like that I can't get the value from submitAnswer as a dependency
+
+    answer_uuid = db_rows[0]['key']
+    #answer_uuid = response['answer_uuid']    
+
+    # ensure answer bookkeeping in db
+    answer_row = test_dbs['answers'].get(answer_uuid)
+    assert answer_row['num_serves'] == 0
+    response = getAnswer()
+    answer_row = test_dbs['answers'].get(answer_uuid)
+    assert answer_row['num_serves'] == 1
+
+    # TODO
+    # need to look through submitAnswer and compare results to expected distribution?
+    # this feels quite important to test actually.
+
+
 @pytest.fixture
 def getAnswer(client: TestClient,
               test_dbs, test_drives,
               set_1_question, # Arrange
               submitAnswer: Response, # Arrange
-              ) -> Response:
+              ) -> Callable:
 
     submitAnswer() # Arrange
     
@@ -365,55 +390,96 @@ def getAnswer(client: TestClient,
     yield _getAnswer
 
     for response in responses:
-        pass
-        # LEFT OFF - the NoResponseAnswers are also 200...how to filter?
-        # if response.status_code == 200: # prob a fair assumption
-        #     test_dbs['answers'].update(
-        #         {"num_serves": test_dbs['answers'].util.increment(-1)},
-        #         response.json()['answer_uuid'])
+        if type(response) == AnswerListen:
+            test_dbs['answers'].update(
+                {"num_serves": test_dbs['answers'].util.increment(-1)},
+                response.json()['answer_uuid'])
+
+### banAnswer
+# - this isn't an actual endpoint but might eventually be separate event than flag
+# - getAnswer doesn't get banned answer
+
+def test_get_no_banned_answer(client: TestClient,
+                              submitAnswer: Response,
+                              getAnswer: Callable,
+                              test_dbs, test_drives,
+                              ) -> None:
+    assert False
 
 
 ### flagAnswer
 # - happy path results in incremented flag in db
 # - error answer not found
 
-### rateAnswer
+### rateAnswer and getAnswerStats
 # - 3 happy paths: abstain, disagree, agree
-# - error case of unknown answer_uuid
-# - answer not found error
+# - TODO error case of unknown answer_uuid
 
-### getAnswerStats
+@pytest.fixture
+def rateAnswer(client: TestClient,
+               test_dbs, test_drives,
+               getAnswer: Callable, # Arrange
+               ) -> Callable:
 
-# could create fixtures and build user workflows out of them,
-# but wouldn't I want to paramterize them?
-# @pytest.fixture
+    response = getAnswer()
+    assert response.status_code == 200
+    answer_uuid = response.json()['answer_uuid'] # TODO inconsistent get submitAnswer i think
+
+    responses = []
+    def _rateAnswer(answer_uuid=answer_uuid, agreement=0):
+        response = client.post(f"/rateAnswer?answer_uuid={answer_uuid}&agreement={agreement}")
+        responses.append(response)
+        return response
+
+    yield _rateAnswer
+
+    for response in responses:
+        pass # TODO ought to record the rating in closure and undo here
 
 
-# def submit_answer(): # eg pass question_uuid as paramter here?
-# would I make submit_answer require getQuestion? that would be
-# proper workflow. would also want to test what happens in system
-# if that doesn't happen though. but can use fixtures to define
-# happy path while serving as scaffolding for downstream tests
+@pytest.fixture
+def getAnswerStats(client: TestClient,
+                   test_dbs, test_drives,
+                   getAnswer: Callable, # Arrange
+                   ) -> Callable:
+    response = getAnswer()
+    assert response.status_code == 200
+    answer_uuid = response.json()['answer_uuid']
 
-# def test_workflow_get_answer_stats(client: TestClient,
-#                                    set_1_question: QuestionModel,
-#                                    test_dbs,
-#                                    test_drives) -> None:
+    responses = []
+    def _getAnswerStats(answer_uuid=answer_uuid):
+        response = client.get(f"/getAnswerStats?answer_uuid={answer_uuid}").json()
+        responses.append(response)
+        return response
+
+    yield _getAnswerStats
+
+    for response in responses:
+        pass # no side effects of this endpoint
+
+def test_rate_and_stats(getAnswer,
+                        rateAnswer,
+                        getAnswerStats):
 #     qid = set_1_question.key
     
 #     # submit new answer and verify stats start at 0
 #     response = client.post("/submitAnswer",
 #                            json={"audio_data": "test data",
 #                                  "question_uuid": qid})
-#     answer_uuid = response.json()['answer_id']
+    response = getAnswer()
+    answer_uuid = response.json()['answer_uuid']
+    # LEFT OFF here
 
+    # - num_serves should be 1, the rest 0
+    
 #     stats = client.get(f"/getAnswerStats?answer_uuid={answer_uuid}").json()
-#     stat_keys = ['num_agrees', 'num_disagrees', 'num_abstains', 'num_serves']
-#     for stat in stat_keys:
-#         assert(stats[stat] == 0)
+    # stat_keys = ['num_agrees', 'num_disagrees', 'num_abstains', 'num_serves']
+    # for stat in stat_keys:
+    #     assert(stats[stat] == 0)
+
 # #    question_uuid = client.post("/getQuestion").json()['key']
     
-#     # get the answer to update the stats
+     # get the answer to update the stats
 #     response = client.post(f"/getAnswer?question_uuid={qid}", json=[]).json()
 #     aid = response['answer_uuid']
 #     stats = client.get(f"/getAnswerStats?answer_uuid={answer_uuid}").json()

@@ -158,12 +158,13 @@ async def get_question(drive: dict = Depends(get_drives), db: dict = Depends(get
     #q = questions[1]
 
     # make sure row exists for question in db
-    if db['questions'].get(q['key']) is None:
+    # (str() bc yaml file has integers as key)
+    if db['questions'].get(str(q['key'])) is None:
         q_db = QuestionDB(**q_model.dict()) #TODO better way? look at pydantic model docs
         db['questions'].insert(q_db.dict())
 
     # regardless of first time being asked or not (=0), increment num_asks
-    db['questions'].update(key=q['key'],
+    db['questions'].update(key=str(q['key']),
                            updates={"num_asks": db['questions'].util.increment(1)})
 
     return q_model.dict()

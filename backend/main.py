@@ -230,6 +230,8 @@ async def submit_answer(ans: SubmitAnswerPost,
 # wilson score confidence interval for binomial distributions
 # any value in also taking into account people who didn't vote?
 # TODO need to add continuity correction bc n will often be small (< 40)
+# TODO take into account max upvotes and downvotes to find controversial answers too,
+#   'improved wilson score': https://arxiv.org/ftp/arxiv/papers/1809/1809.07694.pdf
 def calculate_wilson(p, n, z = 1.96):
     denominator = 1 + z**2/n
     centre_adjusted_probability = p + z*z / (2*n)

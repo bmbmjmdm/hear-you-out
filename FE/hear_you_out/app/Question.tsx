@@ -26,6 +26,7 @@ import { SizeContext } from './helpers'
 import { getAudioCircleSize, resizeAudioCircle, resizeMic, resizeTitle } from './helpers'
 import ShakeElement from './ShakeElement';
 import FadeInElement from './FadeInElement'
+import ModalContents from './ModalContents'
 
 // https://github.com/hyochan/react-native-audio-recorder-player/blob/master/index.ts
 const audioSet = {
@@ -465,27 +466,12 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
           animationOut="fadeOut"
           useNativeDriver={true}
         >
-          <View style={styles.modalOuter}>
-            <View style={styles.modalInner}>
-              <Text style={styles.modalText}>{modalText}</Text>
-              {modalConfirm ? (
-                <View style={styles.modalButtons}>
-                  <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
-                    <Text style={styles.buttonText}>No</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.confirmButton} activeOpacity={0.3} onPress={modalConfirm}>
-                    <Text style={styles.buttonText}>Yes</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View style={styles.modalOneButton}>
-                  <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
-                    <Text style={styles.buttonText}>Ok</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          </View>
+          <ModalContents
+            type={"generic"}
+            text={modalText}
+            closeModal={() => setModalVisible(false)}
+            genericModalConfirmCallback={modalConfirm}
+          />
         </Modal>
         
         <FadeInElement
@@ -597,64 +583,6 @@ const styles = StyleSheet.create({
   yellowCircle: {
     backgroundColor: '#FFF3B2',
   },
-
-  modalInner: {
-    width: 320, 
-  },
-
-  modalOuter: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-
-  modalText: {
-    fontSize: 25,
-    textAlign: 'center',
-    backgroundColor: 'rgb(255, 212, 198)',
-    borderRadius: 20,
-    overflow: "hidden",
-    padding: 10,
-    paddingVertical: 15,
-    borderColor: '#FFADBB',
-    borderWidth: 3,
-  },
-
-  buttonText: {
-    fontSize: 25,
-    fontWeight: 'bold'
-  },
-
-  confirmButton: {
-    width: 100,
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#FFADBB',
-    borderRadius: 20,
-  },
-
-  cancelButton: {
-    width: 100,
-    alignItems: 'center',
-    padding: 13,
-    borderColor: '#FFADBB',
-    borderWidth: 3,
-    borderRadius: 20,
-    backgroundColor: 'rgb(255, 212, 198)',
-  },
-  
-  modalButtons: {
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexDirection: 'row',
-    marginTop: 30
-  },
-  
-  modalOneButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 30
-  }
 });
 
 export default Question;

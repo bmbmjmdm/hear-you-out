@@ -26,6 +26,7 @@ import { SizeContext } from './helpers'
 import { getAudioCircleSize, resizeAudioCircle, resizePlayPause, resizeTitle } from './helpers'
 import ShakeElement from './ShakeElement';
 import FadeInElement from './FadeInElement'
+import ModalContents from './ModalContents'
 
 type AnswerProps = {
   setDisableSwipes: (val: boolean) => void,
@@ -38,11 +39,31 @@ type AnswerProps = {
   onReport: () => {},
   completedTutorial: boolean,
   onCompleteTutorial: () => void,
+  completedApproveTutorial: boolean,
+  onCompleteApproveTutorial: () => void,
+  completedDisapproveTutorial: boolean,
+  onCompleteDisapproveTutorial: () => void,
   // an un-recoverable error has occured and we need to reload the app
   onError: () => void
 }
 
-const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, onApprove, onPass, onReport, completedTutorial, onCompleteTutorial, onError}: AnswerProps) => {
+const Answer = ({
+    setDisableSwipes,
+    id,
+    answerAudioData,
+    question,
+    onDisapprove,
+    onApprove,
+    onPass,
+    onReport,
+    completedTutorial,
+    onCompleteTutorial,
+    completedApproveTutorial,
+    onCompleteApproveTutorial,
+    completedDisapproveTutorial,
+    onCompleteDisapproveTutorial,
+    onError
+  }: AnswerProps) => {
   const screenSize = React.useContext(SizeContext)
   const [sliderValue, setSliderValue] = React.useState(0)
   const [length, setLength] = React.useState(0)
@@ -58,6 +79,10 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
   const [modalVisible, setModalVisible] = React.useState(false)
   const [modalText, setModalText] = React.useState("")
   const [modalConfirm, setModalConfirm] = React.useState<() => void>(() => {})
+  const [approveTutorialModalVisible, setApproveTutorialModalVisible] = React.useState(false)
+  const [disapproveTutorialModalVisible, setDisapproveTutorialModalVisible] = React.useState(false)
+
+  // shaking
   const playerShaker = React.useRef()
   const [shookPlayer, setShookPlayer] = React.useState(false)
 
@@ -249,6 +274,42 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
     onReport()
   }
 
+  const tryApproveAnswer = () => {
+    if (!startedPerm.current) {
+      informBeginPlaying();
+      return;
+    }
+    if (completedApproveTutorial) {
+      onApprove();
+      return;
+    }
+    setApproveTutorialModalVisible(true)
+  }
+
+  const tryDisapproveAnswer = () => {
+    if (!startedPerm.current) {
+      informBeginPlaying();
+      return;
+    }
+    if (completedDisapproveTutorial) {
+      onDisapprove();
+      return;
+    }
+    setDisapproveTutorialModalVisible(true)
+  }
+
+  const confirmApproveTutorial = (action: () => void) => {
+    setApproveTutorialModalVisible(false)
+    onCompleteApproveTutorial()
+    action()
+  }
+
+  const confirmDisapproveTutorial = (action: () => void) => {
+    setDisapproveTutorialModalVisible(false)
+    onCompleteDisapproveTutorial()
+    action()
+  }
+
   const progressTutorial = () => {
     if (currentTutorialElement === '') setCurrentTutorialElement('question')
     if (currentTutorialElement === 'question') setCurrentTutorialElement('play')
@@ -292,27 +353,38 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
           animationOut="fadeOut"
           useNativeDriver={true}
         >
-          <View style={styles.modalOuter}>
-            <View style={styles.modalInner}>
-              <Text style={styles.modalText}>{modalText}</Text>
-              {modalConfirm ? (
-                <View style={styles.modalButtons}>
-                  <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
-                    <Text style={styles.buttonText}>No</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.confirmButton} activeOpacity={0.3} onPress={modalConfirm}>
-                    <Text style={styles.buttonText}>Yes</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View style={styles.modalOneButton}>
-                  <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
-                    <Text style={styles.buttonText}>Ok</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
-          </View>
+          <ModalContents
+            text={modalText}
+            type={"generic"}
+            closeModal={() => setModalVisible(false)}
+            genericModalConfirmCallback={modalConfirm}
+          />
+        </Modal>
+        <Modal
+          isVisible={approveTutorialModalVisible}
+          onBackdropPress={() => setApproveTutorialModalVisible(false)}
+          animationIn="fadeIn"
+          animationOut="fadeOut"
+          useNativeDriver={true}
+        >
+          <ModalContents
+            type={"approve"}
+            onApprove={() => confirmApproveTutorial(onApprove)}
+            onShare={() => confirmApproveTutorial(shareAnswer)}
+          />
+        </Modal>
+        <Modal
+          isVisible={disapproveTutorialModalVisible}
+          onBackdropPress={() => setDisapproveTutorialModalVisible(false)}
+          animationIn="fadeIn"
+          animationOut="fadeOut"
+          useNativeDriver={true}
+        >
+          <ModalContents
+            type={"disapprove"}
+            onDisapprove={() => confirmDisapproveTutorial(onDisapprove)}
+            onReport={() => confirmDisapproveTutorial(onReport)}
+          />
         </Modal>
         
         <FadeInElement
@@ -405,8 +477,8 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
         >
           <BottomButtons
             theme={"answer"}
-            xPressed={startedPerm.current ? onDisapprove : informBeginPlaying}
-            checkPressed={startedPerm.current ? onApprove : informBeginPlaying}
+            xPressed={tryDisapproveAnswer}
+            checkPressed={tryApproveAnswer}
             miscPressed={startedPerm.current ? onPass : informBeginPlaying}
           />
         </FadeInElement>
@@ -454,72 +526,6 @@ const styles = StyleSheet.create({
   yellowCircle: {
     backgroundColor: '#FFF3B2',
   },
-
-  modalInner: {
-    width: 320, 
-  },
-
-  modalOuter: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-
-  tooltipOuter: {
-    justifyContent: 'center',
-    alignItems: 'center',
-    elevation: 1,
-    zIndex: 1
-  },
-
-  modalText: {
-    fontSize: 25,
-    textAlign: 'center',
-    backgroundColor: '#BFECE7',
-    borderRadius: 20,
-    padding: 10,
-    paddingVertical: 15,
-    borderColor: '#A9C5F2',
-    overflow: "hidden",
-    borderWidth: 3,
-  },
-
-  buttonText: {
-    fontSize: 25,
-    fontWeight: 'bold'
-  },
-
-  // note this background color + the relevant border colors are slightly more saturated versions of the bottom background color
-  confirmButton: {
-    width: 100,
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#A9C5F2',
-    borderRadius: 20,
-  },
-
-  cancelButton: {
-    width: 100,
-    alignItems: 'center',
-    padding: 13,
-    borderColor: '#A9C5F2',
-    borderWidth: 3,
-    borderRadius: 20,
-    backgroundColor: '#BFECE7',
-  },
-  
-  modalButtons: {
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexDirection: 'row',
-    marginTop: 30
-  },
-
-  modalOneButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 30
-  }
 });
 
 export default Answer;

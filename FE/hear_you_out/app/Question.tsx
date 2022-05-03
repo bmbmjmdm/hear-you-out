@@ -27,6 +27,7 @@ import { SizeContext } from './helpers'
 import { getAudioCircleSize, resizeAudioCircle, resizeMic, resizeTitle } from './helpers'
 import ShakeElement from './ShakeElement';
 import FadeInElement from './FadeInElement'
+import ModalContents from './ModalContents'
 
 // https://github.com/hyochan/react-native-audio-recorder-player/blob/master/index.ts
 const audioSet = {
@@ -456,19 +457,11 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   }
 
   if (!ready) return (
-    <LinearGradient
-      style={styles.container}
-      // alternatively rgba(255,0,138,0.25)
-      colors={['#191919', '#191919']}
-    />
+    <View style={styles.container} />
   )
 
 return (
-    <LinearGradient
-      style={styles.container}
-      // alternatively rgba(255,0,138,0.25)
-      colors={['#191919', '#191919']}
-    >
+    <View style={styles.container}>
       <Modal
         isVisible={modalVisible}
         onBackdropPress={() => setModalVisible(false)}
@@ -476,37 +469,13 @@ return (
         animationOut="fadeOut"
         useNativeDriver={true}
       >
-        <View style={styles.modalOuter}>
-          <View style={styles.modalInner}>
-            <Text style={styles.modalText}>{modalText}</Text>
-            {modalConfirm ? (
-              <View style={styles.modalButtons}>
-                <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
-                  <Text style={[styles.buttonText, styles.primaryText]}>No</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={styles.confirmButton} activeOpacity={0.3} onPress={modalConfirm}>
-                  <Text style={styles.buttonText}>Yes</Text>
-                </TouchableOpacity>
-              </View>
-            ) : (
-              <View style={styles.modalOneButton}>
-                <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
-                  <Text style={[styles.buttonText, styles.primaryText]}>Ok</Text>
-                </TouchableOpacity>
-              </View>
-            )}
-          </View>
-        </View>
+        <ModalContents
+          type={"generic"}
+          text={modalText}
+          closeModal={() => setModalVisible(false)}
+          genericModalConfirmCallback={modalConfirm}
+        />
       </Modal>
-      
-      <FadeInElement
-        shouldFadeIn={currentTutorialElement === "question"}
-        isVisibleWithoutAnimation={completedTutorial}
-      >
-        <Text style={[styles.header, resizeTitle(screenSize)]}>
-          { question.text }
-        </Text>
-      </FadeInElement>
       
       <FadeInElement
         shouldFadeIn={currentTutorialElement === "record"}
@@ -558,7 +527,7 @@ return (
           submitting={submitting}
         />
       </FadeInElement>
-    </LinearGradient>
+    </View>
   );
 };
 
@@ -608,69 +577,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#191919',
     borderWidth: 3,
   },
-
-  modalInner: {
-    width: 320, 
-  },
-
-  modalOuter: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-
-  modalText: {
-    fontSize: 25,
-    color: "#F0F3F5",
-    textAlign: 'center',
-    backgroundColor: '#191919',
-    borderRadius: 20,
-    padding: 10,
-    paddingVertical: 15,
-    borderColor: '#F0F3F5',
-    overflow: "hidden",
-    borderWidth: 3,
-  },
-
-  buttonText: {
-    fontSize: 25,
-    fontWeight: 'bold'
-  },
-
-  confirmButton: {
-    width: 100,
-    alignItems: 'center',
-    padding: 16,
-    borderRadius: 20,
-    backgroundColor: '#F0F3F5',
-  },
-
-  primaryText: {
-    color: "#F0F3F5",
-  },
-
-  cancelButton: {
-    width: 100,
-    alignItems: 'center',
-    padding: 13,
-    borderRadius: 20,
-    backgroundColor: '#191919',
-    borderColor: '#F0F3F5',
-    borderWidth: 2,
-  },
-  
-  modalButtons: {
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexDirection: 'row',
-    marginTop: 30
-  },
-  
-  modalOneButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 30
-  }
 });
 
 export default Question;

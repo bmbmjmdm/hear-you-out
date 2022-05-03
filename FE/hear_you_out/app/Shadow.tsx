@@ -11,6 +11,8 @@ const Shadow = ({
   disabled = false,
   children
 }) => {
+  // TODO remove this line
+  disabled = true
   const clear = 'rgba(0,0,0,0)'
   let colors
   let center

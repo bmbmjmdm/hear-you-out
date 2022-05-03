@@ -296,7 +296,7 @@ const App = () => {
       <SizeContext.Provider value={screenSize}>
         <View style={styles.loadingScreen}>
           {/* For now we dont set `animating` based on `loadStack`. If we need performance boost, maybe try that */}
-          <ActivityIndicator size="large" color="#A9C5F2" />
+          <ActivityIndicator size="large" color="#F0F3F5" />
         </View>
         {cards1.length ?
           <Swiper
@@ -433,7 +433,8 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    backgroundColor: '#191919'
   }
 });
 

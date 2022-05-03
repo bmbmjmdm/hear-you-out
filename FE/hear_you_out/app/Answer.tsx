@@ -20,7 +20,7 @@ import Share from './Share.png';
 import Flag from './Flag.png';
 import { Slider } from 'react-native-elements';
 import RNFS from 'react-native-fs'
-import AudioRecorderPlayer from 'react-native-audio-recorder-player';
+import AudioRecorderPlayer, { PlayBackType } from 'react-native-audio-recorder-player';
 import RNShare from 'react-native-share'
 import { SizeContext } from './helpers'
 import { getAudioCircleSize, resizeAudioCircle, resizePlayPause, resizeTitle } from './helpers'
@@ -69,7 +69,7 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
   const filepathRaw = RNFS.CachesDirectoryPath + '/' + "CoolAnswer" + id + extention
   const filepath = prepend + filepathRaw
 
-  const playbackListener = ({currentPosition, duration}) => {
+  const playbackListener = ({currentPosition, duration}:PlayBackType) => {
     // if length is set more than once it'll break the slider
     if (!lengthSetOnce.current) {
       setLength(duration)
@@ -268,156 +268,148 @@ const Answer = ({setDisableSwipes, id, answerAudioData, question, onDisapprove, 
   }, [isShown])
 
   if (!ready) return (
-    <View style={styles.whiteBackdrop}>
-      <LinearGradient
-        style={styles.container}
-        colors={['rgba(0,255,117,0.25)', 'rgba(0,74,217,0.25)']}
-      />
-    </View>
+    <LinearGradient
+      style={styles.container}
+      colors={['#191919', '#191919']}
+    />
   )
 
   return (
-    <View style={styles.whiteBackdrop}>
-      <LinearGradient
-        style={styles.container}
-        colors={['rgba(0,255,117,0.25)', 'rgba(0,74,217,0.25)']}
+    <LinearGradient
+      style={styles.container}
+      colors={['#191919', '#191919']}
+    >
+      <Modal
+        isVisible={modalVisible}
+        onBackdropPress={() => setModalVisible(false)}
+        animationIn="fadeIn"
+        animationOut="fadeOut"
+        useNativeDriver={true}
       >
-        <Modal
-          isVisible={modalVisible}
-          onBackdropPress={() => setModalVisible(false)}
-          animationIn="fadeIn"
-          animationOut="fadeOut"
-          useNativeDriver={true}
-        >
-          <View style={styles.modalOuter}>
-            <View style={styles.modalInner}>
-              <Text style={styles.modalText}>{modalText}</Text>
-              {modalConfirm ? (
-                <View style={styles.modalButtons}>
-                  <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
-                    <Text style={styles.buttonText}>No</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.confirmButton} activeOpacity={0.3} onPress={modalConfirm}>
-                    <Text style={styles.buttonText}>Yes</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View style={styles.modalOneButton}>
-                  <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
-                    <Text style={styles.buttonText}>Ok</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
+        <View style={styles.modalOuter}>
+          <View style={styles.modalInner}>
+            <Text style={styles.modalText}>{modalText}</Text>
+            {modalConfirm ? (
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
+                  <Text style={[styles.buttonText, styles.primaryText]}>No</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.confirmButton} activeOpacity={0.3} onPress={modalConfirm}>
+                  <Text style={styles.buttonText}>Yes</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.modalOneButton}>
+                <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
+                  <Text style={[styles.buttonText, styles.primaryText]}>Ok</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
-        </Modal>
-        
-        <FadeInElement
-          shouldFadeIn={currentTutorialElement === "question"}
-          isVisibleWithoutAnimation={completedTutorial}
-        >
-          <Text style={[styles.header, resizeTitle(screenSize)]}>
-            { question }
-          </Text>
-        </FadeInElement>
+        </View>
+      </Modal>
+      
+      <FadeInElement
+        shouldFadeIn={currentTutorialElement === "question"}
+        isVisibleWithoutAnimation={completedTutorial}
+      >
+        <Text style={[styles.header, resizeTitle(screenSize)]}>
+          { question }
+        </Text>
+      </FadeInElement>
 
+      <FadeInElement
+        shouldFadeIn={currentTutorialElement === "play"}
+        isVisibleWithoutAnimation={completedTutorial}
+      >
+        <ShakeElement ref={playerShaker}>
+          <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }}>
+            <TouchableOpacity
+              style={[styles.audioCircle, resizeAudioCircle(screenSize), playing ? styles.yellowCircle : styles.whiteCircle]}
+              onPress={playPressed}
+              activeOpacity={1}
+            >
+              <Image
+                source={playing ? Pause : Play}
+                style={{ width: resizePlayPause(screenSize) }}
+                resizeMode={'contain'}
+              />
+            </TouchableOpacity>
+          </Shadow>
+        </ShakeElement>
+      </FadeInElement>
+
+      <FadeInElement
+        shouldFadeIn={currentTutorialElement === "misc"}
+        isVisibleWithoutAnimation={completedTutorial}
+      >
+        <View style={styles.miscButtons}>
+          <TouchableOpacity onPress={reportAnswer}>
+            <Image
+              source={Flag}
+              style={{ width: 35, marginRight: 20 }}
+              resizeMode={'contain'}
+            />
+          </TouchableOpacity>
+          <TouchableOpacity onPress={shareAnswer}>
+            <Image
+              source={Share}
+              style={{ width: 35, marginLeft: 20 }}
+              resizeMode={'contain'}
+            />
+          </TouchableOpacity>
+        </View>
+      </FadeInElement>
+
+      <View style={{flex: 1}}>
         <FadeInElement
           shouldFadeIn={currentTutorialElement === "play"}
           isVisibleWithoutAnimation={completedTutorial}
         >
-          <ShakeElement ref={playerShaker}>
-            <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }}>
-              <TouchableOpacity
-                style={[styles.audioCircle, resizeAudioCircle(screenSize), playing ? styles.yellowCircle : styles.whiteCircle]}
-                onPress={playPressed}
-                activeOpacity={1}
-              >
-                <Image
-                  source={playing ? Pause : Play}
-                  style={{ width: resizePlayPause(screenSize) }}
-                  resizeMode={'contain'}
-                />
-              </TouchableOpacity>
-            </Shadow>
-          </ShakeElement>
-        </FadeInElement>
-
-        <FadeInElement
-          shouldFadeIn={currentTutorialElement === "misc"}
-          isVisibleWithoutAnimation={completedTutorial}
-        >
-          <View style={styles.miscButtons}>
-            <TouchableOpacity onPress={reportAnswer}>
-              <Image
-                source={Flag}
-                style={{ width: 35, marginRight: 20 }}
-                resizeMode={'contain'}
-              />
+          {length ? 
+            <Slider
+              style={{width: 300, height: 40}}
+              minimumValue={0}
+              maximumValue={length}
+              minimumTrackTintColor="#848688"
+              maximumTrackTintColor="#F0F3F5"
+              allowTouchTrack={true}
+              thumbTintColor="#F0F3F5"
+              value={sliderValue}
+              onSlidingComplete={onSlidingComplete}
+              onSlidingStart={onSlidingStart}
+              thumbStyle={{ height: 30, width: 30 }}
+              trackStyle={{ height: 8, borderRadius: 99 }}
+            />
+            :
+            // we cannot change the maximumValue of Slider once its rendered, so we render a fake slider until we know length
+            <TouchableOpacity activeOpacity={1} onPress={informBeginPlaying}>
+              <View style={{ width: 300, height: 40, alignItems: "center", justifyContent: "center", flexDirection: "row" }}>
+                <View style={{ height: 30, width: 30, borderRadius: 999, backgroundColor:"#F0F3F5" }} />
+                <View style={{ width:270, height: 8, borderTopRightRadius: 99, borderBottomRightRadius: 99, backgroundColor: "#F0F3F5" }} />
+              </View>
             </TouchableOpacity>
-            <TouchableOpacity onPress={shareAnswer}>
-              <Image
-                source={Share}
-                style={{ width: 35, marginLeft: 20 }}
-                resizeMode={'contain'}
-              />
-            </TouchableOpacity>
-          </View>
+          }
         </FadeInElement>
+      </View>
 
-        <View style={{flex: 1}}>
-          <FadeInElement
-            shouldFadeIn={currentTutorialElement === "play"}
-            isVisibleWithoutAnimation={completedTutorial}
-          >
-            {length ? 
-              <Slider
-                style={{width: 300, height: 40}}
-                minimumValue={0}
-                maximumValue={length}
-                minimumTrackTintColor="#888888"
-                maximumTrackTintColor="#FFFFFF"
-                allowTouchTrack={true}
-                thumbTintColor="#000000"
-                value={sliderValue}
-                onSlidingComplete={onSlidingComplete}
-                onSlidingStart={onSlidingStart}
-                thumbStyle={{ height: 30, width: 30 }}
-                trackStyle={{ height: 8, borderRadius: 99 }}
-              />
-              :
-              // we cannot change the maximumValue of Slider once its rendered, so we render a fake slider until we know length
-              <TouchableOpacity activeOpacity={1} onPress={informBeginPlaying}>
-                <View style={{ width: 300, height: 40, alignItems: "center", justifyContent: "center", flexDirection: "row" }}>
-                  <View style={{ height: 30, width: 30, borderRadius: 999, backgroundColor:"#000000" }} />
-                  <View style={{ width:270, height: 8, borderTopRightRadius: 99, borderBottomRightRadius: 99, backgroundColor: "#FFFFFF" }} />
-                </View>
-              </TouchableOpacity>
-            }
-          </FadeInElement>
-        </View>
-
-        <FadeInElement
-          shouldFadeIn={currentTutorialElement === "bottom"}
-          isVisibleWithoutAnimation={completedTutorial}
-        >
-          <BottomButtons
-            theme={"answer"}
-            xPressed={startedPerm.current ? onDisapprove : informBeginPlaying}
-            checkPressed={startedPerm.current ? onApprove : informBeginPlaying}
-            miscPressed={startedPerm.current ? onPass : informBeginPlaying}
-          />
-        </FadeInElement>
-      </LinearGradient>
-    </View>
+      <FadeInElement
+        shouldFadeIn={currentTutorialElement === "bottom"}
+        isVisibleWithoutAnimation={completedTutorial}
+        style={{width: "100%"}}
+      >
+        <BottomButtons
+          theme={"answer"}
+          xPressed={startedPerm.current ? onDisapprove : informBeginPlaying}
+          checkPressed={startedPerm.current ? onApprove : informBeginPlaying}
+          miscPressed={startedPerm.current ? onPass : informBeginPlaying}
+        />
+      </FadeInElement>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
-  whiteBackdrop: {
-    backgroundColor: 'white',
-    flex: 1
-  },
-
   container: {
     flex: 1,
     paddingHorizontal: 20,
@@ -427,7 +419,8 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    textAlign: 'center'
+    textAlign: 'center',
+    color: '#F0F3F5'
   },
 
   audioCircle: {
@@ -439,7 +432,7 @@ const styles = StyleSheet.create({
   },
 
   whiteCircle: {
-    backgroundColor: 'white',
+    backgroundColor: '#F0F3F5',
   },
 
   miscButtons: {
@@ -449,7 +442,7 @@ const styles = StyleSheet.create({
   },
 
   yellowCircle: {
-    backgroundColor: '#FFF3B2',
+    backgroundColor: '#FFF689',
   },
 
   modalInner: {
@@ -471,12 +464,13 @@ const styles = StyleSheet.create({
 
   modalText: {
     fontSize: 25,
+    color: "#F0F3F5",
     textAlign: 'center',
-    backgroundColor: '#BFECE7',
+    backgroundColor: '#191919',
     borderRadius: 20,
     padding: 10,
     paddingVertical: 15,
-    borderColor: '#A9C5F2',
+    borderColor: '#F0F3F5',
     overflow: "hidden",
     borderWidth: 3,
   },
@@ -486,23 +480,26 @@ const styles = StyleSheet.create({
     fontWeight: 'bold'
   },
 
-  // note this background color + the relevant border colors are slightly more saturated versions of the bottom background color
   confirmButton: {
     width: 100,
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#A9C5F2',
     borderRadius: 20,
+    backgroundColor: '#F0F3F5',
+  },
+
+  primaryText: {
+    color: "#F0F3F5",
   },
 
   cancelButton: {
     width: 100,
     alignItems: 'center',
     padding: 13,
-    borderColor: '#A9C5F2',
-    borderWidth: 3,
     borderRadius: 20,
-    backgroundColor: '#BFECE7',
+    backgroundColor: '#191919',
+    borderColor: '#F0F3F5',
+    borderWidth: 2,
   },
   
   modalButtons: {

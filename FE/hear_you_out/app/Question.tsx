@@ -14,6 +14,7 @@ import Modal from "react-native-modal";
 // https://github.com/react-native-linear-gradient/react-native-linear-gradient
 import LinearGradient from 'react-native-linear-gradient';
 import Mic from './Mic.png';
+import YellowMic from './YellowMic.png'
 import Shadow from './Shadow'
 import Checklist from './Checklist'
 import BottomButtons from './BottomButtons'
@@ -167,12 +168,14 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       // a random degree from 0 to 360 in radians
       const rotation = Math.random() * 360 * Math.PI / 180
       // add the circle with all its values to our list of animations
+      const randomColorNum = Math.floor(Math.random() * 11390625)
+      const randomColorStr = "#" + (randomColorNum.toString(16).padStart(6, "0"))
       circlesCopy[id] = 
       (<Animated.View 
         key={id}
         style={[{
           // time limit changes color of circles to be darker
-          backgroundColor: recordTimeForCircles.current < 240 ? "#ff617c" : '#880000',
+          backgroundColor: recordTimeForCircles.current < 240 ? randomColorStr : '#880000',
           borderRadius: 999,
           position: "absolute",
           elevation: -1,
@@ -295,7 +298,11 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   }
 
   const restartRecording = async () => {
-    if (lock.current || recording) return
+    if (lock.current) return
+    if (recording) {
+      recorderShaker?.current?.shake()
+      return;
+    }
     // user pressed first button, now they need to confirm
     setModalText("Delete recording and restart?")
     setModalConfirm(() => restartRecordingConfirmed)
@@ -325,7 +332,11 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   }
 
   const submitRecording = async () => {
-    if (lock.current || recording) return
+    if (lock.current) return
+    if (recording) {
+      recorderShaker?.current?.shake()
+      return;
+    }
     // validate checklist
     if (!checklist?.current?.areAllChecked()) {
       if (!shookChecklist) {
@@ -375,7 +386,11 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   }
 
   const hearRecording = async () => {
-    if (lock.current || recording) return
+    if (lock.current) return
+    if (recording) {
+      recorderShaker?.current?.shake()
+      return;
+    }
     lock.current = true
     try {
       if (playing) {
@@ -441,121 +456,113 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   }
 
   if (!ready) return (
-    <View style={styles.whiteBackdrop}>
-      <LinearGradient
-        style={styles.container}
-        // alternatively rgba(255,0,138,0.25)
-        colors={['#FFADBB', 'rgba(255,181,38,0.25)']}
-      />
-    </View>
+    <LinearGradient
+      style={styles.container}
+      // alternatively rgba(255,0,138,0.25)
+      colors={['#191919', '#191919']}
+    />
   )
 
-  return (
-    <View style={styles.whiteBackdrop}>
-      <LinearGradient
-        style={styles.container}
-        // alternatively rgba(255,0,138,0.25)
-        colors={['#FFADBB', 'rgba(255,181,38,0.25)']}
+return (
+    <LinearGradient
+      style={styles.container}
+      // alternatively rgba(255,0,138,0.25)
+      colors={['#191919', '#191919']}
+    >
+      <Modal
+        isVisible={modalVisible}
+        onBackdropPress={() => setModalVisible(false)}
+        animationIn="fadeIn"
+        animationOut="fadeOut"
+        useNativeDriver={true}
       >
-        <Modal
-          isVisible={modalVisible}
-          onBackdropPress={() => setModalVisible(false)}
-          animationIn="fadeIn"
-          animationOut="fadeOut"
-          useNativeDriver={true}
-        >
-          <View style={styles.modalOuter}>
-            <View style={styles.modalInner}>
-              <Text style={styles.modalText}>{modalText}</Text>
-              {modalConfirm ? (
-                <View style={styles.modalButtons}>
-                  <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
-                    <Text style={styles.buttonText}>No</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.confirmButton} activeOpacity={0.3} onPress={modalConfirm}>
-                    <Text style={styles.buttonText}>Yes</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View style={styles.modalOneButton}>
-                  <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
-                    <Text style={styles.buttonText}>Ok</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
+        <View style={styles.modalOuter}>
+          <View style={styles.modalInner}>
+            <Text style={styles.modalText}>{modalText}</Text>
+            {modalConfirm ? (
+              <View style={styles.modalButtons}>
+                <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
+                  <Text style={[styles.buttonText, styles.primaryText]}>No</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.confirmButton} activeOpacity={0.3} onPress={modalConfirm}>
+                  <Text style={styles.buttonText}>Yes</Text>
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <View style={styles.modalOneButton}>
+                <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
+                  <Text style={[styles.buttonText, styles.primaryText]}>Ok</Text>
+                </TouchableOpacity>
+              </View>
+            )}
           </View>
-        </Modal>
-        
-        <FadeInElement
-          shouldFadeIn={currentTutorialElement === "question"}
-          isVisibleWithoutAnimation={completedTutorial}
-        >
-          <Text style={[styles.header, resizeTitle(screenSize)]}>
-            { question.text }
-          </Text>
-        </FadeInElement>
-        
-        <FadeInElement
-          shouldFadeIn={currentTutorialElement === "record"}
-          isVisibleWithoutAnimation={completedTutorial}
-        >
-          <ShakeElement ref={recorderShaker}>
-            <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }}>
-              {Object.values(circles)}
-              <TouchableOpacity
-                style={[styles.audioCircle, resizeAudioCircle(screenSize), started ? (recording ? styles.redCircle : styles.yellowCircle) : styles.whiteCircle]}
-                onPress={recordPressed}
-                activeOpacity={1}
-              >
-                <Image
-                  source={Mic}
-                  style={{ width: resizeMic(screenSize) }}
-                  resizeMode={'contain'}
-                />
-              </TouchableOpacity>
-            </Shadow>
-          </ShakeElement>
-
-          <Text style={[styles.timer, recordTime < 240 ? {} : styles.timerWarning]}>
-            { getConvertedRecordTime() }
-          </Text>
-        </FadeInElement>
-        
-        <View style={{flex: 1}}>
-          <Checklist
-            type={question.category}
-            ref={checklist}
-            disabledPress={started ? undefined : informBeginRecording}
-            shouldFadeInText={currentTutorialElement === "checklist"}
-            shouldFadeInBoxes={currentTutorialElement === "bottom"}
-            isVisibleWithoutAnimation={completedTutorial}
-          />
         </View>
+      </Modal>
+      
+      <FadeInElement
+        shouldFadeIn={currentTutorialElement === "question"}
+        isVisibleWithoutAnimation={completedTutorial}
+      >
+        <Text style={[styles.header, resizeTitle(screenSize)]}>
+          { question.text }
+        </Text>
+      </FadeInElement>
+      
+      <FadeInElement
+        shouldFadeIn={currentTutorialElement === "record"}
+        isVisibleWithoutAnimation={completedTutorial}
+      >
+        <ShakeElement ref={recorderShaker}>
+          <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }}>
+            {Object.values(circles)}
+            <TouchableOpacity
+              style={[styles.audioCircle, resizeAudioCircle(screenSize), started ? (recording ? styles.redCircle : styles.whiteCircle/*yellowCircle*/) : styles.whiteCircle]}
+              onPress={recordPressed}
+              activeOpacity={1}
+            >
+              <Image
+                source={started && !recording ? Mic/*YellowMic*/ : Mic}
+                style={{ width: resizeMic(screenSize) }}
+                resizeMode={'contain'}
+              />
+            </TouchableOpacity>
+          </Shadow>
+        </ShakeElement>
 
-        <FadeInElement
-          shouldFadeIn={currentTutorialElement === "bottom"}
+        <Text style={[styles.timer, recordTime < 240 ? {} : styles.timerWarning]}>
+          { getConvertedRecordTime() }
+        </Text>
+      </FadeInElement>
+      
+      <View style={{flex: 1}}>
+        <Checklist
+          type={question.category}
+          ref={checklist}
+          disabledPress={started ? undefined : informBeginRecording}
+          shouldFadeInText={currentTutorialElement === "checklist"}
+          shouldFadeInBoxes={currentTutorialElement === "bottom"}
           isVisibleWithoutAnimation={completedTutorial}
-        >
-          <BottomButtons
-            theme={"question"}
-            xPressed={started ? restartRecording : informBeginRecording}
-            checkPressed={started ? submitRecording : informBeginRecording}
-            miscPressed={started ? hearRecording : informBeginRecording}
-            submitting={submitting}
-          />
-        </FadeInElement>
-      </LinearGradient>
-    </View>
+        />
+      </View>
+
+      <FadeInElement
+        shouldFadeIn={currentTutorialElement === "bottom"}
+        isVisibleWithoutAnimation={completedTutorial}
+        style={{width: "100%"}}
+      >
+        <BottomButtons
+          theme={"question"}
+          xPressed={started ? restartRecording : informBeginRecording}
+          checkPressed={started ? submitRecording : informBeginRecording}
+          miscPressed={started ? hearRecording : informBeginRecording}
+          submitting={submitting}
+        />
+      </FadeInElement>
+    </LinearGradient>
   );
 };
 
 const styles = StyleSheet.create({
-  whiteBackdrop: {
-    backgroundColor: 'white',
-    flex: 1
-  },
-
   container: {
     flex: 1,
     paddingHorizontal: 20,
@@ -565,18 +572,20 @@ const styles = StyleSheet.create({
   },
 
   header: {
-    textAlign: 'center'
+    textAlign: 'center',
+    color: '#F0F3F5'
   },
 
   timer: {
     fontSize: 20,
     textAlign: 'center',
     marginTop: -10,
-    marginBottom: 10
+    marginBottom: 10,
+    color: "#F2F5DE"
   },
 
   timerWarning: {
-    color: "#ff1f45"
+    color: "#BB6153"
   },
 
   audioCircle: {
@@ -586,16 +595,18 @@ const styles = StyleSheet.create({
   },
 
   whiteCircle: {
-    backgroundColor: 'white',
+    backgroundColor: '#F0F3F5',
   },
 
   // TODO is this good color?
   redCircle: {
-    backgroundColor: '#FFADBB',
+    backgroundColor: '#AA5042',
   },
 
   yellowCircle: {
-    backgroundColor: '#FFF3B2',
+    borderColor: '#FFF689',
+    backgroundColor: '#191919',
+    borderWidth: 3,
   },
 
   modalInner: {
@@ -610,13 +621,14 @@ const styles = StyleSheet.create({
 
   modalText: {
     fontSize: 25,
+    color: "#F0F3F5",
     textAlign: 'center',
-    backgroundColor: 'rgb(255, 212, 198)',
+    backgroundColor: '#191919',
     borderRadius: 20,
-    overflow: "hidden",
     padding: 10,
     paddingVertical: 15,
-    borderColor: '#FFADBB',
+    borderColor: '#F0F3F5',
+    overflow: "hidden",
     borderWidth: 3,
   },
 
@@ -629,18 +641,22 @@ const styles = StyleSheet.create({
     width: 100,
     alignItems: 'center',
     padding: 16,
-    backgroundColor: '#FFADBB',
     borderRadius: 20,
+    backgroundColor: '#F0F3F5',
+  },
+
+  primaryText: {
+    color: "#F0F3F5",
   },
 
   cancelButton: {
     width: 100,
     alignItems: 'center',
     padding: 13,
-    borderColor: '#FFADBB',
-    borderWidth: 3,
     borderRadius: 20,
-    backgroundColor: 'rgb(255, 212, 198)',
+    backgroundColor: '#191919',
+    borderColor: '#F0F3F5',
+    borderWidth: 2,
   },
   
   modalButtons: {

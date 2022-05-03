@@ -8,14 +8,20 @@ import {
   ActivityIndicator
 } from 'react-native';
 import Shadow from './Shadow'
-import Speaker from './Speaker.png'
-import Skip from './Skip.png'
 import { SizeContext } from './helpers'
 import { getBBLargeSize, getBBSmallSize, resizeBBLarge, resizeBBSmall } from './helpers'
+import Speaker from './Speaker.png'
+import Skip from './Skip.png'
+import SpeakerBlack from './SpeakerBlack.png'
+import SkipBlack from './SkipBlack.png'
 import Garbage from './garbage.png'
 import ThumbsDown from './thumbsDown.png'
 import ThumbsUp from './thumbsUp.png'
 import RightArrow from './rightArrow.png'
+import GarbageBlack from './garbageBlack.png'
+import ThumbsDownBlack from './thumbsDownBlack.png'
+import ThumbsUpBlack from './thumbsUpBlack.png'
+import RightArrowBlack from './rightArrowBlack.png'
 
 type BottomButtonsProps = {
   theme: "answer" | "question",
@@ -38,61 +44,59 @@ const BottomButtons = ({theme, xPressed, miscPressed, checkPressed, submitting}:
 const Button = ({name, theme, onPress, submitting = false}) => {
   const screenSize = React.useContext(SizeContext)
   const [pressed, setPressed] = React.useState(false)
+  const backgroundColor = "#191919"
   let radius;
   let style;
-  let underlay;
   let image;
   let imageSize;
+  let color
 
   if (name === "check") {
-    const bgColor = theme === "question" ? "#FF8AB2" : "#ABFFB8"
-    const pressedColor = theme === "question" ? "#C16A89" : "#598560"
+    color = "#659B5E"
     radius = getBBLargeSize(screenSize)
-    underlay = pressedColor
-    style = [styles.bigCircle, resizeBBLarge(screenSize), {backgroundColor: pressed ? underlay : bgColor}, pressed ? styles.depth : {}]
-    image = theme === "question" ? RightArrow : ThumbsUp
+    style = [styles.bigCircle, resizeBBLarge(screenSize), {borderColor: color, borderWidth: 2, backgroundColor: pressed ? color : backgroundColor}]
+    if (theme === "question") image = pressed ? RightArrowBlack : RightArrow
+    else image = pressed ? ThumbsUpBlack : ThumbsUp
     imageSize = theme === "question" ? (12/20) * radius : (12/20) * radius
   }
   else if (name === "x") {
-    const bgColor = theme === "question" ? "#FFC5C3" : "#ABFFB8"
-    const pressedColor = theme === "question" ? "#C69A99" : "#598560"
+    color = "#AA5042"
     radius = getBBLargeSize(screenSize)
-    underlay = pressedColor
-    style = [styles.bigCircle, resizeBBLarge(screenSize), {backgroundColor: pressed ? underlay : bgColor}, pressed ? styles.depth : {}]
-    image = theme === "question" ? Garbage : ThumbsDown
+    style = [styles.bigCircle, resizeBBLarge(screenSize), {borderColor: color, borderWidth: 2, backgroundColor: pressed ? color : backgroundColor}]
+    if (theme === "question") image = pressed ? GarbageBlack : Garbage
+    else image = pressed ? ThumbsDownBlack : ThumbsDown
     imageSize = theme === "question" ? (10/20) * radius : (12/20) * radius
   }
   else {
+    color = "#FFF689"
     radius = getBBSmallSize(screenSize)
-    underlay = '#918a64'
-    style = [styles.littleCircle, resizeBBSmall(screenSize), pressed ? {backgroundColor: underlay} : {}, pressed ? styles.depthSmall : {}]
-    image = theme == "question" ? Speaker : Skip;
+    style = [styles.littleCircle, resizeBBSmall(screenSize), {borderColor: color, borderWidth: 1, backgroundColor: pressed ? color : backgroundColor}]
+    if (theme === "question") image = pressed ? SpeakerBlack : Speaker
+    else image = pressed ? SkipBlack : Skip
     imageSize =  theme === "question" ? (3/5) * radius : (2/3) * radius 
   }
 
   return (
-    <Shadow radius={radius} disabled={pressed}>
-      <TouchableHighlight
-        onPressIn={() => setPressed(true)}
-        onPressOut={() => setTimeout(() => setPressed(false), 100)}
-        underlayColor={underlay}
-        activeOpacity={1}
-        style={style}
-        onPress={onPress}
-      >
-        {submitting ? 
-          <ActivityIndicator size="large" color="#111111" />
-          : 
-          <Image
-            source={image}
-            style={{
-              width: imageSize,
-              height: imageSize
-            }}
-          />
-        }
-      </TouchableHighlight>
-    </Shadow>
+    <TouchableHighlight
+      onPressIn={() => setPressed(true)}
+      onPressOut={() => setTimeout(() => setPressed(false), 100)}
+      underlayColor={color}
+      activeOpacity={1}
+      style={style}
+      onPress={onPress}
+    >
+      {submitting ? 
+        <ActivityIndicator size="large" color="#659B5E" />
+        : 
+        <Image
+          source={image}
+          style={{
+            width: imageSize,
+            height: imageSize
+          }}
+        />
+      }
+    </TouchableHighlight>
   )
 }
 
@@ -100,7 +104,10 @@ const Button = ({name, theme, onPress, submitting = false}) => {
 const styles = StyleSheet.create({
   container: {
     alignItems: "center",
-    flexDirection: 'row'
+    flexDirection: 'row',
+    justifyContent: "space-between",
+    width: "100%",
+    marginBottom: 25
   },
   bigCircle: {
     borderRadius:999,
@@ -109,7 +116,6 @@ const styles = StyleSheet.create({
   },
   littleCircle: {
     borderRadius:999,
-    backgroundColor: '#FFF3B2',
     alignItems: 'center',
     justifyContent: 'center'
   },

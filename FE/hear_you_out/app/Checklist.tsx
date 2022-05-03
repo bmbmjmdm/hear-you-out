@@ -107,19 +107,20 @@ const CheckItem = ({text, disabledPress, shouldFadeInText, shouldFadeInBox, isVi
               else setVal(newVal)
             }}
             tintColors={{
-              true: "#575757"
+              true: "#D0D3D5",
+              false: "#D0D3D5"
             }}
             disabled={disabledPress}
-            onFillColor={Platform.OS === "android" ? "#575757" : undefined}
-            onCheckColor={"#222222"}
-            onTintColor={"#222222"}
-            tintColor={"#575757"}
+            onFillColor={Platform.OS === "android" ? "#D0D3D5" : undefined}
+            onCheckColor={"#D0D3D5"}
+            onTintColor={"#D0D3D5"}
+            tintColor={"#D0D3D5"}
             onAnimationType={"one-stroke"}
             offAnimationType={"one-stroke"}
             style={Platform.OS === "android" ? {} : {
               width: 25,
               height: 25,
-              marginRight: 5
+              marginRight: 5,
             }}
           />
         </ShakeElement>
@@ -162,6 +163,7 @@ const styles = StyleSheet.create({
     marginBottom: 3,
     maxWidth: 310,
     flexGrow: 1,
+    color: '#F0F3F5'
   }
 });
 

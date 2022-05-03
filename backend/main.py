@@ -35,6 +35,7 @@ except:
 # - # improve api docs thusly: https://fastapi.tiangolo.com/tutorial/path-operation-configuration
 # - which endpoints should have associated pydantic models? all of them? 
 # - new endpoint for returning agrees, disagrees, abstains for a given answer ID
+# - add openAPI config info, see: https://lyz-code.github.io/blue-book/fastapi/
 
 # load local env if we're running locally
 if os.environ.get('DETA_RUNTIME') is None:
@@ -79,17 +80,22 @@ class QuestionModel(BaseModel):
     text: str
     category: str
 
-#class QuestionTableSchema(QuestionModel):
-#    num_asks: int = 0
+class QuestionDB(QuestionModel):
+    num_asks: int = 0
     
-class AnswerSubmission(BaseModel):
-    audio_data: bytes
+class SubmitAnswerPost(BaseModel):
+    audio_data: bytes # should this be str since its b64 encoded? maybe create new Type
     question_uuid: str # uuid.UUID
 
+class SubmitAnswerResponse(BaseModel):
+    answer_id: str # TODO
+    question_id: str # TODO # TODO inconsistent with AnswerListen answer_uuid name
+    entry_timestamp: str
+
 class AnswerListen(BaseModel):
-    audio_data: bytes
+    audio_data: bytes # str?
     answer_uuid: str # TODO
-    
+
 class NoAnswersResponse(BaseModel):
     no_answers = True
 
@@ -105,8 +111,8 @@ class AnswerTableSchema(BaseModel):
     num_disagrees: int = 0
     num_abstains: int = 0
     num_serves: int = 0
-
-class AnswerStats(BaseModel):
+    
+class AnswerStatsResponse(BaseModel):
     key: str # TODO uuid; # answer_uuid
     num_agrees: int = 0
     num_disagrees: int = 0
@@ -118,7 +124,6 @@ def gen_uuid(): # TODO
     good_enough = str(uniform(0, 100)) # from random
     good_enough = good_enough.replace(".","") # remove the dot
     return f"{good_enough}"
-
 
 # handle all exceptions thrown in code below with a 500 http response
 # todo test what happens when this isn't here
@@ -134,6 +139,7 @@ def gen_uuid(): # TODO
 async def root():
     return {'hey': 'world'}
 
+# return 500 if no questions (vs 200 with a FailState response model)
 @app.get("/getQuestion", response_model=QuestionModel)
 async def get_question(drive: dict = Depends(get_drives), db: dict = Depends(get_dbs)):
     # get today's question...how? from drive? from base? from internet endpoint? from file?/src
@@ -150,19 +156,23 @@ async def get_question(drive: dict = Depends(get_drives), db: dict = Depends(get
     data_loaded = yaml.safe_load(data_streamed)
     questions = data_loaded['questions']
     q = choice(questions)
+    q_model = QuestionModel(**q)
     #q = questions[1]
 
-    # TODO keep track of questions asked so far
-    # - and how many responses they got?
-    #q_tschema = QuestionTableSchema(q)
-    #db['questions'].insert(q.dict())
-    #db['questions'].update(key=q['key'],
-    #                    updates={"num_asks": db['questions'].util.increment(1)})
+    # make sure row exists for question in db
+    # (str() bc yaml file has integers as key)
+    if db['questions'].get(str(q['key'])) is None:
+        q_db = QuestionDB(**q_model.dict()) #TODO better way? look at pydantic model docs
+        db['questions'].insert(q_db.dict())
 
-    return {"text": q['text'], "key": q['key'], "category": q["category"]}
+    # regardless of first time being asked or not (=0), increment num_asks
+    db['questions'].update(key=str(q['key']),
+                           updates={"num_asks": db['questions'].util.increment(1)})
 
-@app.post("/submitAnswer")
-async def submit_answer(ans: AnswerSubmission,
+    return q_model.dict()
+
+@app.post("/submitAnswer", response_model=SubmitAnswerResponse)
+async def submit_answer(ans: SubmitAnswerPost,
                         drive: dict = Depends(get_drives),
                         db: dict = Depends(get_dbs)):
     answer_uuid = gen_uuid()
@@ -171,7 +181,10 @@ async def submit_answer(ans: AnswerSubmission,
     # TODO put upper limit on amount of data?
     # - what is the default POST cap?
     # - create a unit test for an expected file size, and a file size over the POST cap
-    
+
+    if db['questions'].get(question_uuid) is None:
+        return PlainTextResponse("question_uuid not found", status_code=404)
+        
     # store audio in drive, then bookkeep in base
     try:
         drive['answers'].put(answer_uuid, data, content_type='application/octet-stream')
@@ -188,7 +201,9 @@ async def submit_answer(ans: AnswerSubmission,
                                 entry_timestamp=ts)
     db['answers'].insert(new_row.dict())
 
-    return {'answer_id': answer_uuid}
+    return {'answer_id': answer_uuid,
+            'question_id': question_uuid,
+            'entry_timestamp': ts}
 
 # button meanings:
 # dis/like or dis/agree?
@@ -246,7 +261,7 @@ def filter_answers_from_db(items: List[AnswerTableSchema], question_uuid: str, s
     seen_unpop = []
     seen_contro = []
     for item in items:
-        print(item, question_uuid)
+        #print(item, question_uuid)
         if item.question_uuid != question_uuid:
             continue
         if item.is_banned:
@@ -293,7 +308,7 @@ async def get_answer(question_uuid: str,
     res = db['answers'].fetch()
     #print(res, res.count)
     if res.count == 0:
-        return NoAnswersResponse
+        return NoAnswersResponse()
 
     answers_items = [AnswerTableSchema(**item) for item in res.items]
     pop, unpop, contro, seen_pop, seen_unpop, seen_contro = filter_answers_from_db(answers_items, question_uuid, seen_answer_uuids)
@@ -309,7 +324,7 @@ async def get_answer(question_uuid: str,
         seen_contro += seen_contro2
 
     if len(pop+unpop+contro) == 0:
-        return NoAnswersResponse
+        return NoAnswersResponse()
 
     # calculate distribution thus far from seen answers, since we want to take that into account.
     # TODO finish this
@@ -408,11 +423,12 @@ async def unban_answer(answer_uuid: str,
 # doesn't seem terrribly hard to add user id and magic links for all of them. turn above into dependency injection.
 # can probably wait til after MVP...?
 # would be cool if the security nonce gen and lookup and be pre/post hooks for these path executions
-@app.post("/rateAnswer")
+@app.post("/rateAnswer") # why is this post? todo
 async def rate_answer(answer_uuid: str,
                       agreement: int,
                       db: dict = Depends(get_dbs)):
     # TODO do i need to supply their current value if i'm not modifying them?
+    print("rate", answer_uuid, agreement)
     try:
         if agreement > 0:
             db['answers'].update(key=answer_uuid,
@@ -431,8 +447,21 @@ async def rate_answer(answer_uuid: str,
         
     return PlainTextResponse("rating recorded", status_code=200)
 
-@app.get("/getAnswerStats", response_model=Union[AnswerStats,NoAnswersResponse])
+@app.get("/getAnswerStats", response_model=Union[AnswerStatsResponse,NoAnswersResponse])
 async def get_answer_stats(answer_uuid: str,
                            drive: dict = Depends(get_drives),
                            db: dict = Depends(get_dbs)):
-    return NoAnswersResponse()
+    row = db['answers'].get(answer_uuid)
+    if row is None:
+        return NoAnswersResponse()
+    else:
+        # good way to AnswerStatsResponse(**row) while ignoring irrelevant keys?
+        # print(row)
+        # return AnswerStatsResponse().parse_obj_as(AnswerStatsResponse, row)
+        return AnswerStatsResponse( # replace following lines with **row?
+            key = row['key'],
+            num_serves = row['num_serves'],
+            num_agrees = row['num_agrees'],
+            num_abstains = row['num_abstains'],
+            num_disagrees = row['num_disagrees'])
+

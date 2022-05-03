@@ -1,11 +1,17 @@
 ## running locally in WSL2
 
 `ifconfig`
-activate venv
+source .venv/bin/activate
 hear-you-out/backend$ `uvicorn --host <ip> main:app`
 web browse to <ip>:8000/docs
 
 ### running tests
 
 hear-you-out/backend$ `pytest`
+
+### install
+
+python -m venv .venv
+source .venv/bin/activate
+python -m pip install -r requirements.txt local_requirements.txt
 

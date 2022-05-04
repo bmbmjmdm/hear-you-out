@@ -1,5 +1,8 @@
-import {View, StyleSheet, Text, TouchableOpacity} from 'react-native'
+import {View, StyleSheet, Text, TouchableOpacity, Image} from 'react-native'
 import React from 'react'
+import { BottomButton } from './BottomButtons'
+import Flag from './Flag.png';
+import Share from './Share.png';
 
 type ModalContentsProps = {
   type: "generic" | "approve" | "disapprove",
@@ -24,7 +27,7 @@ const ModalContents = ({
  } : ModalContentsProps) => {
   const genericButtons = genericModalConfirmCallback ? (
     <View style={styles.modalButtons}>
-      <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => closeModal}>
+      <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={closeModal}>
         <Text style={[styles.buttonText, styles.primaryText]}>No</Text>
       </TouchableOpacity>
       <TouchableOpacity style={styles.confirmButton} activeOpacity={0.3} onPress={genericModalConfirmCallback}>
@@ -33,7 +36,7 @@ const ModalContents = ({
     </View>
   ) : (
     <View style={styles.modalOneButton}>
-      <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => closeModal}>
+      <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={closeModal}>
         <Text style={[styles.buttonText, styles.primaryText]}>Ok</Text>
       </TouchableOpacity>
     </View>
@@ -41,23 +44,35 @@ const ModalContents = ({
 
   const approveButtons = (
     <View style={styles.modalButtons}>
-      <TouchableOpacity style={styles.} activeOpacity={0.3} onPress={() => onShare()}>
-        {/** TODO add share icon button */}
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.} activeOpacity={0.3} onPress={() => onApprove()}>
-        {/** TODO add approve icon button */}
-      </TouchableOpacity>
+      <View style={styles.iconButton}>
+        <TouchableOpacity onPress={onShare}>
+          <Image
+            source={Share}
+            style={{ width: 35 }}
+            resizeMode={'contain'}
+          />
+        </TouchableOpacity>
+      </View>
+      <View style={styles.iconButton}>
+        <BottomButton theme={"answer"} name={"check"} onPress={onApprove} extraDark={true} />
+      </View>
     </View>
   )
 
   const disapproveButtons = (
     <View style={styles.modalButtons}>
-      <TouchableOpacity style={styles.} activeOpacity={0.3} onPress={() => onReport()}>
-        {/** TODO add report icon button */}
-      </TouchableOpacity>
-      <TouchableOpacity style={styles.} activeOpacity={0.3} onPress={() => onDisapprove()}>
-        {/** TODO add disapprove icon button */}
-      </TouchableOpacity>
+      <View style={styles.iconButton}>
+        <TouchableOpacity onPress={onReport}>
+          <Image
+            source={Flag}
+            style={{ width: 35 }}
+            resizeMode={'contain'}
+          />
+        </TouchableOpacity>
+      </View>
+      <View style={styles.iconButton}>
+        <BottomButton theme={"answer"} name={"x"} onPress={onDisapprove} extraDark={true} />
+      </View>
     </View>
   )
 
@@ -150,6 +165,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginTop: 30
+  },
+
+  iconButton: {
+    width: 160,
+    alignItems: 'center',
+    marginTop: -30
   }
 })
 

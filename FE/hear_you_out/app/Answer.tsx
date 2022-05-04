@@ -10,11 +10,8 @@ import {
   Alert,
 } from 'react-native';
 import Modal from "react-native-modal";
-// https://github.com/react-native-linear-gradient/react-native-linear-gradient
-import LinearGradient from 'react-native-linear-gradient';
 import Play from './Play.png';
 import Pause from './Pause.png';
-import Shadow from './Shadow'
 import BottomButtons from './BottomButtons'
 import Share from './Share.png';
 import Flag from './Flag.png';
@@ -39,10 +36,10 @@ type AnswerProps = {
   onReport: () => {},
   completedTutorial: boolean,
   onCompleteTutorial: () => void,
-  completedApproveTutorial: boolean,
-  onCompleteApproveTutorial: () => void,
-  completedDisapproveTutorial: boolean,
-  onCompleteDisapproveTutorial: () => void,
+  completedShareTutorial: boolean,
+  onCompleteShareTutorial: () => void,
+  completedFlagTutorial: boolean,
+  onCompleteFlagTutorial: () => void,
   // an un-recoverable error has occured and we need to reload the app
   onError: () => void,
   isShown: boolean
@@ -59,10 +56,10 @@ const Answer = ({
     onReport,
     completedTutorial,
     onCompleteTutorial,
-    completedApproveTutorial,
-    onCompleteApproveTutorial,
-    completedDisapproveTutorial,
-    onCompleteDisapproveTutorial,
+    completedShareTutorial,
+    onCompleteShareTutorial,
+    completedFlagTutorial,
+    onCompleteFlagTutorial,
     onError,
     isShown
   }: AnswerProps) => {
@@ -281,7 +278,7 @@ const Answer = ({
       informBeginPlaying();
       return;
     }
-    if (completedApproveTutorial) {
+    if (completedShareTutorial) {
       onApprove();
       return;
     }
@@ -293,7 +290,7 @@ const Answer = ({
       informBeginPlaying();
       return;
     }
-    if (completedDisapproveTutorial) {
+    if (completedFlagTutorial) {
       onDisapprove();
       return;
     }
@@ -302,13 +299,13 @@ const Answer = ({
 
   const confirmApproveTutorial = (action: () => void) => {
     setApproveTutorialModalVisible(false)
-    onCompleteApproveTutorial()
+    onCompleteShareTutorial()
     action()
   }
 
   const confirmDisapproveTutorial = (action: () => void) => {
     setDisapproveTutorialModalVisible(false)
-    onCompleteDisapproveTutorial()
+    onCompleteFlagTutorial()
     action()
   }
 
@@ -330,10 +327,7 @@ const Answer = ({
   }, [isShown])
 
   if (!ready) return (
-    <LinearGradient
-      style={styles.container}
-      colors={['#191919', '#191919']}
-    />
+    <View style={styles.container} />
   )
 
   return (
@@ -393,7 +387,7 @@ const Answer = ({
         isVisibleWithoutAnimation={completedTutorial}
       >
         <ShakeElement ref={playerShaker}>
-          <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }}>
+          <View style={{ marginTop: 30 }}>
             <TouchableOpacity
               style={[styles.audioCircle, resizeAudioCircle(screenSize), playing ? styles.yellowCircle : styles.whiteCircle]}
               onPress={playPressed}
@@ -405,7 +399,7 @@ const Answer = ({
                 resizeMode={'contain'}
               />
             </TouchableOpacity>
-          </Shadow>
+          </View>
         </ShakeElement>
       </FadeInElement>
 
@@ -485,7 +479,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     // TODO certain devices may need more padding if SafetyArea doesnt account for top bar
     paddingTop: Platform.OS === "ios" ? 30 : 20,
-    alignItems: 'center'
+    alignItems: 'center',
+    backgroundColor: "#191919"
   },
 
   header: {
@@ -508,7 +503,7 @@ const styles = StyleSheet.create({
   miscButtons: {
     alignItems: 'center',
     flexDirection: 'row',
-    marginTop: -50
+    marginTop: -25
   },
 
   yellowCircle: {

@@ -11,11 +11,8 @@ import {
   Alert,
 } from 'react-native';
 import Modal from "react-native-modal";
-// https://github.com/react-native-linear-gradient/react-native-linear-gradient
-import LinearGradient from 'react-native-linear-gradient';
 import Mic from './Mic.png';
 import YellowMic from './YellowMic.png'
-import Shadow from './Shadow'
 import Checklist from './Checklist'
 import BottomButtons from './BottomButtons'
 import AudioRecorderPlayer, { AudioEncoderAndroidType, AVEncodingOption } from 'react-native-audio-recorder-player';
@@ -239,6 +236,8 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
           needsNewFile.current = false
           needsConcat.current = true
           await recorder.startRecorder(additionalFile, audioSet, true)
+          // this is due to a bug with recorder that thinks the new file is already paused (and therefore cannot be paused), when its not
+          await recorder.resumeRecorder()
         }
         // we can simply unpause
         else {
@@ -478,11 +477,20 @@ return (
       </Modal>
       
       <FadeInElement
+        shouldFadeIn={currentTutorialElement === "question"}
+        isVisibleWithoutAnimation={completedTutorial}
+      >
+        <Text style={[styles.header, resizeTitle(screenSize)]}>
+          { question.text }
+        </Text>
+      </FadeInElement>
+      
+      <FadeInElement
         shouldFadeIn={currentTutorialElement === "record"}
         isVisibleWithoutAnimation={completedTutorial}
       >
         <ShakeElement ref={recorderShaker}>
-          <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }}>
+          <View style={{ marginTop: 30 }}>
             {Object.values(circles)}
             <TouchableOpacity
               style={[styles.audioCircle, resizeAudioCircle(screenSize), started ? (recording ? styles.redCircle : styles.whiteCircle/*yellowCircle*/) : styles.whiteCircle]}
@@ -495,7 +503,7 @@ return (
                 resizeMode={'contain'}
               />
             </TouchableOpacity>
-          </Shadow>
+          </View>
         </ShakeElement>
 
         <Text style={[styles.timer, recordTime < 240 ? {} : styles.timerWarning]}>
@@ -537,7 +545,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     // TODO certain devices may need more padding if SafetyArea doesnt account for top bar
     paddingTop: Platform.OS === "ios" ? 30 : 20,
-    alignItems: 'center'
+    alignItems: 'center',
+    backgroundColor: "#191919"
   },
 
   header: {
@@ -548,7 +557,7 @@ const styles = StyleSheet.create({
   timer: {
     fontSize: 20,
     textAlign: 'center',
-    marginTop: -10,
+    marginTop: 10,
     marginBottom: 10,
     color: "#F2F5DE"
   },

@@ -43,6 +43,8 @@ const App = () => {
   const [question, setQuestion] = React.useState<APIQuestion>({})
   const [completedQuestionTutorial, setCompletedQuestionTutorial ] = React.useState(false)
   const [completedAnswerTutorial, setCompletedAnswerTutorial ] = React.useState(false)
+  const [completedFlagTutorial, setCompletedFlagTutorial ] = React.useState(false)
+  const [completedShareTutorial, setCompletedShareTutorial ] = React.useState(false)
   const appState = React.useRef(AppState.currentState);
   const appStateListener = React.useRef(null);
 
@@ -78,6 +80,10 @@ const App = () => {
       checkQT().catch((e) => checkQT())
       let checkAT = () => AsyncStorage.getItem("completedAnswerTutorial").then((val) => setCompletedAnswerTutorial(JSON.parse(val) || false))
       checkAT().catch((e) => checkAT())
+      let checkFT = () => AsyncStorage.getItem("completedFlagTutorial").then((val) => setCompletedFlagTutorial(JSON.parse(val) || false))
+      checkFT().catch((e) => checkFT())
+      let checkST = () => AsyncStorage.getItem("completedShareTutorial").then((val) => setCompletedShareTutorial(JSON.parse(val) || false))
+      checkST().catch((e) => checkST())
 
       // load last answered question so we make sure not to re-ask them it
       const lastQParsed = await loadLastQ()
@@ -289,6 +295,22 @@ const App = () => {
     })
   }
 
+  const onCompleteFlagTutorial = () => {
+    setCompletedFlagTutorial(true)
+    AsyncStorage.setItem("completedFlagTutorial", JSON.stringify(true)).catch((e) => {
+      // try again
+      AsyncStorage.setItem("completedFlagTutorial", JSON.stringify(true))
+    })
+  }
+
+  const onCompleteShareTutorial = () => {
+    setCompletedShareTutorial(true)
+    AsyncStorage.setItem("completedShareTutorial", JSON.stringify(true)).catch((e) => {
+      // try again
+      AsyncStorage.setItem("completedShareTutorial", JSON.stringify(true))
+    })
+  }
+
   // since Swiper doesnt support adding more cards to an existing stack, we use 2 here to simulate a single stack. Whichever one is "beneath" gets refreshed and reloaded while the one "on top" is displayed
   // once the one on top runs out, the one below is shown and they swap jobs
   return (
@@ -309,7 +331,26 @@ const App = () => {
                 return <NoAnswers setDisableSwipes={setDisableSwipes} isShown={topStack === 1} />
               }
               else {
-                return <Answer setDisableSwipes={setDisableSwipes} answerAudioData={card.data} id={card.id} question={card.questionText} completedTutorial={completedAnswerTutorial} onCompleteTutorial={onCompleteAnswerTutorial} onApprove={() => swiper1.current.swipeRight()} onDisapprove={() => swiper1.current.swipeLeft()} onPass={() => swiper1.current.swipeTop()} onReport={() => swiper1.current.swipeBottom()} onError={reloadStacks} isShown={topStack === 1} />
+                return (
+                  <Answer
+                    setDisableSwipes={setDisableSwipes}
+                    answerAudioData={card.data}
+                    id={card.id}
+                    question={card.questionText}
+                    completedTutorial={completedAnswerTutorial}
+                    onCompleteTutorial={onCompleteAnswerTutorial}
+                    onApprove={() => swiper1.current.swipeRight()}
+                    onDisapprove={() => swiper1.current.swipeLeft()}
+                    onPass={() => swiper1.current.swipeTop()}
+                    onReport={() => swiper1.current.swipeBottom()}
+                    onError={reloadStacks}
+                    isShown={topStack === 1}
+                    completedFlagTutorial={completedFlagTutorial}
+                    completedShareTutorial={completedShareTutorial}
+                    onCompleteFlagTutorial={onCompleteFlagTutorial}
+                    onCompleteShareTutorial={onCompleteShareTutorial}
+                  />
+                )
               }
             }}
             onSwiped={() => {}}
@@ -369,7 +410,26 @@ const App = () => {
                 return <NoAnswers setDisableSwipes={setDisableSwipes} isShown={topStack === 2} />
               }
               else {
-                return <Answer setDisableSwipes={setDisableSwipes} answerAudioData={card.data} id={card.id} question={card.questionText} completedTutorial={completedAnswerTutorial} onCompleteTutorial={onCompleteAnswerTutorial} onApprove={() => swiper2.current.swipeRight()} onDisapprove={() => swiper2.current.swipeLeft()} onPass={() => swiper2.current.swipeTop()} onReport={() => swiper2.current.swipeBottom()} onError={reloadStacks} isShown={topStack === 2} />
+                return (
+                  <Answer
+                    setDisableSwipes={setDisableSwipes}
+                    answerAudioData={card.data}
+                    id={card.id}
+                    question={card.questionText}
+                    completedTutorial={completedAnswerTutorial}
+                    onCompleteTutorial={onCompleteAnswerTutorial}
+                    onApprove={() => swiper2.current.swipeRight()}
+                    onDisapprove={() => swiper2.current.swipeLeft()}
+                    onPass={() => swiper2.current.swipeTop()}
+                    onReport={() => swiper2.current.swipeBottom()}
+                    onError={reloadStacks}
+                    isShown={topStack === 2}
+                    completedFlagTutorial={completedFlagTutorial}
+                    completedShareTutorial={completedShareTutorial}
+                    onCompleteFlagTutorial={onCompleteFlagTutorial}
+                    onCompleteShareTutorial={onCompleteShareTutorial}
+                  />
+                )
               }
             }}
             onSwiped={() => {}}

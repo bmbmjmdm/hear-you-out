@@ -34,17 +34,17 @@ type BottomButtonsProps = {
 const BottomButtons = ({theme, xPressed, miscPressed, checkPressed, submitting}: BottomButtonsProps) => {
   return (
     <View style={styles.container}>
-      <Button theme={theme} name={'x'} onPress={xPressed} />
-      <Button theme={theme} name={'misc'} onPress={miscPressed} />
-      <Button theme={theme} name={'check'} onPress={checkPressed} submitting={submitting} />
+      <BottomButton theme={theme} name={'x'} onPress={xPressed} />
+      <BottomButton theme={theme} name={'misc'} onPress={miscPressed} />
+      <BottomButton theme={theme} name={'check'} onPress={checkPressed} submitting={submitting} />
     </View>
   )
 };
 
-const Button = ({name, theme, onPress, submitting = false}) => {
+export const BottomButton = ({name, theme, onPress, submitting = false, extraDark = false}) => {
   const screenSize = React.useContext(SizeContext)
   const [pressed, setPressed] = React.useState(false)
-  const backgroundColor = "#191919"
+  const backgroundColor = extraDark ? "#101010" : "#191919"
   let radius;
   let style;
   let image;

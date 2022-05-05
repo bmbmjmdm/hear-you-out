@@ -236,8 +236,6 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
           needsNewFile.current = false
           needsConcat.current = true
           await recorder.startRecorder(additionalFile, audioSet, true)
-          // this is due to a bug with recorder that thinks the new file is already paused (and therefore cannot be paused), when its not
-          await recorder.resumeRecorder()
         }
         // we can simply unpause
         else {
@@ -264,6 +262,8 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
     lock.current = true
     try { 
       if (recording || force) {
+        // this is due to a bug with recorder that thinks the new file is already paused (and therefore cannot be paused), when its not
+        await recorder.resumeRecorder()
         await recorder.pauseRecorder()
         setRecording(false)
         timing.current = false
@@ -321,6 +321,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       setRecordTime(0)
       await stopRecorderAndConcat()
       await deleteCurrentFile()
+      checklist?.current?.uncheckAll()
       setModalVisible(false)
     }
     catch (e) {

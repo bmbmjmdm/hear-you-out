@@ -33,6 +33,11 @@ const Checklist = ({type, disabledPress, shouldFadeInText, shouldFadeInBoxes, is
       }
       return true
     },
+    uncheckAll: () => {
+      for (const i in allRefs) {
+        allRefs[i].uncheck()
+      }
+    },
     shake: () => {
       for (const i in allRefs) {
         allRefs[i].shake()
@@ -90,7 +95,10 @@ const CheckItem = ({text, disabledPress, shouldFadeInText, shouldFadeInBox, isVi
     isChecked: () => val,
     shake: () => {
       if (!val) shakeRef.current.shake()
-    }
+    },
+    uncheck: () => {
+      setVal(false)
+    },
   }))
 
   return (

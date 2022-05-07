@@ -7,7 +7,6 @@ import {
   Image,
   TouchableOpacity,
   Platform,
-  Animated,
   Alert,
 } from 'react-native';
 import Modal from "react-native-modal";
@@ -18,10 +17,9 @@ import BottomButtons from './BottomButtons'
 import AudioRecorderPlayer, { AudioEncoderAndroidType, AVEncodingOption } from 'react-native-audio-recorder-player';
 import RNFS from 'react-native-fs'
 import { RNFFmpeg } from 'react-native-ffmpeg';
-import uuid from 'react-native-uuid';
 import { APIAnswerStats, APIQuestion } from "./Network"
 import { SizeContext } from './helpers'
-import { getAudioCircleSize, resizeAudioCircle, resizeMic, resizeTitle } from './helpers'
+import { resizeAudioCircle, resizeMic, resizeTitle, animateCircle } from './helpers'
 import ShakeElement from './ShakeElement';
 import FadeInElement from './FadeInElement'
 import ModalContents from './ModalContents'
@@ -71,6 +69,9 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
   const [recordTime, setRecordTime] = React.useState(0)
   const timing = React.useRef(false)
   const interval = React.useRef(null)
+  // we call animateCircle from a scope that doesnt have access to recordTime, so we box the state here for it and update it each render
+  const recordTimeForCircles = React.useRef(0)
+  recordTimeForCircles.current = recordTime
 
   // recorder/player
   const recorder = React.useRef(new AudioRecorderPlayer()).current
@@ -117,7 +118,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
       recorder.addRecordBackListener(({ currentMetering }) => {
         // TODO test this level on other devices
         const minMeter = Platform.OS === "android" ? -20 : -23
-        if (currentMetering > minMeter) animateCircle()
+        if (currentMetering > minMeter) animateCircle(setCircles, screenSize, recordTimeForCircles)
       })
       // we make a text file with our audio file paths listed for later concatenation
       const paths = [originalFile, additionalFile]
@@ -153,68 +154,13 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
     }
   }, [])
 
+  // when the question is first shown, if the user's answer to the previous question has stats, show them to the user
   React.useEffect(() => {
     if (hasStats && isShown) {
       setModalVisible(true)
       setModalText(stats.num_serves + " people heard your last answer!")
     }
   }, [hasStats, isShown])
-
-  // we call animateCircle from a scope that doesnt have access to recordTime, so we box the state here for it and update it each render
-  const recordTimeForCircles = React.useRef(0)
-  recordTimeForCircles.current = recordTime
-  // while the user is recording, we make a cute animation behind the record button
-  // create a circle that will fade out from the center in a random directon
-  const animateCircle = () => {
-    // get an up-to-date mutable copy of the state so we set it right
-    setCircles((lastState) => {
-      const circlesCopy = {...lastState}
-      // id of our animation
-      const id: any = uuid.v4()
-      // the animated value we'll use to drive our animation
-      const anim = new Animated.Value(0)
-      // a random degree from 0 to 360 in radians
-      const rotation = Math.random() * 360 * Math.PI / 180
-      // add the circle with all its values to our list of animations
-      const randomColorNum = Math.floor(Math.random() * 11390625)
-      const randomColorStr = "#" + (randomColorNum.toString(16).padStart(6, "0"))
-      circlesCopy[id] = 
-      (<Animated.View 
-        key={id}
-        style={[{
-          // time limit changes color of circles to be darker
-          backgroundColor: recordTimeForCircles.current < 240 ? randomColorStr : '#880000',
-          borderRadius: 999,
-          position: "absolute",
-          elevation: -1,
-          zIndex: -1,
-          opacity: Animated.subtract(new Animated.Value(1), anim),
-          transform: [
-            // polar coordinate using our random rotation where distance goes from 0 to 100
-            {translateY: Animated.multiply(Animated.multiply(anim, new Animated.Value(200)), new Animated.Value(Math.sin(rotation)))},
-            {translateX: Animated.multiply(Animated.multiply(anim, new Animated.Value(200)), new Animated.Value(Math.cos(rotation)))}
-          ]
-        },
-        resizeAudioCircle(screenSize)]}
-      />)
-      // kick off the animation
-      Animated.timing(anim, {
-        toValue: 1,
-        duration: 1000,
-        useNativeDriver: true
-      }).start(() => {
-        // remove animation from our list after animation finishes
-        // get a new copy 
-        setCircles((lastState2) => {
-          const circlesCopy2 = {...lastState2}
-          circlesCopy2[id] = null
-          return circlesCopy2
-        })
-      })
-      // finish setting state
-      return circlesCopy
-    })
-  }
 
   const recordPressed = () => {
     if (recording) recordPaused()

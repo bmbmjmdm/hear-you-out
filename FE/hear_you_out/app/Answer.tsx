@@ -20,10 +20,12 @@ import RNFS from 'react-native-fs'
 import AudioRecorderPlayer, { PlayBackType } from 'react-native-audio-recorder-player';
 import RNShare from 'react-native-share'
 import { SizeContext } from './helpers'
-import { getAudioCircleSize, resizeAudioCircle, resizePlayPause, resizeTitle } from './helpers'
+import { resizeAudioCircle, resizePlayPause, resizeTitle, animateCircle } from './helpers'
 import ShakeElement from './ShakeElement';
 import FadeInElement from './FadeInElement'
 import ModalContents from './ModalContents'
+import { RNFFmpeg } from 'react-native-ffmpeg';
+import { Buffer } from "buffer";
 
 type AnswerProps = {
   setDisableSwipes: (val: boolean) => void,
@@ -73,6 +75,10 @@ const Answer = ({
   const startedPerm = React.useRef(false)
   const [ready, setReady] = React.useState(false)
   const [currentTutorialElement, setCurrentTutorialElement] = React.useState("")
+  const [circles, setCircles] = React.useState({})
+  const [meterData, setMeterData] = React.useState([])
+  // this is for the playback listener, we could update it whenever the playing state updates but id rather not
+  const playingRef = React.useRef(false) 
 
   // modal
   const [modalVisible, setModalVisible] = React.useState(false)
@@ -91,8 +97,12 @@ const Answer = ({
   const prepend = Platform.OS === 'android' ? "" : "file://"
   const filepathRaw = RNFS.CachesDirectoryPath + '/' + "CoolAnswer" + id + extention
   const filepath = prepend + filepathRaw
+  const pcmPathRaw = RNFS.CachesDirectoryPath + '/' + "PCM" + id + extention
+  const pcmPath = prepend + pcmPathRaw
 
   const playbackListener = ({currentPosition, duration}:PlayBackType) => {
+    // animate a circle every random interval
+    if (meterData[currentPosition] >= 120 && playingRef.current) animateCircle(setCircles, screenSize)
     // if length is set more than once it'll break the slider
     if (!lengthSetOnce.current) {
       setLength(duration)
@@ -104,6 +114,7 @@ const Answer = ({
     // the answer finished playing
     if (currentPosition === duration) {
       setPlaying(false)
+      playingRef.current = false
       setSliderValue(0)
       started.current = false
       return
@@ -116,10 +127,28 @@ const Answer = ({
   React.useEffect(() => {
     const asyncFun = async () => {
       try {
-        await RNFS.writeFile(filepath, answerAudioData, 'base64').then(() => setReady(true))
-        player.addPlayBackListener(playbackListener)
+        await RNFS.writeFile(filepath, answerAudioData, 'base64')
+        // convert the file to pcm solely to get an array of the audio data
+        await RNFFmpeg.execute(`-y  -i ${filepath}  -acodec pcm_s16le -f s16le -ac 1 -ar 1000 ${pcmPath}`)
+        // you're reading that right, we're reading the file using base64 only to decode the base64, because rn doesnt let us read raw data
+        const pcmFile = Buffer.from(await RNFS.readFile(pcmPath, 'base64'), 'base64')
+        let pcmData = []
+        // byte conversion pulled off stack overflow
+        for(var i = 0 ; i < pcmFile.length ; i = i + 2){
+          var byteA = pcmFile[i];
+          var byteB = pcmFile[i + 1];
+          var sign = byteB & (1 << 7);
+          var val = (((byteA & 0xFF) | (byteB & 0xFF) << 8)); // convert to 16 bit signed int
+          if (sign) { // if negative
+            val = 0xFFFF0000 | val;  // fill in most significant bits with 1's
+          }
+          pcmData.push(Math.abs(val))
+        }
+        // this is the resulting audio data array, higher value means higher amplitude
+        setMeterData(pcmData)
       }
       catch (e) {
+        console.log(e)
         // cannot create our audio file, nothing we can do
         Alert.alert("Cannot write answer to file. Please contact support if this keeps happening.")
         onError()
@@ -133,6 +162,7 @@ const Answer = ({
           player.removePlayBackListener()
           await player.stopPlayer()
           await RNFS.unlink(filepath)
+          await RNFS.unlink(pcmPath)
         }
         catch (e) {
           console.log("failed to stop/unlink answer on unmount")
@@ -142,8 +172,18 @@ const Answer = ({
       asyncFunRet()
     }
   }, [])
+
+  React.useEffect(() => {
+    if (meterData.length) {
+      player.setSubscriptionDuration(0.2)
+      player.addPlayBackListener(playbackListener)
+      setReady(true)
+    }
+  }, [meterData])
+
   
   // UI functions
+
   const onSlidingStart = () => {
     // dont let the user accidentily swipe the overall card
     setDisableSwipes(true)
@@ -206,7 +246,6 @@ const Answer = ({
           onError()
         }
       }
-      setPlaying(!playing)
     }
     // we're not playing and didnt start yet, so start
     else {
@@ -223,6 +262,7 @@ const Answer = ({
       }
     }
     setPlaying(!playing)
+    playingRef.current = !playing
   }
 
   const informBeginPlaying = () => {
@@ -388,6 +428,7 @@ const Answer = ({
       >
         <ShakeElement ref={playerShaker}>
           <View style={{ marginTop: 30 }}>
+            {Object.values(circles)}
             <TouchableOpacity
               style={[styles.audioCircle, resizeAudioCircle(screenSize), playing ? styles.yellowCircle : styles.whiteCircle]}
               onPress={playPressed}

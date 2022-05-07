@@ -19,7 +19,7 @@ import AudioRecorderPlayer, { AudioEncoderAndroidType, AVEncodingOption } from '
 import RNFS from 'react-native-fs'
 import { RNFFmpeg } from 'react-native-ffmpeg';
 import uuid from 'react-native-uuid';
-import { APIQuestion } from "./Network"
+import { APIAnswerStats, APIQuestion } from "./Network"
 import { SizeContext } from './helpers'
 import { getAudioCircleSize, resizeAudioCircle, resizeMic, resizeTitle } from './helpers'
 import ShakeElement from './ShakeElement';
@@ -46,9 +46,11 @@ type QuestionProps = {
   onCompleteTutorial: () => void
   // an un-recoverable error has occured and we need to reload the app
   onError: () => void
+  stats: APIAnswerStats,
+  isShown: boolean
 }
 
-const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompleteTutorial, onError }: QuestionProps) => {
+const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedTutorial, onCompleteTutorial, onError }: QuestionProps) => {
   const screenSize = React.useContext(SizeContext)
   const checklist = React.useRef()
   const recorderShaker = React.useRef()
@@ -56,6 +58,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   const [currentTutorialElement, setCurrentTutorialElement] = React.useState("")
   // TODO set disabled styles on everything when submitting?
   const [submitting, setSubmitting] = React.useState(false)
+  const hasStats = stats?.num_serves
 
   // modal
   const [modalVisible, setModalVisible] = React.useState(false)
@@ -149,6 +152,13 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       asyncFunRet()
     }
   }, [])
+
+  React.useEffect(() => {
+    if (hasStats && isShown) {
+      setModalVisible(true)
+      setModalText(stats.num_serves + " people heard your last answer!")
+    }
+  }, [hasStats, isShown])
 
   // we call animateCircle from a scope that doesnt have access to recordTime, so we box the state here for it and update it each render
   const recordTimeForCircles = React.useRef(0)

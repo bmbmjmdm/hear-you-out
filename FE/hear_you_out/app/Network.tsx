@@ -27,6 +27,25 @@ export const getQuestion = async (): Promise<APIQuestion> => {
   return await result.json()
 }
 
+export type APIAnswerStats = {
+  key: string,
+  num_agrees: number,
+  num_disagrees: number,
+  num_abstains: number,
+  num_serves: number
+}
+
+export const getAnswerStats = async(): Promise<APIAnswerStats> => {
+  const oldAnswer = await AsyncStorage.getItem("oldAnswer")
+  const result = await fetchWithRetry(`https://hearyouout.deta.dev/getAnswerStats?answer_uuid=${oldAnswer}`, {
+    method: 'GET',
+    headers: {
+      Accept: 'application/json',
+    },
+  });
+  return await result.json()
+}
+
 export type APIAnswer = {
   audio_data: string,
   question_uuid: string
@@ -49,6 +68,7 @@ export const submitAnswer = async (answer: APIAnswer): Promise<APIAnswerId> => {
   const json = await result.json()
   // overwrite previously seen answers since we're on a new question
   await AsyncStorage.setItem("answerList", JSON.stringify([json.answer_id]))
+  await AsyncStorage.setItem("oldAnswer", JSON.stringify(json.answer_id))
   return json
 }
 

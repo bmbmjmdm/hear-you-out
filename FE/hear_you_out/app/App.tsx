@@ -16,7 +16,7 @@ import Question from './Question'
 import Answer from './Answer'
 import PermissionsAndroid from 'react-native-permissions';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { APIQuestion, getAnswer, getQuestion, rateAnswer, submitAnswer, reportAnswer, clearTempAnswerList } from './Network'
+import { APIQuestion, getAnswer, getQuestion, rateAnswer, submitAnswer, reportAnswer, clearTempAnswerList, getAnswerStats, APIAnswerStats } from './Network'
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NoAnswers from './NoAnswers'
 import { ScreenSize, SizeContext } from './helpers'
@@ -41,6 +41,7 @@ const App = () => {
   const [cards2, setCards2] = React.useState([])
   const [topStack, setTopStack] = React.useState(1)
   const [question, setQuestion] = React.useState<APIQuestion>({})
+  const [stats, setStats] = React.useState<APIAnswerStats>({})
   const [completedQuestionTutorial, setCompletedQuestionTutorial ] = React.useState(false)
   const [completedAnswerTutorial, setCompletedAnswerTutorial ] = React.useState(false)
   const [completedFlagTutorial, setCompletedFlagTutorial ] = React.useState(false)
@@ -193,6 +194,9 @@ const App = () => {
       const newQ = await getQuestion()
       const curQuestion = previousQuestionForced || question
       if (curQuestion.key !== newQ.key && loadedQuestion?.key !== newQ.key) {
+        // TODO get the previous answer's info
+        const oldAnswerStats = await getAnswerStats()
+        setStats(oldAnswerStats)
         setQuestion(newQ)
         // we completely override the card stack since we only allow 1 card per stack right now
         const cardSetterCallback = (oldCards) => ["Question"]
@@ -325,7 +329,17 @@ const App = () => {
             cards={cards1}
             renderCard={(card) => {
               if (card === 'Question') {
-                return <Question submitAnswerAndProceed={submitAnswerAndProceed} question={question} completedTutorial={completedQuestionTutorial} onCompleteTutorial={onCompleteQuestionTutorial} onError={reloadStacks} />
+                return (
+                  <Question
+                    submitAnswerAndProceed={submitAnswerAndProceed}
+                    question={question}
+                    stats={stats}
+                    completedTutorial={completedQuestionTutorial}
+                    onCompleteTutorial={onCompleteQuestionTutorial}
+                    onError={reloadStacks}
+                    isShown={topStack === 1}
+                  />
+                )
               }
               else if (card === 'None') {
                 return <NoAnswers setDisableSwipes={setDisableSwipes} isShown={topStack === 1} />
@@ -404,7 +418,17 @@ const App = () => {
             cards={cards2}
             renderCard={(card) => {
               if (card === 'Question') {
-                return <Question submitAnswerAndProceed={submitAnswerAndProceed} question={question} completedTutorial={completedQuestionTutorial} onCompleteTutorial={onCompleteQuestionTutorial} onError={reloadStacks} />
+                return (
+                  <Question
+                    submitAnswerAndProceed={submitAnswerAndProceed}
+                    question={question}
+                    stats={stats}
+                    completedTutorial={completedQuestionTutorial}
+                    onCompleteTutorial={onCompleteQuestionTutorial}
+                    onError={reloadStacks}
+                    isShown={topStack === 2}
+                  />
+                )
               }
               else if (card === 'None') {
                 return <NoAnswers setDisableSwipes={setDisableSwipes} isShown={topStack === 2} />

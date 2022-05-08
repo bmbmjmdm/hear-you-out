@@ -77,6 +77,7 @@ const Answer = ({
   const [currentTutorialElement, setCurrentTutorialElement] = React.useState("")
   const [circles, setCircles] = React.useState({})
   const [meterData, setMeterData] = React.useState([])
+  const [loudExampleAmplitude, setLoudExampleAmplitude] = React.useState(500)
   // this is for the playback listener, we could update it whenever the playing state updates but id rather not
   const playingRef = React.useRef(false) 
 
@@ -101,8 +102,14 @@ const Answer = ({
   const pcmPath = prepend + pcmPathRaw
 
   const playbackListener = ({currentPosition, duration}:PlayBackType) => {
-    // animate a circle every random interval
-    if (meterData[currentPosition] >= 120 && playingRef.current) animateCircle("answer", setCircles, screenSize)
+    // animate a circle every time we go above our exemplar loud amplitude.
+    // check the surrounding 0.1 seconds to reduce misses
+    let max = 0;
+    const startingPosition = Math.max(0, currentPosition - 5)
+    for (let i = startingPosition; i < 5 + startingPosition; i++) {
+      if (meterData[i] > max) max = meterData[i]
+    }
+    if (max >= loudExampleAmplitude && playingRef.current) animateCircle("answer", setCircles, screenSize)
     // if length is set more than once it'll break the slider
     if (!lengthSetOnce.current) {
       setLength(duration)
@@ -142,8 +149,13 @@ const Answer = ({
           if (sign) { // if negative
             val = 0xFFFF0000 | val;  // fill in most significant bits with 1's
           }
-          pcmData.push(Math.abs(val))
+          const absVal = Math.abs(val)
+          pcmData.push(absVal)
         }
+        // we find an "exemplar amplitude", representing a 66th percentile loudness
+        const sortedAmplitudes = [...pcmData].sort()
+        const exemplarIndex = Math.round(sortedAmplitudes.length * 2 / 3)
+        setLoudExampleAmplitude(sortedAmplitudes[exemplarIndex])
         // this is the resulting audio data array, higher value means higher amplitude
         setMeterData(pcmData)
       }

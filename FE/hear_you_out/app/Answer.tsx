@@ -102,7 +102,7 @@ const Answer = ({
 
   const playbackListener = ({currentPosition, duration}:PlayBackType) => {
     // animate a circle every random interval
-    if (meterData[currentPosition] >= 120 && playingRef.current) animateCircle(setCircles, screenSize)
+    if (meterData[currentPosition] >= 120 && playingRef.current) animateCircle("answer", setCircles, screenSize)
     // if length is set more than once it'll break the slider
     if (!lengthSetOnce.current) {
       setLength(duration)
@@ -166,6 +166,7 @@ const Answer = ({
         }
         catch (e) {
           console.log("failed to stop/unlink answer on unmount")
+          console.log(e)
           // we're already unmounted, so don't worry about it
         }
       }
@@ -205,6 +206,7 @@ const Answer = ({
       }
       catch (e) {
         console.log("start then pause failed")
+        console.log(e)
         // let restart fail silently, its not worth reloading the app over and for MVP the user can recover manually
       }
     }
@@ -212,6 +214,7 @@ const Answer = ({
       await player.seekToPlayer(val)
     }
     catch (e) {
+      console.log(e)
       // same as above catch
       Alert.alert("Failed to seek. Please contact support if this keeps happening.")
     }
@@ -225,6 +228,7 @@ const Answer = ({
         await player.pausePlayer()
       }
       catch (e) {
+        console.log(e)
         Alert.alert("Failed to pause. Please contact support if this keeps happening.")
       }
     }
@@ -238,9 +242,11 @@ const Answer = ({
         // if we cant resume the player, try to restart
         try {
           console.log("failed to resume player, restarting")
+          console.log(e)
           await player.startPlayer(filepath)
         }
-        catch (e) {
+        catch (e2) {
+          console.log(e2)
           // if we cant start the player, this is a serious problem
           Alert.alert("Cannot play answer. Please contact support if this keeps happening.")
           onError()
@@ -256,6 +262,7 @@ const Answer = ({
         await player.startPlayer(filepath)
       }
       catch (e) {
+        console.log(e)
         // if we cant start the player, this is a serious problem
         Alert.alert("Cannot play answer. Please contact support if this keeps happening.")
         onError()
@@ -292,6 +299,7 @@ const Answer = ({
     }
     catch (e) {
       if (e.message !== "User did not share") {
+        console.log(e)
         Alert.alert("Failed to share. Please contact support if this keeps happening.")
       }
     }
@@ -548,7 +556,7 @@ const styles = StyleSheet.create({
   },
 
   yellowCircle: {
-    backgroundColor: '#FFF689',
+    backgroundColor: '#659B5E',
   },
 });
 

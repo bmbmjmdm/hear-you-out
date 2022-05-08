@@ -11,18 +11,18 @@ import {
 } from 'react-native';
 import Modal from "react-native-modal";
 import Mic from './Mic.png';
-import YellowMic from './YellowMic.png'
 import Checklist from './Checklist'
 import BottomButtons from './BottomButtons'
 import AudioRecorderPlayer, { AudioEncoderAndroidType, AVEncodingOption } from 'react-native-audio-recorder-player';
 import RNFS from 'react-native-fs'
 import { RNFFmpeg } from 'react-native-ffmpeg';
 import { APIAnswerStats, APIQuestion } from "./Network"
-import { SizeContext } from './helpers'
+import { resizePlayPause, SizeContext } from './helpers'
 import { resizeAudioCircle, resizeMic, resizeTitle, animateCircle } from './helpers'
 import ShakeElement from './ShakeElement';
 import FadeInElement from './FadeInElement'
 import ModalContents from './ModalContents'
+import Pause from './Pause.png';
 
 // https://github.com/hyochan/react-native-audio-recorder-player/blob/master/index.ts
 const audioSet = {
@@ -118,7 +118,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
       recorder.addRecordBackListener(({ currentMetering }) => {
         // TODO test this level on other devices
         const minMeter = Platform.OS === "android" ? -20 : -23
-        if (currentMetering > minMeter) animateCircle(setCircles, screenSize, recordTimeForCircles)
+        if (currentMetering > minMeter) animateCircle("question", setCircles, screenSize, recordTimeForCircles)
       })
       // we make a text file with our audio file paths listed for later concatenation
       const paths = [originalFile, additionalFile]
@@ -129,7 +129,8 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
       try {
         await RNFS.writeFile(fileList, listContent, 'utf8')
         setReady(true)
-      } catch (error) {
+      } catch (e) {
+        console.log(e)
         // if we can't even write our filelist, something's seriously wrong. 
         Alert.alert("Cannot write files. Please contact support if this keeps happening.")
         onError()
@@ -147,6 +148,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
         }
         catch (e) {
           console.log("failed to stop/unlink question on unmount")
+          console.log(e)
           // we're unmounting, don't bother handling error
         }
       }
@@ -207,6 +209,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
     catch (e) {
       // Writing files or accessing the recorder must have failed, but I don't know why. Reset everything
       Alert.alert("Recording failed. Please contact support if this keeps happening.")
+      console.log(e)
       onError()
     }
     lock.current = false
@@ -230,6 +233,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
       // Pausing failed. Re-attempt without forcing. If we wind up here again, error out.
       if (retry) {
         Alert.alert("Pausing failed. Please contact support if this keeps happening.")
+        console.log(e)
         onError()
       }
       else {
@@ -283,6 +287,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
     catch (e) {
       // Similar to recording failed, we dont know what went wrong but it's pretty serious and un-recoverable
       Alert.alert("Restarting failed. Please contact support if this keeps happening.")
+      console.log(e)
       onError()
     }
     lock.current = false
@@ -338,6 +343,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
     catch (e) {
       // they'll be able to re-answer the question since this wasn't a network error
       Alert.alert("Error during submission. Please contact support if this keeps happening.")
+      console.log(e)
       onError()
     }
   }
@@ -361,6 +367,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
     catch (e) {
       // Don't throw the user out for this. They can still record, restart, and submit possibly
       Alert.alert("Error during playback. Please contact support if this keeps happening.")
+      console.log(e)
 
     }
     lock.current = false
@@ -455,8 +462,8 @@ return (
               activeOpacity={1}
             >
               <Image
-                source={started && !recording ? Mic/*YellowMic*/ : Mic}
-                style={{ width: resizeMic(screenSize) }}
+                source={recording ? Pause : Mic}
+                style={{ width: recording ? resizePlayPause(screenSize) : resizeMic(screenSize) }}
                 resizeMode={'contain'}
               />
             </TouchableOpacity>
@@ -533,7 +540,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#F0F3F5',
   },
 
-  // TODO is this good color?
   redCircle: {
     backgroundColor: '#AA5042',
   },

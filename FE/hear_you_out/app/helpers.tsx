@@ -102,7 +102,7 @@ export const resizeCat = (screenSize: ScreenSize) => {
 
 // while the user is recording or audio is playing, we make a cute animation behind the record button
 // create a circle that will fade out from the center in a random directon
-export const animateCircle = (setCircles, screenSize, recordTimeForCircles = {current: 0}) => {
+export const animateCircle = (theme: "answer" | "question", setCircles: Function, screenSize: ScreenSize, recordTimeForCircles = {current: 0}) => {
   // get an up-to-date mutable copy of the state so we set it right
   setCircles((lastState) => {
     const circlesCopy = {...lastState}
@@ -113,14 +113,20 @@ export const animateCircle = (setCircles, screenSize, recordTimeForCircles = {cu
     // a random degree from 0 to 360 in radians
     const rotation = Math.random() * 360 * Math.PI / 180
     // add the circle with all its values to our list of animations
-    const randomColorNum = Math.floor(Math.random() * 11390625)
-    const randomColorStr = "#" + (randomColorNum.toString(16).padStart(6, "0"))
+    const isQuestion = theme === "question"
+    const randomVal = 255 - Math.ceil(Math.random() * (isQuestion ? 255 : 200))
+    const randomDigits = randomVal.toString(16).padStart(2, "0")
+    const switchColor = Math.random() > 0.5
+    const firstColor = isQuestion ? "FF" : "00"
+    const secondColor = switchColor ? randomDigits : isQuestion ? "00" : "FF"
+    const thirdColor = !switchColor ? randomDigits : isQuestion ? "00" : "FF"
+    const randomColor = `#${firstColor}${secondColor}${thirdColor}`
     circlesCopy[id] = 
     (<Animated.View 
       key={id}
       style={[{
         // time limit changes color of circles to be darker
-        backgroundColor: recordTimeForCircles.current < 240 ? randomColorStr : '#880000',
+        backgroundColor: recordTimeForCircles.current < 240 ? randomColor : '#880000',
         borderRadius: 999,
         position: "absolute",
         elevation: -1,

@@ -9,8 +9,17 @@ import {
 } from 'react-native';
 import CheckBox from '@react-native-community/checkbox';
 import ShakeElement from "./ShakeElement"
+import FadeInElement from './FadeInElement';
 
-const Checklist = ({type, disabledPress} : {type:string, disabledPress?: Function}, ref) => {
+interface ChecklistProps {
+  shouldFadeInText: boolean,
+  shouldFadeInBoxes: boolean,
+  isVisibleWithoutAnimation: boolean,
+  type: string,
+  disabledPress?: Function
+}
+
+const Checklist = ({type, disabledPress, shouldFadeInText, shouldFadeInBoxes, isVisibleWithoutAnimation} : ChecklistProps, ref) => {
   const allRefs = React.useRef({}).current
   let itemList = checklist_map[type]
   if (!itemList) itemList = checklist_map["other"]
@@ -24,6 +33,11 @@ const Checklist = ({type, disabledPress} : {type:string, disabledPress?: Functio
       }
       return true
     },
+    uncheckAll: () => {
+      for (const i in allRefs) {
+        allRefs[i].uncheck()
+      }
+    },
     shake: () => {
       for (const i in allRefs) {
         allRefs[i].shake()
@@ -34,7 +48,15 @@ const Checklist = ({type, disabledPress} : {type:string, disabledPress?: Functio
   // construct our checklist items from our known checklist map + type
   for (const i in itemList) {
     itemComponents.push(
-      <CheckItemWithRef text={itemList[i]} key={i} ref={curRef => allRefs[i] = curRef} disabledPress={disabledPress} />
+      <CheckItemWithRef
+        text={itemList[i]}
+        key={i}
+        ref={curRef => allRefs[i] = curRef}
+        disabledPress={disabledPress}
+        shouldFadeInText={shouldFadeInText}
+        shouldFadeInBox={shouldFadeInBoxes}
+        isVisibleWithoutAnimation={isVisibleWithoutAnimation}
+      />
     )
   }
 
@@ -64,7 +86,7 @@ const checklist_map = {
 }
 
 // a single item with a check and text
-const CheckItem = ({text, disabledPress}, ref) => {
+const CheckItem = ({text, disabledPress, shouldFadeInText, shouldFadeInBox, isVisibleWithoutAnimation}, ref) => {
   const [val, setVal] = React.useState(false)
   const shakeRef = React.useRef(null)
   
@@ -73,43 +95,58 @@ const CheckItem = ({text, disabledPress}, ref) => {
     isChecked: () => val,
     shake: () => {
       if (!val) shakeRef.current.shake()
-    }
+    },
+    uncheck: () => {
+      setVal(false)
+    },
   }))
 
   return (
     <View style={styles.checkItem}>
-      <ShakeElement ref={shakeRefNew => shakeRef.current = shakeRefNew}>
-        <CheckBox
-          value={val}
-          onValueChange={newVal => {
-            if (disabledPress) disabledPress()
-            else setVal(newVal)
-          }}
-          tintColors={{
-            true: "#575757"
-          }}
-          onFillColor={Platform.OS === "android" ? "#575757" : undefined}
-          onCheckColor={"#222222"}
-          onTintColor={"#222222"}
-          tintColor={"#575757"}
-          onAnimationType={"one-stroke"}
-          offAnimationType={"one-stroke"}
-          style={Platform.OS === "android" ? {} : {
-            width: 25,
-            height: 25,
-            marginRight: 5
-          }}
-        />
-      </ShakeElement>
-      <Text
-        style={styles.text}
-        onPress={() => {
-          if (disabledPress) disabledPress()
-          else setVal(!val)
-        }}
+      <FadeInElement
+        shouldFadeIn={shouldFadeInBox}
+        isVisibleWithoutAnimation={isVisibleWithoutAnimation}
       >
-        {text}
-      </Text>
+        <ShakeElement ref={shakeRefNew => shakeRef.current = shakeRefNew}>
+          <CheckBox
+            value={val}
+            onValueChange={newVal => {
+              if (disabledPress) disabledPress()
+              else setVal(newVal)
+            }}
+            tintColors={{
+              true: "#D0D3D5",
+              false: "#D0D3D5"
+            }}
+            disabled={disabledPress}
+            onFillColor={Platform.OS === "android" ? "#D0D3D5" : undefined}
+            onCheckColor={"#D0D3D5"}
+            onTintColor={"#D0D3D5"}
+            tintColor={"#D0D3D5"}
+            onAnimationType={"one-stroke"}
+            offAnimationType={"one-stroke"}
+            style={Platform.OS === "android" ? {} : {
+              width: 25,
+              height: 25,
+              marginRight: 5,
+            }}
+          />
+        </ShakeElement>
+      </FadeInElement>
+      <FadeInElement
+        shouldFadeIn={shouldFadeInText}
+        isVisibleWithoutAnimation={isVisibleWithoutAnimation}
+      >
+        <Text
+          style={styles.text}
+          onPress={() => {
+            if (disabledPress) disabledPress()
+            else setVal(!val)
+          }}
+        >
+          {text}
+        </Text>
+      </FadeInElement>
     </View>
   )
 }
@@ -124,7 +161,6 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   checkItem: {
-    alignItems: 'center',
     marginBottom: 10,
     flexDirection: 'row',
     padding: 1,
@@ -135,6 +171,7 @@ const styles = StyleSheet.create({
     marginBottom: 3,
     maxWidth: 310,
     flexGrow: 1,
+    color: '#F0F3F5'
   }
 });
 

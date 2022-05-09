@@ -7,25 +7,22 @@ import {
   Image,
   TouchableOpacity,
   Platform,
-  Animated,
   Alert,
 } from 'react-native';
 import Modal from "react-native-modal";
-// https://github.com/react-native-linear-gradient/react-native-linear-gradient
-import LinearGradient from 'react-native-linear-gradient';
 import Mic from './Mic.png';
-import Shadow from './Shadow'
 import Checklist from './Checklist'
 import BottomButtons from './BottomButtons'
 import AudioRecorderPlayer, { AudioEncoderAndroidType, AVEncodingOption } from 'react-native-audio-recorder-player';
 import RNFS from 'react-native-fs'
 import { RNFFmpeg } from 'react-native-ffmpeg';
-import uuid from 'react-native-uuid';
-import { APIQuestion } from "./Network"
-import { SizeContext } from './helpers'
-import { getAudioCircleSize, resizeAudioCircle, resizeMic, resizeTitle } from './helpers'
+import { APIAnswerStats, APIQuestion } from "./Network"
+import { resizePlayPause, SizeContext } from './helpers'
+import { resizeAudioCircle, resizeMic, resizeTitle, animateCircle } from './helpers'
 import ShakeElement from './ShakeElement';
 import FadeInElement from './FadeInElement'
+import ModalContents from './ModalContents'
+import Pause from './Pause.png';
 
 // https://github.com/hyochan/react-native-audio-recorder-player/blob/master/index.ts
 const audioSet = {
@@ -47,16 +44,19 @@ type QuestionProps = {
   onCompleteTutorial: () => void
   // an un-recoverable error has occured and we need to reload the app
   onError: () => void
+  stats: APIAnswerStats,
+  isShown: boolean
 }
 
-const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompleteTutorial, onError }: QuestionProps) => {
+const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedTutorial, onCompleteTutorial, onError }: QuestionProps) => {
   const screenSize = React.useContext(SizeContext)
   const checklist = React.useRef()
   const recorderShaker = React.useRef()
   const [circles, setCircles] = React.useState({})
-  const [currentTutorialElement, setCurrentTutorialElement] = React.useState("question")
+  const [currentTutorialElement, setCurrentTutorialElement] = React.useState("")
   // TODO set disabled styles on everything when submitting?
   const [submitting, setSubmitting] = React.useState(false)
+  const hasStats = stats?.num_serves
 
   // modal
   const [modalVisible, setModalVisible] = React.useState(false)
@@ -69,6 +69,9 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   const [recordTime, setRecordTime] = React.useState(0)
   const timing = React.useRef(false)
   const interval = React.useRef(null)
+  // we call animateCircle from a scope that doesnt have access to recordTime, so we box the state here for it and update it each render
+  const recordTimeForCircles = React.useRef(0)
+  recordTimeForCircles.current = recordTime
 
   // recorder/player
   const recorder = React.useRef(new AudioRecorderPlayer()).current
@@ -115,7 +118,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       recorder.addRecordBackListener(({ currentMetering }) => {
         // TODO test this level on other devices
         const minMeter = Platform.OS === "android" ? -20 : -23
-        if (currentMetering > minMeter) animateCircle()
+        if (currentMetering > minMeter) animateCircle("question", setCircles, screenSize, recordTimeForCircles)
       })
       // we make a text file with our audio file paths listed for later concatenation
       const paths = [originalFile, additionalFile]
@@ -126,7 +129,8 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       try {
         await RNFS.writeFile(fileList, listContent, 'utf8')
         setReady(true)
-      } catch (error) {
+      } catch (e) {
+        console.log(e)
         // if we can't even write our filelist, something's seriously wrong. 
         Alert.alert("Cannot write files. Please contact support if this keeps happening.")
         onError()
@@ -144,6 +148,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
         }
         catch (e) {
           console.log("failed to stop/unlink question on unmount")
+          console.log(e)
           // we're unmounting, don't bother handling error
         }
       }
@@ -151,59 +156,13 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
     }
   }, [])
 
-  // we call animateCircle from a scope that doesnt have access to recordTime, so we box the state here for it and update it each render
-  const recordTimeForCircles = React.useRef(0)
-  recordTimeForCircles.current = recordTime
-  // while the user is recording, we make a cute animation behind the record button
-  // create a circle that will fade out from the center in a random directon
-  const animateCircle = () => {
-    // get an up-to-date mutable copy of the state so we set it right
-    setCircles((lastState) => {
-      const circlesCopy = {...lastState}
-      // id of our animation
-      const id: any = uuid.v4()
-      // the animated value we'll use to drive our animation
-      const anim = new Animated.Value(0)
-      // a random degree from 0 to 360 in radians
-      const rotation = Math.random() * 360 * Math.PI / 180
-      // add the circle with all its values to our list of animations
-      circlesCopy[id] = 
-      (<Animated.View 
-        key={id}
-        style={[{
-          // time limit changes color of circles to be darker
-          backgroundColor: recordTimeForCircles.current < 240 ? "#ff617c" : '#880000',
-          borderRadius: 999,
-          position: "absolute",
-          elevation: -1,
-          zIndex: -1,
-          opacity: Animated.subtract(new Animated.Value(1), anim),
-          transform: [
-            // polar coordinate using our random rotation where distance goes from 0 to 100
-            {translateY: Animated.multiply(Animated.multiply(anim, new Animated.Value(200)), new Animated.Value(Math.sin(rotation)))},
-            {translateX: Animated.multiply(Animated.multiply(anim, new Animated.Value(200)), new Animated.Value(Math.cos(rotation)))}
-          ]
-        },
-        resizeAudioCircle(screenSize)]}
-      />)
-      // kick off the animation
-      Animated.timing(anim, {
-        toValue: 1,
-        duration: 1000,
-        useNativeDriver: true
-      }).start(() => {
-        // remove animation from our list after animation finishes
-        // get a new copy 
-        setCircles((lastState2) => {
-          const circlesCopy2 = {...lastState2}
-          circlesCopy2[id] = null
-          return circlesCopy2
-        })
-      })
-      // finish setting state
-      return circlesCopy
-    })
-  }
+  // when the question is first shown, if the user's answer to the previous question has stats, show them to the user
+  React.useEffect(() => {
+    if (hasStats && isShown) {
+      setModalVisible(true)
+      setModalText(stats.num_serves + " people heard your last answer!")
+    }
+  }, [hasStats, isShown])
 
   const recordPressed = () => {
     if (recording) recordPaused()
@@ -250,6 +209,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
     catch (e) {
       // Writing files or accessing the recorder must have failed, but I don't know why. Reset everything
       Alert.alert("Recording failed. Please contact support if this keeps happening.")
+      console.log(e)
       onError()
     }
     lock.current = false
@@ -261,9 +221,11 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
     lock.current = true
     try { 
       if (recording || force) {
+        // this is due to a bug with recorder that thinks the new file is already paused (and therefore cannot be paused), when its not
+        await recorder.resumeRecorder()
+        await recorder.pauseRecorder()
         setRecording(false)
         timing.current = false
-        await recorder.pauseRecorder()
       }
       lock.current = false
     }
@@ -271,11 +233,12 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       // Pausing failed. Re-attempt without forcing. If we wind up here again, error out.
       if (retry) {
         Alert.alert("Pausing failed. Please contact support if this keeps happening.")
+        console.log(e)
         onError()
       }
       else {
         lock.current = false
-        recordPaused(false, true)
+        setTimeout(() => recordPaused(false, true), 100)
       }
     }
   }
@@ -295,7 +258,11 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   }
 
   const restartRecording = async () => {
-    if (lock.current || recording) return
+    if (lock.current) return
+    if (recording) {
+      recorderShaker?.current?.shake()
+      return;
+    }
     // user pressed first button, now they need to confirm
     setModalText("Delete recording and restart?")
     setModalConfirm(() => restartRecordingConfirmed)
@@ -314,18 +281,24 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
       setRecordTime(0)
       await stopRecorderAndConcat()
       await deleteCurrentFile()
+      checklist?.current?.uncheckAll()
       setModalVisible(false)
     }
     catch (e) {
       // Similar to recording failed, we dont know what went wrong but it's pretty serious and un-recoverable
       Alert.alert("Restarting failed. Please contact support if this keeps happening.")
+      console.log(e)
       onError()
     }
     lock.current = false
   }
 
   const submitRecording = async () => {
-    if (lock.current || recording) return
+    if (lock.current) return
+    if (recording) {
+      recorderShaker?.current?.shake()
+      return;
+    }
     // validate checklist
     if (!checklist?.current?.areAllChecked()) {
       if (!shookChecklist) {
@@ -370,12 +343,17 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
     catch (e) {
       // they'll be able to re-answer the question since this wasn't a network error
       Alert.alert("Error during submission. Please contact support if this keeps happening.")
+      console.log(e)
       onError()
     }
   }
 
   const hearRecording = async () => {
-    if (lock.current || recording) return
+    if (lock.current) return
+    if (recording) {
+      recorderShaker?.current?.shake()
+      return;
+    }
     lock.current = true
     try {
       if (playing) {
@@ -389,6 +367,7 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
     catch (e) {
       // Don't throw the user out for this. They can still record, restart, and submit possibly
       Alert.alert("Error during playback. Please contact support if this keeps happening.")
+      console.log(e)
 
     }
     lock.current = false
@@ -416,21 +395,20 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
     }
   }
 
-  const progressTutorial = () => {
-    if (currentTutorialElement === 'question') setCurrentTutorialElement('record')
-    if (currentTutorialElement === 'record') setCurrentTutorialElement('checklist')
-    if (currentTutorialElement === 'checklist') setCurrentTutorialElement('bottom')
-    if (currentTutorialElement === 'bottom') onCompleteTutorial()
-  }
-
   React.useEffect(() => {
     // dumb way of progressing through tutorial, but a good place to start
     // TODO make more interactive
     if (!completedTutorial) {
-      setTimeout(progressTutorial, 2500) // 2 seconds to read the question
-      setTimeout(progressTutorial, 16500) // 16 seconds to press button and answer
-      setTimeout(progressTutorial, 4500) // 4 seconds to read checklist
-      setTimeout(progressTutorial, 750) // make sure bottom buttons are fully faded in before marking tutorial complete
+      let waitTime = 1000
+      setTimeout(() => setCurrentTutorialElement('question'), waitTime) // 1 second to load screen
+      waitTime += 3500
+      setTimeout(() => setCurrentTutorialElement('checklist'), waitTime) // 3 seconds to read the question
+      waitTime += 4500
+      setTimeout(() => setCurrentTutorialElement('record'), waitTime) // 4 seconds to read checklist
+      waitTime += 16500
+      setTimeout(() => setCurrentTutorialElement('bottom'), waitTime) // 16 seconds to press button and answer
+      waitTime += 750
+      setTimeout(onCompleteTutorial, waitTime) // make sure bottom buttons are fully faded in before marking tutorial complete
     }
   }, [])
 
@@ -442,141 +420,114 @@ const Question = ({ submitAnswerAndProceed, question, completedTutorial, onCompl
   }
 
   if (!ready) return (
-    <View style={styles.whiteBackdrop}>
-      <LinearGradient
-        style={styles.container}
-        // alternatively rgba(255,0,138,0.25)
-        colors={['#FFADBB', 'rgba(255,181,38,0.25)']}
-      />
-    </View>
+    <View style={styles.container} />
   )
 
-  return (
-    <View style={styles.whiteBackdrop}>
-      <LinearGradient
-        style={styles.container}
-        // alternatively rgba(255,0,138,0.25)
-        colors={['#FFADBB', 'rgba(255,181,38,0.25)']}
+return (
+    <View style={styles.container}>
+      <Modal
+        isVisible={modalVisible}
+        onBackdropPress={() => setModalVisible(false)}
+        animationIn="fadeIn"
+        animationOut="fadeOut"
+        useNativeDriver={true}
       >
-        <Modal
-          isVisible={modalVisible}
-          onBackdropPress={() => setModalVisible(false)}
-          animationIn="fadeIn"
-          animationOut="fadeOut"
-          useNativeDriver={true}
-        >
-          <View style={styles.modalOuter}>
-            <View style={styles.modalInner}>
-              <Text style={styles.modalText}>{modalText}</Text>
-              {modalConfirm ? (
-                <View style={styles.modalButtons}>
-                  <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
-                    <Text style={styles.buttonText}>No</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={styles.confirmButton} activeOpacity={0.3} onPress={modalConfirm}>
-                    <Text style={styles.buttonText}>Yes</Text>
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View style={styles.modalOneButton}>
-                  <TouchableOpacity style={styles.cancelButton} activeOpacity={0.3} onPress={() => setModalVisible(false)}>
-                    <Text style={styles.buttonText}>Ok</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
-            </View>
+        <ModalContents
+          type={"generic"}
+          text={modalText}
+          closeModal={() => setModalVisible(false)}
+          genericModalConfirmCallback={modalConfirm}
+        />
+      </Modal>
+      
+      <FadeInElement
+        shouldFadeIn={currentTutorialElement === "question"}
+        isVisibleWithoutAnimation={completedTutorial}
+      >
+        <Text style={[styles.header, resizeTitle(screenSize)]}>
+          { question.text }
+        </Text>
+      </FadeInElement>
+      
+      <FadeInElement
+        shouldFadeIn={currentTutorialElement === "record"}
+        isVisibleWithoutAnimation={completedTutorial}
+      >
+        <ShakeElement ref={recorderShaker}>
+          <View style={{ marginTop: 30 }}>
+            {Object.values(circles)}
+            <TouchableOpacity
+              style={[styles.audioCircle, resizeAudioCircle(screenSize), started ? (recording ? styles.redCircle : styles.whiteCircle/*yellowCircle*/) : styles.whiteCircle]}
+              onPress={recordPressed}
+              activeOpacity={1}
+            >
+              <Image
+                source={recording ? Pause : Mic}
+                style={{ width: recording ? resizePlayPause(screenSize) : resizeMic(screenSize) }}
+                resizeMode={'contain'}
+              />
+            </TouchableOpacity>
           </View>
-        </Modal>
-        
-        <FadeInElement
-          shouldFadeIn={currentTutorialElement === "question"}
-          isVisibleWithoutAnimation={completedTutorial}
-        >
-          <Text style={[styles.header, resizeTitle(screenSize)]}>
-            { question.text }
-          </Text>
-        </FadeInElement>
-        
-        <FadeInElement
-          shouldFadeIn={currentTutorialElement === "record"}
-          isVisibleWithoutAnimation={completedTutorial}
-        >
-          <ShakeElement ref={recorderShaker}>
-            <Shadow radius={getAudioCircleSize(screenSize)} style={{ marginTop: 30 }}>
-              {Object.values(circles)}
-              <TouchableOpacity
-                style={[styles.audioCircle, resizeAudioCircle(screenSize), started ? (recording ? styles.redCircle : styles.yellowCircle) : styles.whiteCircle]}
-                onPress={recordPressed}
-                activeOpacity={1}
-              >
-                <Image
-                  source={Mic}
-                  style={{ width: resizeMic(screenSize) }}
-                  resizeMode={'contain'}
-                />
-              </TouchableOpacity>
-            </Shadow>
-          </ShakeElement>
+        </ShakeElement>
 
-          <Text style={[styles.timer, recordTime < 240 ? {} : styles.timerWarning]}>
-            { getConvertedRecordTime() } / 5:00
-          </Text>
-        </FadeInElement>
-        
-        <View style={{flex: 1}}>
-          <FadeInElement
-            shouldFadeIn={currentTutorialElement === "checklist"}
-            isVisibleWithoutAnimation={completedTutorial}
-            inheritedFlex={1}
-          >
-            <Checklist type={question.category} ref={checklist} disabledPress={started ? undefined : informBeginRecording} />
-          </FadeInElement>
-        </View>
-
-        <FadeInElement
-          shouldFadeIn={currentTutorialElement === "bottom"}
+        <Text style={[styles.timer, recordTime < 240 ? {} : styles.timerWarning]}>
+          { getConvertedRecordTime() }
+        </Text>
+      </FadeInElement>
+      
+      <View style={{flex: 1}}>
+        <Checklist
+          type={question.category}
+          ref={checklist}
+          disabledPress={started ? undefined : informBeginRecording}
+          shouldFadeInText={currentTutorialElement === "checklist"}
+          shouldFadeInBoxes={currentTutorialElement === "bottom"}
           isVisibleWithoutAnimation={completedTutorial}
-        >
-          <BottomButtons
-            theme={"question"}
-            xPressed={started ? restartRecording : informBeginRecording}
-            checkPressed={started ? submitRecording : informBeginRecording}
-            miscPressed={started ? hearRecording : informBeginRecording}
-            submitting={submitting}
-          />
-        </FadeInElement>
-      </LinearGradient>
+        />
+      </View>
+
+      <FadeInElement
+        shouldFadeIn={currentTutorialElement === "bottom"}
+        isVisibleWithoutAnimation={completedTutorial}
+        style={{width: "100%"}}
+      >
+        <BottomButtons
+          theme={"question"}
+          xPressed={started ? restartRecording : informBeginRecording}
+          checkPressed={started ? submitRecording : informBeginRecording}
+          miscPressed={started ? hearRecording : informBeginRecording}
+          submitting={submitting}
+        />
+      </FadeInElement>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  whiteBackdrop: {
-    backgroundColor: 'white',
-    flex: 1
-  },
-
   container: {
     flex: 1,
     paddingHorizontal: 20,
     // TODO certain devices may need more padding if SafetyArea doesnt account for top bar
     paddingTop: Platform.OS === "ios" ? 30 : 20,
-    alignItems: 'center'
+    alignItems: 'center',
+    backgroundColor: "#191919"
   },
 
   header: {
-    textAlign: 'center'
+    textAlign: 'center',
+    color: '#F0F3F5'
   },
 
   timer: {
     fontSize: 20,
     textAlign: 'center',
-    marginTop: -10,
-    marginBottom: 10
+    marginTop: 10,
+    marginBottom: 10,
+    color: "#F2F5DE"
   },
 
   timerWarning: {
-    color: "#ff1f45"
+    color: "#BB6153"
   },
 
   audioCircle: {
@@ -586,75 +537,18 @@ const styles = StyleSheet.create({
   },
 
   whiteCircle: {
-    backgroundColor: 'white',
+    backgroundColor: '#F0F3F5',
   },
 
-  // TODO is this good color?
   redCircle: {
-    backgroundColor: '#FFADBB',
+    backgroundColor: '#AA5042',
   },
 
   yellowCircle: {
-    backgroundColor: '#FFF3B2',
-  },
-
-  modalInner: {
-    width: 320, 
-  },
-
-  modalOuter: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center'
-  },
-
-  modalText: {
-    fontSize: 25,
-    textAlign: 'center',
-    backgroundColor: 'rgb(255, 212, 198)',
-    borderRadius: 20,
-    overflow: "hidden",
-    padding: 10,
-    paddingVertical: 15,
-    borderColor: '#FFADBB',
+    borderColor: '#FFF689',
+    backgroundColor: '#191919',
     borderWidth: 3,
   },
-
-  buttonText: {
-    fontSize: 25,
-    fontWeight: 'bold'
-  },
-
-  confirmButton: {
-    width: 100,
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: '#FFADBB',
-    borderRadius: 20,
-  },
-
-  cancelButton: {
-    width: 100,
-    alignItems: 'center',
-    padding: 13,
-    borderColor: '#FFADBB',
-    borderWidth: 3,
-    borderRadius: 20,
-    backgroundColor: 'rgb(255, 212, 198)',
-  },
-  
-  modalButtons: {
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    flexDirection: 'row',
-    marginTop: 30
-  },
-  
-  modalOneButton: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 30
-  }
 });
 
 export default Question;

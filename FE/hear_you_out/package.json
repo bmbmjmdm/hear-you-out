@@ -12,6 +12,7 @@
   "dependencies": {
     "@react-native-async-storage/async-storage": "^1.15.14",
     "@react-native-community/checkbox": "^0.5.8",
+    "buffer": "^6.0.3",
     "react": "16.13.1",
     "react-native": "0.63.0",
     "react-native-audio-recorder-player": "^3.2.0",

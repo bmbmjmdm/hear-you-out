@@ -1,14 +1,14 @@
-import {View, Animated, StyleSheet, Text, Dimensions, Easing} from 'react-native'
+import {View, Animated, StyleSheet, Text, Dimensions, Easing, ViewStyle} from 'react-native'
 import React from 'react'
 
 type FadeInElementProps = {
   children: React.ReactElement | React.ReactElement[],
   shouldFadeIn: boolean,
   isVisibleWithoutAnimation?: boolean,
-  inheritedFlex?: number
+  style?: ViewStyle
 }
 
-const FadeInElement = ({ children, shouldFadeIn, isVisibleWithoutAnimation = false, inheritedFlex } : FadeInElementProps) => {
+const FadeInElement = ({ children, shouldFadeIn, isVisibleWithoutAnimation = false, style = {} } : FadeInElementProps) => {
   const curOpacity = React.useRef(new Animated.Value(0)).current
 
   React.useEffect(() => {
@@ -22,8 +22,8 @@ const FadeInElement = ({ children, shouldFadeIn, isVisibleWithoutAnimation = fal
   }, [shouldFadeIn])
 
   return (
-    <Animated.View style={{opacity: isVisibleWithoutAnimation ? 1 : curOpacity, flex: inheritedFlex}}>
-      <View style={styles.disableClicks} />
+    <Animated.View style={[{opacity: isVisibleWithoutAnimation ? 1 : curOpacity}, style]}>
+      <View style={shouldFadeIn || isVisibleWithoutAnimation ? {} : styles.disableClicks} />
       { children }
     </Animated.View>
   )

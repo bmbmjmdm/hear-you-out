@@ -16,7 +16,7 @@ import Question from './Question'
 import Answer from './Answer'
 import PermissionsAndroid from 'react-native-permissions';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { APIQuestion, getAnswer, getQuestion, rateAnswer, submitAnswer, reportAnswer, clearTempAnswerList } from './Network'
+import { APIQuestion, getAnswer, getQuestion, rateAnswer, submitAnswer, reportAnswer, clearTempAnswerList, getAnswerStats, APIAnswerStats } from './Network'
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NoAnswers from './NoAnswers'
 import { ScreenSize, SizeContext } from './helpers'
@@ -41,8 +41,11 @@ const App = () => {
   const [cards2, setCards2] = React.useState([])
   const [topStack, setTopStack] = React.useState(1)
   const [question, setQuestion] = React.useState<APIQuestion>({})
+  const [stats, setStats] = React.useState<APIAnswerStats>({})
   const [completedQuestionTutorial, setCompletedQuestionTutorial ] = React.useState(false)
   const [completedAnswerTutorial, setCompletedAnswerTutorial ] = React.useState(false)
+  const [completedFlagTutorial, setCompletedFlagTutorial ] = React.useState(false)
+  const [completedShareTutorial, setCompletedShareTutorial ] = React.useState(false)
   const appState = React.useRef(AppState.currentState);
   const appStateListener = React.useRef(null);
 
@@ -78,6 +81,10 @@ const App = () => {
       checkQT().catch((e) => checkQT())
       let checkAT = () => AsyncStorage.getItem("completedAnswerTutorial").then((val) => setCompletedAnswerTutorial(JSON.parse(val) || false))
       checkAT().catch((e) => checkAT())
+      let checkFT = () => AsyncStorage.getItem("completedFlagTutorial").then((val) => setCompletedFlagTutorial(JSON.parse(val) || false))
+      checkFT().catch((e) => checkFT())
+      let checkST = () => AsyncStorage.getItem("completedShareTutorial").then((val) => setCompletedShareTutorial(JSON.parse(val) || false))
+      checkST().catch((e) => checkST())
 
       // load last answered question so we make sure not to re-ask them it
       const lastQParsed = await loadLastQ()
@@ -187,6 +194,9 @@ const App = () => {
       const newQ = await getQuestion()
       const curQuestion = previousQuestionForced || question
       if (curQuestion.key !== newQ.key && loadedQuestion?.key !== newQ.key) {
+        // TODO get the previous answer's info
+        const oldAnswerStats = await getAnswerStats()
+        setStats(oldAnswerStats)
         setQuestion(newQ)
         // we completely override the card stack since we only allow 1 card per stack right now
         const cardSetterCallback = (oldCards) => ["Question"]
@@ -262,6 +272,7 @@ const App = () => {
   const reloadStacks = () => {
     // we use setImmediate as a replacement of nextTick. We're trying to avoid collision with other state setters
     setImmediate(async () => {
+      setDisableSwipes(true)
       setCards1([])
       setCards2([])
       setTopStack(1)
@@ -289,6 +300,22 @@ const App = () => {
     })
   }
 
+  const onCompleteFlagTutorial = () => {
+    setCompletedFlagTutorial(true)
+    AsyncStorage.setItem("completedFlagTutorial", JSON.stringify(true)).catch((e) => {
+      // try again
+      AsyncStorage.setItem("completedFlagTutorial", JSON.stringify(true))
+    })
+  }
+
+  const onCompleteShareTutorial = () => {
+    setCompletedShareTutorial(true)
+    AsyncStorage.setItem("completedShareTutorial", JSON.stringify(true)).catch((e) => {
+      // try again
+      AsyncStorage.setItem("completedShareTutorial", JSON.stringify(true))
+    })
+  }
+
   // since Swiper doesnt support adding more cards to an existing stack, we use 2 here to simulate a single stack. Whichever one is "beneath" gets refreshed and reloaded while the one "on top" is displayed
   // once the one on top runs out, the one below is shown and they swap jobs
   return (
@@ -296,20 +323,49 @@ const App = () => {
       <SizeContext.Provider value={screenSize}>
         <View style={styles.loadingScreen}>
           {/* For now we dont set `animating` based on `loadStack`. If we need performance boost, maybe try that */}
-          <ActivityIndicator size="large" color="#A9C5F2" />
+          <ActivityIndicator size="large" color="#F0F3F5" />
         </View>
         {cards1.length ?
           <Swiper
             cards={cards1}
             renderCard={(card) => {
               if (card === 'Question') {
-                return <Question submitAnswerAndProceed={submitAnswerAndProceed} question={question} completedTutorial={completedQuestionTutorial} onCompleteTutorial={onCompleteQuestionTutorial} onError={reloadStacks} />
+                return (
+                  <Question
+                    submitAnswerAndProceed={submitAnswerAndProceed}
+                    question={question}
+                    stats={stats}
+                    completedTutorial={completedQuestionTutorial}
+                    onCompleteTutorial={onCompleteQuestionTutorial}
+                    onError={reloadStacks}
+                    isShown={topStack === 1}
+                  />
+                )
               }
               else if (card === 'None') {
                 return <NoAnswers setDisableSwipes={setDisableSwipes} isShown={topStack === 1} />
               }
               else {
-                return <Answer setDisableSwipes={setDisableSwipes} answerAudioData={card.data} id={card.id} question={card.questionText} completedTutorial={completedAnswerTutorial} onCompleteTutorial={onCompleteAnswerTutorial} onApprove={() => swiper1.current.swipeRight()} onDisapprove={() => swiper1.current.swipeLeft()} onPass={() => swiper1.current.swipeTop()} onReport={() => swiper1.current.swipeBottom()} onError={reloadStacks} />
+                return (
+                  <Answer
+                    setDisableSwipes={setDisableSwipes}
+                    answerAudioData={card.data}
+                    id={card.id}
+                    question={card.questionText}
+                    completedTutorial={completedAnswerTutorial}
+                    onCompleteTutorial={onCompleteAnswerTutorial}
+                    onApprove={() => swiper1.current.swipeRight()}
+                    onDisapprove={() => swiper1.current.swipeLeft()}
+                    onPass={() => swiper1.current.swipeTop()}
+                    onReport={() => swiper1.current.swipeBottom()}
+                    onError={reloadStacks}
+                    isShown={topStack === 1}
+                    completedFlagTutorial={completedFlagTutorial}
+                    completedShareTutorial={completedShareTutorial}
+                    onCompleteFlagTutorial={onCompleteFlagTutorial}
+                    onCompleteShareTutorial={onCompleteShareTutorial}
+                  />
+                )
               }
             }}
             onSwiped={() => {}}
@@ -363,13 +419,42 @@ const App = () => {
             cards={cards2}
             renderCard={(card) => {
               if (card === 'Question') {
-                return <Question submitAnswerAndProceed={submitAnswerAndProceed} question={question} completedTutorial={completedQuestionTutorial} onCompleteTutorial={onCompleteQuestionTutorial} onError={reloadStacks} />
+                return (
+                  <Question
+                    submitAnswerAndProceed={submitAnswerAndProceed}
+                    question={question}
+                    stats={stats}
+                    completedTutorial={completedQuestionTutorial}
+                    onCompleteTutorial={onCompleteQuestionTutorial}
+                    onError={reloadStacks}
+                    isShown={topStack === 2}
+                  />
+                )
               }
               else if (card === 'None') {
                 return <NoAnswers setDisableSwipes={setDisableSwipes} isShown={topStack === 2} />
               }
               else {
-                return <Answer setDisableSwipes={setDisableSwipes} answerAudioData={card.data} id={card.id} question={card.questionText} completedTutorial={completedAnswerTutorial} onCompleteTutorial={onCompleteAnswerTutorial} onApprove={() => swiper2.current.swipeRight()} onDisapprove={() => swiper2.current.swipeLeft()} onPass={() => swiper2.current.swipeTop()} onReport={() => swiper2.current.swipeBottom()} onError={reloadStacks} />
+                return (
+                  <Answer
+                    setDisableSwipes={setDisableSwipes}
+                    answerAudioData={card.data}
+                    id={card.id}
+                    question={card.questionText}
+                    completedTutorial={completedAnswerTutorial}
+                    onCompleteTutorial={onCompleteAnswerTutorial}
+                    onApprove={() => swiper2.current.swipeRight()}
+                    onDisapprove={() => swiper2.current.swipeLeft()}
+                    onPass={() => swiper2.current.swipeTop()}
+                    onReport={() => swiper2.current.swipeBottom()}
+                    onError={reloadStacks}
+                    isShown={topStack === 2}
+                    completedFlagTutorial={completedFlagTutorial}
+                    completedShareTutorial={completedShareTutorial}
+                    onCompleteFlagTutorial={onCompleteFlagTutorial}
+                    onCompleteShareTutorial={onCompleteShareTutorial}
+                  />
+                )
               }
             }}
             onSwiped={() => {}}
@@ -433,7 +518,8 @@ const styles = StyleSheet.create({
     width: "100%",
     height: "100%",
     alignItems: 'center',
-    justifyContent: 'center'
+    justifyContent: 'center',
+    backgroundColor: '#191919'
   }
 });
 

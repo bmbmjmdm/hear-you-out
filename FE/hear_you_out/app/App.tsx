@@ -272,6 +272,7 @@ const App = () => {
   const reloadStacks = () => {
     // we use setImmediate as a replacement of nextTick. We're trying to avoid collision with other state setters
     setImmediate(async () => {
+      setDisableSwipes(true)
       setCards1([])
       setCards2([])
       setTopStack(1)

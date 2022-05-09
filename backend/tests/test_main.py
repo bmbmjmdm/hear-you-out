@@ -80,20 +80,22 @@ def client(app: FastAPI) -> TestClient:
 #        into a given test? (do we actually want to do this?)
 #   - could do this by returning parameterized closure!
 
+# TODO - actually want a test to check prod db for the correct formatted questions
+
 @pytest.fixture
 def set_1_question(test_dbs, test_drives) -> QuestionModel:
     # this doesn't add a q per se, it sets entire list to single q
     key = 'set_1_question key'
     text = 'none'
-    category = 'n/a'
+    checklist = ['n/a']
 
     # yaml data model:
     # questions:
     # - key: 1
     #   text: "What is one idea, novel or otherwise, that you'd like more people to hear about?"
-    #   category: "type 1"
+    #   checklist: ["item 1"]
 
-    qm = QuestionModel(key=key, text=text, category=category)
+    qm = QuestionModel(key=key, text=text, checklist=checklist)
     # model_dicts = [QuestionModel(*q).dict() for q in questions]
     yaml_string = yaml.dump({'questions': [qm.dict()]}, sort_keys=False) # don't sort keys so key remains first
     

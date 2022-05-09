@@ -34,8 +34,8 @@ except:
 # - - alt to dev/prod env flag, could and/or read it from path (eg as path prefix)
 # - # improve api docs thusly: https://fastapi.tiangolo.com/tutorial/path-operation-configuration
 # - which endpoints should have associated pydantic models? all of them? 
-# - new endpoint for returning agrees, disagrees, abstains for a given answer ID
 # - add openAPI config info, see: https://lyz-code.github.io/blue-book/fastapi/
+# - return checklist with question based on it's category
 
 # load local env if we're running locally
 if os.environ.get('DETA_RUNTIME') is None:
@@ -78,11 +78,11 @@ def get_dbs():
 class QuestionModel(BaseModel):
     key: str
     text: str
-    category: str
+    checklist: List[str]
 
 class QuestionDB(QuestionModel):
     num_asks: int = 0
-    
+
 class SubmitAnswerPost(BaseModel):
     audio_data: bytes # should this be str since its b64 encoded? maybe create new Type
     question_uuid: str # uuid.UUID
@@ -229,9 +229,16 @@ async def submit_answer(ans: SubmitAnswerPost,
 
 # wilson score confidence interval for binomial distributions
 # any value in also taking into account people who didn't vote?
-# TODO need to add continuity correction bc n will often be small (< 40)
-# TODO take into account max upvotes and downvotes to find controversial answers too,
+# TODO
+# - need to add continuity correction bc n will often be small (< 40)
+# - take into account max upvotes and downvotes to find controversial answers too,
 #   'improved wilson score': https://arxiv.org/ftp/arxiv/papers/1809/1809.07694.pdf
+# - or do personalized recommendation? would this be significantly more effective?
+#   "the people who normally vote like you did not like this, so you probably won't"
+#   Bayesian Personalized Ranking in Python: https://github.com/shah314/BPR
+#   ..maybe use this later when # users and # answers higher? but might be good to store
+#   stats on the user from the beginning so we have enough data for it to work well later
+#   -> Users db that tracks rows of [phone_id, answer_uuid, user's rating of answer]
 def calculate_wilson(p, n, z = 1.96):
     denominator = 1 + z**2/n
     centre_adjusted_probability = p + z*z / (2*n)

@@ -152,9 +152,9 @@ const Answer = ({
           const absVal = Math.abs(val)
           pcmData.push(absVal)
         }
-        // we find an "exemplar amplitude", representing a 66th percentile loudness
+        // we find an "exemplar amplitude", representing a 75th percentile loudness
         const sortedAmplitudes = [...pcmData].sort()
-        const exemplarIndex = Math.round(sortedAmplitudes.length * 2 / 3)
+        const exemplarIndex = Math.round(sortedAmplitudes.length * 3 / 4)
         setLoudExampleAmplitude(sortedAmplitudes[exemplarIndex])
         // this is the resulting audio data array, higher value means higher amplitude
         setMeterData(pcmData)

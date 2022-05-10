@@ -475,9 +475,9 @@ return (
         </Text>
       </FadeInElement>
       
-      <View style={{flex: 1}}>
+      <View style={styles.checkListContainer}>
         <Checklist
-          type={question.category}
+          list={question.checklist}
           ref={checklist}
           disabledPress={started ? undefined : informBeginRecording}
           shouldFadeInText={currentTutorialElement === "checklist"}
@@ -548,6 +548,13 @@ const styles = StyleSheet.create({
     borderColor: '#FFF689',
     backgroundColor: '#191919',
     borderWidth: 3,
+  },
+
+  checkListContainer: {
+    flex: 1,
+    width: "100%",
+    paddingLeft: 10,
+    paddingBottom: 10,
   },
 });
 

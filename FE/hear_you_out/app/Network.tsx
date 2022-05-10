@@ -12,7 +12,7 @@ const fetchWithRetry = async (url, options) => {
 }
 
 export type APIQuestion = {
-  category: string,
+  checklist: Array<string>,
   key: string,
   text: string
 }

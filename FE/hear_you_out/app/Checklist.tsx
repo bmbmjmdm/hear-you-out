@@ -15,14 +15,15 @@ interface ChecklistProps {
   shouldFadeInText: boolean,
   shouldFadeInBoxes: boolean,
   isVisibleWithoutAnimation: boolean,
-  type: string,
+  list: Array<string>,
   disabledPress?: Function
 }
 
-const Checklist = ({type, disabledPress, shouldFadeInText, shouldFadeInBoxes, isVisibleWithoutAnimation} : ChecklistProps, ref) => {
+const Checklist = ({list, disabledPress, shouldFadeInText, shouldFadeInBoxes, isVisibleWithoutAnimation} : ChecklistProps, ref) => {
   const allRefs = React.useRef({}).current
-  let itemList = checklist_map[type]
-  if (!itemList) itemList = checklist_map["other"]
+  if (!list) list = [
+    "Answer the question with as much detail as possible",
+  ]
   const itemComponents = []
 
   // expose a function that goes through all items in the checklist to see if theyre all checked
@@ -46,10 +47,10 @@ const Checklist = ({type, disabledPress, shouldFadeInText, shouldFadeInBoxes, is
   }))
   
   // construct our checklist items from our known checklist map + type
-  for (const i in itemList) {
+  for (const i in list) {
     itemComponents.push(
       <CheckItemWithRef
-        text={itemList[i]}
+        text={list[i]}
         key={i}
         ref={curRef => allRefs[i] = curRef}
         disabledPress={disabledPress}
@@ -72,18 +73,6 @@ const Checklist = ({type, disabledPress, shouldFadeInText, shouldFadeInBoxes, is
     </ScrollView>
   )
 };
-
-// backend tells us the type, we know the checklist items based on this type
-const checklist_map = {
-  political: [
-    "Answer the question",
-    "Provide supporting arguments and facts. Cite specific sources if possible (ex: name of website/newspaper)",
-    "Give your understanding of the Opposing argument(s) and why you think they're wrong"
-  ],
-  other: [
-    "Answer the question with as much detail as possible",
-  ],
-}
 
 // a single item with a check and text
 const CheckItem = ({text, disabledPress, shouldFadeInText, shouldFadeInBox, isVisibleWithoutAnimation}, ref) => {

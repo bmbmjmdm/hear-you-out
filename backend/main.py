@@ -7,7 +7,7 @@ import datetime
 from math import sqrt
 from pydantic import BaseModel
 from functools import lru_cache
-from typing import List, Optional, Union
+from typing import List, Optional, Union, Iterable
 from random import uniform, choice
 from deta import Deta, Drive, Base
 from discord_webhook import DiscordWebhook
@@ -34,8 +34,13 @@ except:
 # - - https://fastapi.tiangolo.com/advanced/settings/
 # - - alt to dev/prod env flag, could and/or read it from path (eg as path prefix)
 # - # improve api docs thusly: https://fastapi.tiangolo.com/tutorial/path-operation-configuration
-# - which endpoints should have associated pydantic models? all of them? 
+# - which endpoints should have associated pydantic models?
+# - - all of them? no, only the ones that return content, not the ones that just ack
 # - add openAPI config info, see: https://lyz-code.github.io/blue-book/fastapi/
+# - add api version, like https://christophergs.com/tutorials/ultimate-fastapi-tutorial-pt-8-project-structure-api-versioning/
+# - - would need to break api compatibility by switching to this structure,
+#     hopefully dale wouldn't mind
+
 
 # load local env if we're running locally
 if os.environ.get('DETA_RUNTIME') is None:
@@ -59,6 +64,7 @@ deta = Deta(Secret_key)
 # - can I do anything like https://fastapi.tiangolo.com/tutorial/sql-databases/
 # - since I use db and drive together almost always,
 #   maybe create a pydantic schema for them and use it as a single Dependency
+# - move them into separate deps pkg? like https://christophergs.com/tutorials/ultimate-fastapi-tutorial-pt-8-project-structure-api-versioning/
 @lru_cache
 def get_drives():
     questions_drive = Drive("questions")
@@ -235,12 +241,26 @@ async def submit_answer(ans: SubmitAnswerPost,
 #   'improved wilson score': https://arxiv.org/ftp/arxiv/papers/1809/1809.07694.pdf
 # - reddit's comment rank is based on wilson score, 85% confidence: https://medium.com/hacking-and-gonzo/how-reddit-ranking-algorithms-work-ef111e33d0d9
 # - - we want to do this, but also take into account downvotes as an...equal indicator ofgoodness? so are they both upvotes, essentially? just activity/reactiveness?
+# - - - but what if lack of vote could be an indicator of goodness of answer? bc they don't know whether to upvote or downvote bc it had good and bad qualities
 # - or do personalized recommendation? would this be significantly more effective?
 #   "the people who normally vote like you did not like this, so you probably won't"
 #   Bayesian Personalized Ranking in Python: https://github.com/shah314/BPR
+#     (seemingly better lib for BPR: https://github.com/lyst/lightfm)
 #   ..maybe use this later when # users and # answers higher? but might be good to store
 #   stats on the user from the beginning so we have enough data for it to work well later
 #   -> Users db that tracks rows of [phone_id, answer_uuid, user's rating of answer]
+# - - collaborative filtering looks like the most relevant type of recommender system (or hybrid of it)
+# - - - https://en.wikipedia.org/wiki/Collaborative_filtering
+# - - - might require too much data per Answer+User to be useful at the start?
+# - - hmm could try clustering/categorizing users and answers and then matching that way
+# - - presumably want recommender distribution to have a long tail (recommend Answers with low-historical-data)
+# - - hmm wonder if we should include implicit context in the data...kinda creepy
+# - what kind of algo would work well for 10, 100, 1000 people (given unknown + diff demographic distributions
+# - - (what's the minimum model complexity to achieve the results we want)
+# - - - could try writing down the results we want for different scenarios?
+# - - - - actively prevent echo chamber
+# - - - - show users equal mix of answers they agree/disagree with (and abstain from?)
+# - - - - - relattive to user demographic distribution, bucket answers via "dis/liked more than usual"
 def calculate_wilson(p, n, z = 1.96):
     denominator = 1 + z**2/n
     centre_adjusted_probability = p + z*z / (2*n)
@@ -265,12 +285,7 @@ def calculate_popularity(num_agrees, num_disagrees):
 # skip past the banned ones
 # categorize popularity
 def filter_answers_from_db(items: List[AnswerTableSchema], question_uuid: str, seen_answer_uuids: List[str]):
-    pop = []
-    unpop = []
-    contro = []
-    seen_pop = []
-    seen_unpop = []
-    seen_contro = []
+    pop, unpop, contro, seen_pop, seen_unpop, seen_contro = [[] for _ in range(6)]
     for item in items:
         #print(item, question_uuid)
         if item.question_uuid != question_uuid:
@@ -293,39 +308,26 @@ def filter_answers_from_db(items: List[AnswerTableSchema], question_uuid: str, s
                 seen_contro.append(item)
             else:
                 contro.append(item)
-        elif popularity > 0:
+        else:
             if item.key in seen_answer_uuids:
                 seen_pop.append(item)
             else:
                 pop.append(item)
-        else:
-            ## todo throw instead of return? think through how error should be handled
-            return PlainTextResponse("popularity invalid", status_code=500)
 
     # TODO check for emptiness here? to prevent typeerror unpacking None
     return pop, unpop, contro, seen_pop, seen_unpop, seen_contro
 
-# returns diff data model if no answers found (2nd happy path)
-@app.post("/getAnswer", response_model=Union[AnswerListen,NoAnswersResponse])
-async def get_answer(question_uuid: str,
-                     seen_answer_uuids: List[str],
-                     drive: dict = Depends(get_drives),
-                     db: dict = Depends(get_dbs)):
-    # filter through all answers in DB once.
-    # want all of them to get an equal random distribution.
-    # not bothering writing a query for fetch cuz it feels btter to have all
-    #   filter logic in the same place.
-    # categorize into popular, controversial, unpopular during the single pass
-    res = db['answers'].fetch()
-    #print(res, res.count)
-    if res.count == 0:
-        return NoAnswersResponse()
+def tHe_alGoRitHm(db_stream: Iterable[List[AnswerTableSchema]], 
+                  question_uuid: str,
+                  seen_answer_uuids: List[str]):
 
-    answers_items = [AnswerTableSchema(**item) for item in res.items]
-    pop, unpop, contro, seen_pop, seen_unpop, seen_contro = filter_answers_from_db(answers_items, question_uuid, seen_answer_uuids)
-    while res.last: # Todo when will this be too slow?
-        # TODO ought to unit test this inner logic
-        res = db['answers'].fetch(last=res.last)
+    # answers_items = db_stream()
+    # if empty(answers_items):
+    #     return NoAnswersResponse()
+
+    # todo fix this data mode...
+    pop, unpop, contro, seen_pop, seen_unpop, seen_contro = [[] for _ in range(6)]
+    for answers_items in db_stream(): # Todo when will this be too slow?
         pop2, unpop2, contro2, seen_pop2, seen_unpop2, seen_contro2 = filter_answers_from_db(answers_items, question_uuid, seen_answer_uuids)
         pop += pop2
         unpop += unpop2
@@ -355,15 +357,31 @@ async def get_answer(question_uuid: str,
         #distribution["dist"+calculate_popularity()}"
 
     a = choice(pop+unpop+contro)
-    # cat = choice(range(3)) # 0, 1, 2
-    # if cat == 0:
-    #     a = choice(pop)
-    # elif cat == 1:
-    #     a = choice(unpop)
-    # elif cat == 2:
-    #     a = choice(contro)
-    # else:
-    #     return PlainTextResponse("wat", status_code=500)
+    return a
+    
+# returns diff data model if no answers found (2nd happy path)
+@app.post("/getAnswer", response_model=Union[AnswerListen,NoAnswersResponse])
+async def get_answer(question_uuid: str,
+                     seen_answer_uuids: List[str],
+                     drive: dict = Depends(get_drives),
+                     db: dict = Depends(get_dbs)):
+    
+    # filter through all answers in DB once.
+    # want all of them to get an equal random distribution.
+    # not bothering writing a query for fetch cuz it feels btter to have all
+    #   filter logic in the same place.
+    # categorize into popular, controversial, unpopular during the single pass
+    def db_stream() -> Iterable[List[AnswerTableSchema]]:
+        res = db['answers'].fetch()
+        answers_items = [AnswerTableSchema(**item) for item in res.items]
+        yield answers_items
+        while res.last: # Todo when will this be too slow?
+            # TODO ought to unit test this inner logic
+            res = db['answers'].fetch(last=res.last)
+            answers_items = [AnswerTableSchema(**item) for item in res.items]
+            yield answers_items
+        
+    a = tHe_alGoRitHm(db_stream, question_uuid, seen_answer_uuids)
     
     # get the selected answer
     answer_uuid = a.key

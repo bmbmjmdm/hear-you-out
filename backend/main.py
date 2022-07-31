@@ -24,6 +24,7 @@ except:
 #from fastapi.responses import HTMLResponse, StreamingResponse
 
 ### TODO
+# - update yaml to map category name to checklist (node anchors?)
 # - qetQuestion algo
 # - getAnswer algo
 # - tests (see todo in test_main)
@@ -35,7 +36,6 @@ except:
 # - # improve api docs thusly: https://fastapi.tiangolo.com/tutorial/path-operation-configuration
 # - which endpoints should have associated pydantic models? all of them? 
 # - add openAPI config info, see: https://lyz-code.github.io/blue-book/fastapi/
-# - return checklist with question based on it's category
 
 # load local env if we're running locally
 if os.environ.get('DETA_RUNTIME') is None:
@@ -233,6 +233,8 @@ async def submit_answer(ans: SubmitAnswerPost,
 # - need to add continuity correction bc n will often be small (< 40)
 # - take into account max upvotes and downvotes to find controversial answers too,
 #   'improved wilson score': https://arxiv.org/ftp/arxiv/papers/1809/1809.07694.pdf
+# - reddit's comment rank is based on wilson score, 85% confidence: https://medium.com/hacking-and-gonzo/how-reddit-ranking-algorithms-work-ef111e33d0d9
+# - - we want to do this, but also take into account downvotes as an...equal indicator ofgoodness? so are they both upvotes, essentially? just activity/reactiveness?
 # - or do personalized recommendation? would this be significantly more effective?
 #   "the people who normally vote like you did not like this, so you probably won't"
 #   Bayesian Personalized Ranking in Python: https://github.com/shah314/BPR

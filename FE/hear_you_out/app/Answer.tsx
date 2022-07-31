@@ -153,6 +153,7 @@ const Answer = ({
           pcmData.push(absVal)
         }
         // we find an "exemplar amplitude", representing a 75th percentile loudness
+        // TODO fix this when the array is lopsided, aka 75%+ is quiet or 75%+ is loud
         const sortedAmplitudes = [...pcmData].sort()
         const exemplarIndex = Math.round(sortedAmplitudes.length * 3 / 4)
         setLoudExampleAmplitude(sortedAmplitudes[exemplarIndex])

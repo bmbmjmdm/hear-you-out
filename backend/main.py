@@ -319,7 +319,7 @@ def filter_answers_from_db(items: List[AnswerTableSchema], question_uuid: str, s
 
 def tHe_alGoRitHm(db_stream: Iterable[List[AnswerTableSchema]], 
                   question_uuid: str,
-                  seen_answer_uuids: List[str]):
+                  seen_answer_uuids: List[str]) -> Union[NoAnswersResponse,AnswerTableSchema]:
 
     # answers_items = db_stream()
     # if empty(answers_items):
@@ -382,6 +382,9 @@ async def get_answer(question_uuid: str,
             yield answers_items
         
     a = tHe_alGoRitHm(db_stream, question_uuid, seen_answer_uuids)
+    if isinstance(a, NoAnswersResponse): # better way to propagate this?
+        return a                         #   functional core monad?
+
     
     # get the selected answer
     answer_uuid = a.key

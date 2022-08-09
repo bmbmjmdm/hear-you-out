@@ -13,5 +13,5 @@ hear-you-out/backend$ `pytest`
 
 python -m venv .venv
 source .venv/bin/activate
-python -m pip install -r requirements.txt local_requirements.txt
+python -m pip install -r requirements.txt -r local_requirements.txt
 

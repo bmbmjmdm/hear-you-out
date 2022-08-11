@@ -24,6 +24,10 @@ except:
 #from fastapi.responses import HTMLResponse, StreamingResponse
 
 ### TODO
+# - try out python lsp(/alternative) for docs, mvoement, code completions
+# - - C-c C-d for elpy docs
+# - - C-c C-s elpy rgrep symbol
+# - - jedi and company for code completion i think
 # - update yaml to map category name to checklist (node anchors?)
 # - qetQuestion algo
 # - getAnswer algo
@@ -41,6 +45,11 @@ except:
 # - - would need to break api compatibility by switching to this structure,
 #     hopefully dale wouldn't mind
 
+from .config import Settings
+
+@lru_cache
+def get_settings():
+    return Settings()
 
 # load local env if we're running locally
 if os.environ.get('DETA_RUNTIME') is None:
@@ -147,12 +156,14 @@ async def root():
 
 # return 500 if no questions (vs 200 with a FailState response model)
 @app.get("/getQuestion", response_model=QuestionModel)
-async def get_question(drive: dict = Depends(get_drives), db: dict = Depends(get_dbs)):
+async def get_question(drive: dict = Depends(get_drives),
+                       db: dict = Depends(get_dbs),
+                       settings: Settings = Depends(get_settings)):
     # get today's question...how? from drive? from base? from internet endpoint? from file?/src
     # - think i want to go with base (need them anwyay). and can dev separate micro to insert Qs to it! or separate endpoint, with special auth?
     # - cron job to delete old files 30min after question change (if they are on a schedule)
 
-    question_list_stream = drive['questions'].get('list of questions.yaml')
+    question_list_stream = drive['questions'].get(settings.qfilename)
     if question_list_stream is None:
         return PlainTextResponse("what's a question, really?", status_code=500)
 

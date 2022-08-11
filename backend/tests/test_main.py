@@ -11,6 +11,12 @@ from fastapi.testclient import TestClient
 
 from ..main import QuestionModel, NoAnswersResponse, AnswerListen
 
+from ..config import Settings
+
+def get_settings():
+    return Settings()
+
+
 # check out pytest.monkeypatch? eg https://testdriven.io/blog/fastapi-crud/
 
 # - want to play with postman to construct flows, and tests
@@ -83,11 +89,12 @@ def client(app: FastAPI) -> TestClient:
 # TODO - actually want a test to check prod db for the correct formatted questions
 
 @pytest.fixture
-def set_1_question(test_dbs, test_drives) -> QuestionModel:
+def set_1_question(test_dbs, test_drives,
+                   settings: Settings = get_settings() ) -> QuestionModel:
     # this doesn't add a q per se, it sets entire list to single q
     key = 'set_1_question key'
     text = 'none'
-    checklist = ['n/a']
+    checklist = ['a', 'b']
 
     # yaml data model:
     # questions:
@@ -99,7 +106,7 @@ def set_1_question(test_dbs, test_drives) -> QuestionModel:
     # model_dicts = [QuestionModel(*q).dict() for q in questions]
     yaml_string = yaml.dump({'questions': [qm.dict()]}, sort_keys=False) # don't sort keys so key remains first
     
-    qfilename = 'list of questions.yaml'
+    qfilename = settings.qfilename
     qfile = test_drives['questions'].get(qfilename)
     if qfile is None:
         test_drives['questions'].put(qfilename, yaml_string)
@@ -323,6 +330,21 @@ def test_get_answer_no_answers(client: TestClient,
 
     assert response.status_code == 200
     assert response.json() == NoAnswersResponse().dict()
+
+def test_question_yaml_parsing(set_1_question: QuestionModel,
+                               test_drives,
+                               settings: Settings = get_settings()) -> None:
+    qfilename = settings.qfilename
+    qfilecontents = test_drives['questions'].get(qfilename).read().decode().strip()
+    if qfilecontents is None:
+        raise Exception(f"{qfilename} not in drive, but we assume it is")
+
+    questions_yaml = yaml.safe_load(qfilecontents)
+    questions = questions_yaml['questions']
+    q = questions[0]
+    q_model = QuestionModel(**q)
+    assert True
+
 
 def test_get_answer(client: TestClient,
                     getAnswer: Callable,

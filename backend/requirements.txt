@@ -2,6 +2,7 @@ deta
 pyyaml
 fastapi
 pydantic
+pydantic-yaml
 python-dotenv
 discord_webhook
 

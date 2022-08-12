@@ -9,7 +9,7 @@ from deta import Drive, Base
 from fastapi import FastAPI, Response
 from fastapi.testclient import TestClient
 
-from ..main import QuestionModel, NoAnswersResponse, AnswerListen
+from ..main import QuestionModel, NoAnswersResponse, AnswerListen, yaml_to_questions
 
 from ..config import Settings
 
@@ -92,7 +92,7 @@ def client(app: FastAPI) -> TestClient:
 @pytest.fixture
 def set_1_question(test_dbs, test_drives,
                    settings: Settings = get_settings() ) -> QuestionModel:
-    # TODO update this to use local tests/question_list_1_entry.yaml
+    # should I update this to use local tests/question_list_1_entry.yaml
     # this doesn't add a q per se, it sets entire list to single q
     key = 'set_1_question key'
     text = 'none'
@@ -335,19 +335,12 @@ def test_get_answer_no_answers(client: TestClient,
 
 # read local questions.yaml and ensure it parses
 def test_question_yaml_parsing(settings: Settings = get_settings()):
-    def parses_into_question_model(qfilecontents: str) -> bool:
-        if qfilecontents is None:
-            raise Exception(f"empty question file")
-
-        questions_yaml = yaml.safe_load(qfilecontents)
-        questions = questions_yaml['questions']
-        q = questions[0]
-        q_model = QuestionModel(**q)
-        return True
-
     with open(settings.local_qpath, 'r') as f:
         qfilecontents = f.read()
-        assert parses_into_question_model(qfilecontents)
+        qm = QuestionModel(**(yaml_to_questions(qfilecontents))[0])
+        assert True
+        return
+    assert False
 
 # assert schema of local questions.yaml matches that of prod
 ### CAREFUL PROD DATABASE
@@ -359,17 +352,14 @@ def test_question_list_schema_in_sync(
 
     remote_qpath = settings.qfilename
     qcontents_prod = get_drives()['questions'].get(remote_qpath).read().decode().strip()
-    #qcontents_test = test_drives['questions'].get(remote_qpath).read().decode().strip()
+    prod_model = QuestionModel(**(yaml_to_questions(qcontents_prod)[0]))
 
-    ### LEFT OFF getting schema of each yaml blob and asserting they're equal
-    # (realized it doesn't make sense to check test question list bc that's inserted
-    #  by set_1_question)
-    assert False
-    
     with open(settings.local_qpath, 'r') as f:
-        qfilecontents = f.read()
-        assert qcontents_local == qcontents_test
-    
+        qcontents_local = f.read()
+
+    local_model = QuestionModel(**(yaml_to_questions(qcontents_local)[0]))
+
+    assert local_model.schema() == prod_model.schema()
 
 def test_get_answer(client: TestClient,
                     getAnswer: Callable,

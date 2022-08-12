@@ -6,6 +6,7 @@ import datetime
 
 from math import sqrt
 from pydantic import BaseModel
+from pydantic_yaml import YamlModel
 from functools import lru_cache
 from typing import List, Optional, Union, Iterable
 from random import uniform, choice
@@ -28,6 +29,7 @@ except:
 # - - C-c C-d for elpy docs
 # - - C-c C-s elpy rgrep symbol
 # - - jedi and company for code completion i think
+# - - C-c C-e for symbol multi-edit
 # - update yaml to map category name to checklist (node anchors?)
 # - qetQuestion algo
 # - getAnswer algo
@@ -90,7 +92,7 @@ def get_dbs():
 #questions_drive, answers_drive = get_drives()
 #questions_db, answers_db = get_dbs()
 
-class QuestionModel(BaseModel):
+class QuestionModel(YamlModel):
     key: str
     text: str
     checklist: List[str]
@@ -140,6 +142,14 @@ def gen_uuid(): # TODO
     good_enough = good_enough.replace(".","") # remove the dot
     return f"{good_enough}"
 
+def yaml_to_questions(contents_yaml: str) -> List[str]:
+    if contents_yaml is None:
+        raise Exception(f"empty file")
+
+    questions_yaml = yaml.safe_load(contents_yaml)
+    questions = questions_yaml['questions']
+    return questions
+
 # handle all exceptions thrown in code below with a 500 http response
 # todo test what happens when this isn't here
 # todo maybe do this in prod but not dev?
@@ -170,8 +180,8 @@ async def get_question(drive: dict = Depends(get_drives),
     data_streamed = question_list_stream.read().decode().strip() # strip to remove trailing newline
     # read store of questions every invocation
     # compare the entry with the given datetime TODO
-    data_loaded = yaml.safe_load(data_streamed)
-    questions = data_loaded['questions']
+    
+    questions = yaml_to_questions(data_streamed)
     q = choice(questions)
     q_model = QuestionModel(**q)
     #q = questions[1]

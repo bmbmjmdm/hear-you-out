@@ -1,0 +1,11 @@
+category_1_checklist: &cat1list
+  ["cat1 1", "cat1 2"]
+category_2_checklist: &cat2list
+  ["cat2 1", "cat2 2"]
+questions:
+- key: 1
+  text: "doobity bop?"
+  checklist: *cat1list
+- key: 2
+  text: "beep booopity dop?"
+  checklist: *cat2list

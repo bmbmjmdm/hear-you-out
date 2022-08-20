@@ -9,7 +9,13 @@ from deta import Drive, Base
 from fastapi import FastAPI, Response
 from fastapi.testclient import TestClient
 
-from ..main import QuestionModel, NoAnswersResponse, AnswerListen
+from ..main import QuestionModel, NoAnswersResponse, AnswerListen, yaml_to_questions
+
+from ..config import Settings
+
+def get_settings():
+    return Settings()
+
 
 # check out pytest.monkeypatch? eg https://testdriven.io/blog/fastapi-crud/
 
@@ -80,14 +86,17 @@ def client(app: FastAPI) -> TestClient:
 #        into a given test? (do we actually want to do this?)
 #   - could do this by returning parameterized closure!
 
-# TODO - actually want a test to check prod db for the correct formatted questions
+# TODO - actually want a test to check prod db for the correct formatted questions.
+#        how to do this despite dependency_overrides above? avoid using endpoint?
 
 @pytest.fixture
-def set_1_question(test_dbs, test_drives) -> QuestionModel:
+def set_1_question(test_dbs, test_drives,
+                   settings: Settings = get_settings() ) -> QuestionModel:
+    # should I update this to use local tests/question_list_1_entry.yaml
     # this doesn't add a q per se, it sets entire list to single q
     key = 'set_1_question key'
     text = 'none'
-    checklist = ['n/a']
+    checklist = ['a', 'b']
 
     # yaml data model:
     # questions:
@@ -99,7 +108,7 @@ def set_1_question(test_dbs, test_drives) -> QuestionModel:
     # model_dicts = [QuestionModel(*q).dict() for q in questions]
     yaml_string = yaml.dump({'questions': [qm.dict()]}, sort_keys=False) # don't sort keys so key remains first
     
-    qfilename = 'list of questions.yaml'
+    qfilename = settings.qfilename
     qfile = test_drives['questions'].get(qfilename)
     if qfile is None:
         test_drives['questions'].put(qfilename, yaml_string)
@@ -323,6 +332,34 @@ def test_get_answer_no_answers(client: TestClient,
 
     assert response.status_code == 200
     assert response.json() == NoAnswersResponse().dict()
+
+# read local questions.yaml and ensure it parses
+def test_question_yaml_parsing(settings: Settings = get_settings()):
+    with open(settings.local_qpath, 'r') as f:
+        qfilecontents = f.read()
+        qm = QuestionModel(**(yaml_to_questions(qfilecontents))[0])
+        assert True
+        return
+    assert False
+
+# assert schema of local questions.yaml matches that of prod
+### CAREFUL PROD DATABASE
+def test_question_list_schema_in_sync(
+        test_drives,
+        settings: Settings = get_settings()) -> None:
+
+    from ..main import get_drives
+
+    remote_qpath = settings.qfilename
+    qcontents_prod = get_drives()['questions'].get(remote_qpath).read().decode().strip()
+    prod_model = QuestionModel(**(yaml_to_questions(qcontents_prod)[0]))
+
+    with open(settings.local_qpath, 'r') as f:
+        qcontents_local = f.read()
+
+    local_model = QuestionModel(**(yaml_to_questions(qcontents_local)[0]))
+
+    assert local_model.schema() == prod_model.schema()
 
 def test_get_answer(client: TestClient,
                     getAnswer: Callable,

@@ -26,6 +26,7 @@ import FadeInElement from './FadeInElement'
 import ModalContents from './ModalContents'
 import { RNFFmpeg } from 'react-native-ffmpeg';
 import { Buffer } from "buffer";
+import { PointerArrow } from "./PointerArrow"
 
 type AnswerProps = {
   setDisableSwipes: (val: boolean) => void,
@@ -449,6 +450,10 @@ const Answer = ({
       >
         <ShakeElement ref={playerShaker}>
           <View style={{ marginTop: 30 }}>
+            <PointerArrow
+              beginAnimation={currentTutorialElement === "play"}
+              beganAction={playing}
+            />
             {Object.values(circles)}
             <TouchableOpacity
               style={[styles.audioCircle, resizeAudioCircle(screenSize), playing ? styles.yellowCircle : styles.whiteCircle]}

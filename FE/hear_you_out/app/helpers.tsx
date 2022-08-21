@@ -99,10 +99,30 @@ export const resizeCat = (screenSize: ScreenSize) => {
    }
 }
 
+export const getPointerArrowSize = (screenSize: ScreenSize) => {
+  return screenSize == "large" ? 150
+    : screenSize == "small" ? 100
+    : screenSize == "tiny" ? 75
+    : 125 // default is 175 at medium
+}
+
+export const resizePointerArrowOffset = (screenSize: ScreenSize) => {
+  const left = screenSize == "large" ? 180
+    : screenSize == "small" ? 130
+    : screenSize == "tiny" ? 105
+    : 155
+  const top = screenSize == "large" ? 110
+    : screenSize == "small" ? 60
+    : screenSize == "tiny" ? 35
+    : 85
+  return {left, top}
+}
+
 
 // while the user is recording or audio is playing, we make a cute animation behind the record button
-// create a circle that will fade out from the center in a random directon
-export const animateCircle = (theme: "answer" | "question", setCircles: Function, screenSize: ScreenSize, recordTimeForCircles = {current: 0}) => {
+// the array returned by this should be rendered as a sibling of the circle we are animating (eminating these faded circles from)
+// this function creates an array of circles that will fade out from the center in a random directon
+export const animateCircle = (component: "answer" | "question" | "check" | "x" | "misc", setCircles: Function, screenSize: ScreenSize, recordTimeForCircles = {current: 0}) => {
   // get an up-to-date mutable copy of the state so we set it right
   setCircles((lastState) => {
     const circlesCopy = {...lastState}
@@ -112,15 +132,34 @@ export const animateCircle = (theme: "answer" | "question", setCircles: Function
     const anim = new Animated.Value(0)
     // a random degree from 0 to 360 in radians
     const rotation = Math.random() * 360 * Math.PI / 180
+
+    let randomColor;
+    let size;
+    if (component === "answer" || component === "question") {
+      const isQuestion = component === "question"
+      const randomVal = 255 - Math.ceil(Math.random() * (isQuestion ? 255 : 200))
+      const randomDigits = randomVal.toString(16).padStart(2, "0")
+      const switchColor = Math.random() > 0.5
+      // given our results above, construct the RGB color 1 color at a time
+      const firstColor = isQuestion ? "BB" : "65"
+      const secondColor = switchColor ? randomDigits : isQuestion ? "00" : "FF"
+      const thirdColor = !switchColor ? randomDigits : isQuestion ? "00" : "FF"
+      randomColor = `#${firstColor}${secondColor}${thirdColor}`
+      size = resizeAudioCircle(screenSize)
+    }
+    else if (component === "check") {
+      randomColor = "#659B5E";
+      size = resizeBBLarge(screenSize)
+    }
+    else if (component === "x") {
+      randomColor = "#AA5042"
+      size = resizeBBLarge(screenSize)
+    }
+    else if (component === "misc") {
+      randomColor = "#FFF689"
+      size = resizeBBSmall(screenSize)
+    }
     // add the circle with all its values to our list of animations
-    const isQuestion = theme === "question"
-    const randomVal = 255 - Math.ceil(Math.random() * (isQuestion ? 255 : 200))
-    const randomDigits = randomVal.toString(16).padStart(2, "0")
-    const switchColor = Math.random() > 0.5
-    const firstColor = isQuestion ? "FF" : "00"
-    const secondColor = switchColor ? randomDigits : isQuestion ? "00" : "FF"
-    const thirdColor = !switchColor ? randomDigits : isQuestion ? "00" : "FF"
-    const randomColor = `#${firstColor}${secondColor}${thirdColor}`
     circlesCopy[id] = 
     (<Animated.View 
       key={id}
@@ -138,7 +177,7 @@ export const animateCircle = (theme: "answer" | "question", setCircles: Function
           {translateX: Animated.multiply(Animated.multiply(anim, new Animated.Value(200)), new Animated.Value(Math.cos(rotation)))}
         ]
       },
-      resizeAudioCircle(screenSize)]}
+      size]}
     />)
     // kick off the animation
     Animated.timing(anim, {

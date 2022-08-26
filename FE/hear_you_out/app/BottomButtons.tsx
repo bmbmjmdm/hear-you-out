@@ -8,7 +8,7 @@ import {
   ActivityIndicator
 } from 'react-native';
 import Shadow from './Shadow'
-import { SizeContext } from './helpers'
+import { animateCircle, SizeContext } from './helpers'
 import { getBBLargeSize, getBBSmallSize, resizeBBLarge, resizeBBSmall } from './helpers'
 import Speaker from './Speaker.png'
 import Skip from './Skip.png'
@@ -50,6 +50,20 @@ export const BottomButton = ({name, theme, onPress, submitting = false, extraDar
   let image;
   let imageSize;
   let color
+  const [circles, setCircles] = React.useState({})
+  const animationInterval = React.useRef(null)
+
+  const onPressIn = () => {
+    setPressed(true)
+    animationInterval.current = setInterval(() => animateCircle(name, setCircles, screenSize), 10)
+  }
+setCircles
+  const onPressOut = () => {
+    setTimeout(() => {
+      clearInterval(animationInterval.current)
+      setPressed(false)
+    }, 100)
+  }
 
   if (name === "check") {
     color = "#659B5E"
@@ -77,26 +91,29 @@ export const BottomButton = ({name, theme, onPress, submitting = false, extraDar
   }
 
   return (
-    <TouchableHighlight
-      onPressIn={() => setPressed(true)}
-      onPressOut={() => setTimeout(() => setPressed(false), 100)}
-      underlayColor={color}
-      activeOpacity={1}
-      style={style}
-      onPress={onPress}
-    >
-      {submitting ? 
-        <ActivityIndicator size="large" color="#659B5E" />
-        : 
-        <Image
-          source={image}
-          style={{
-            width: imageSize,
-            height: imageSize
-          }}
-        />
-      }
-    </TouchableHighlight>
+    <View>
+      {Object.values(circles)}
+      <TouchableHighlight
+        onPressIn={onPressIn}
+        onPressOut={onPressOut}
+        underlayColor={color}
+        activeOpacity={1}
+        style={style}
+        onPress={onPress}
+      >
+        {submitting ? 
+          <ActivityIndicator size="large" color="#659B5E" />
+          : 
+          <Image
+            source={image}
+            style={{
+              width: imageSize,
+              height: imageSize
+            }}
+          />
+        }
+      </TouchableHighlight>
+    </View>
   )
 }
 

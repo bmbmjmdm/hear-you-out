@@ -23,6 +23,7 @@ import ShakeElement from './ShakeElement';
 import FadeInElement from './FadeInElement'
 import ModalContents from './ModalContents'
 import Pause from './Pause.png';
+import { PointerArrow } from "./PointerArrow"
 
 // https://github.com/hyochan/react-native-audio-recorder-player/blob/master/index.ts
 const audioSet = {
@@ -455,6 +456,10 @@ return (
       >
         <ShakeElement ref={recorderShaker}>
           <View style={{ marginTop: 30 }}>
+            <PointerArrow
+              beginAnimation={currentTutorialElement === "record"}
+              beganAction={recording}
+            />
             {Object.values(circles)}
             <TouchableOpacity
               style={[styles.audioCircle, resizeAudioCircle(screenSize), started ? (recording ? styles.redCircle : styles.whiteCircle/*yellowCircle*/) : styles.whiteCircle]}

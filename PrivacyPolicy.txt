@@ -1,0 +1,1 @@
+We store user-made recordings ("Answers") with user-related metadata in a secure database and do not share this data with anyone outside of regular app use. We do not sell your data.

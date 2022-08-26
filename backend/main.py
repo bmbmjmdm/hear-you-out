@@ -30,7 +30,7 @@ except:
 # - - C-c C-s elpy rgrep symbol
 # - - jedi and company for code completion i think
 # - - C-c C-e for symbol multi-edit
-# - update yaml to map category name to checklist (node anchors?)
+# + update yaml to map category name to checklist (node anchors?)
 # - qetQuestion algo
 # - getAnswer algo
 # - tests (see todo in test_main)
@@ -182,6 +182,7 @@ async def get_question(drive: dict = Depends(get_drives),
     # compare the entry with the given datetime TODO
     
     questions = yaml_to_questions(data_streamed)
+    # LEFT OFF algo to use release_on field in question yaml to select. write down potential error states
     q = choice(questions)
     q_model = QuestionModel(**q)
     #q = questions[1]

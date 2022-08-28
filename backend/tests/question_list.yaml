@@ -1,3 +1,4 @@
+days_between_questions: 3
 category_1_checklist: &cat1list
   ["cat1 1", "cat1 2"]
 category_2_checklist: &cat2list
@@ -6,8 +7,6 @@ questions:
 - key: 1
   text: "doobity bop?"
   checklist: *cat1list
-  release_on: 2022.08.17
 - key: 2
   text: "beep booopity dop?"
   checklist: *cat2list
-  release_on: 2022.08.25

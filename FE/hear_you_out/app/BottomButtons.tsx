@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { ReactNode } from 'react';
 import {
   StyleSheet,
   View,
@@ -28,20 +28,21 @@ type BottomButtonsProps = {
   xPressed: () => void,
   miscPressed: () => void,
   checkPressed: () => void,
-  submitting?: boolean
+  submitting?: boolean,
+  miscComponent?: ReactNode
 }
 
-const BottomButtons = ({theme, xPressed, miscPressed, checkPressed, submitting}: BottomButtonsProps) => {
+const BottomButtons = ({theme, xPressed, miscPressed, checkPressed, submitting, miscComponent}: BottomButtonsProps) => {
   return (
     <View style={styles.container}>
       <BottomButton theme={theme} name={'x'} onPress={xPressed} />
-      <BottomButton theme={theme} name={'misc'} onPress={miscPressed} />
+      <BottomButton theme={theme} name={'misc'} onPress={miscPressed} imageOverride={miscComponent} />
       <BottomButton theme={theme} name={'check'} onPress={checkPressed} submitting={submitting} />
     </View>
   )
 };
 
-export const BottomButton = ({name, theme, onPress, submitting = false, extraDark = false}) => {
+export const BottomButton = ({name, theme, onPress, submitting = false, extraDark = false, imageOverride = null}) => {
   const screenSize = React.useContext(SizeContext)
   const [pressed, setPressed] = React.useState(false)
   const backgroundColor = extraDark ? "#101010" : "#191919"
@@ -103,7 +104,7 @@ setCircles
       >
         {submitting ? 
           <ActivityIndicator size="large" color="#659B5E" />
-          : 
+          : imageOverride ? imageOverride :
           <Image
             source={image}
             style={{

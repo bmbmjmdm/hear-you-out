@@ -37,8 +37,9 @@ const App = () => {
   const [disableSwipes, setDisableSwipes] = React.useState(true)
   const swiper1 = React.useRef(null)
   const swiper2 = React.useRef(null)
-  const [cards1, setCards1] = React.useState([])
-  const [cards2, setCards2] = React.useState([])
+  const [grantedPermissions, setGrantedPermissions] = React.useState(false)
+  const [cards1, setCards1] = React.useState<Array<string | object>>([])
+  const [cards2, setCards2] = React.useState<Array<string | object>>([])
   const [topStack, setTopStack] = React.useState(1)
   const [question, setQuestion] = React.useState<APIQuestion>({})
   const [stats, setStats] = React.useState<APIAnswerStats>({})
@@ -47,7 +48,14 @@ const App = () => {
   const [completedFlagTutorial, setCompletedFlagTutorial ] = React.useState(false)
   const [completedShareTutorial, setCompletedShareTutorial ] = React.useState(false)
   const appState = React.useRef(AppState.currentState);
-  const appStateListener = React.useRef(null);
+  const appStateListener = React.useRef<Function | null>(null);
+
+  const animatedSwipeRight1 = React.useRef(false)
+  const animatedSwipeLeft1 = React.useRef(false)
+  const answer1 = React.useRef(null)
+  const animatedSwipeRight2 = React.useRef(false)
+  const animatedSwipeLeft2 = React.useRef(false)
+  const answer2 = React.useRef(null)
 
   const loadLastQ = async () => {
     const recallableLoad = async () => {
@@ -94,27 +102,43 @@ const App = () => {
 
       // ask for permissions on android
       if (Platform.OS === 'android') {
-        try {
-          const grants = await PermissionsAndroid.requestMultiple([
-            PermissionsAndroid.PERMISSIONS.ANDROID.WRITE_EXTERNAL_STORAGE,
-            PermissionsAndroid.PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE,
-            PermissionsAndroid.PERMISSIONS.ANDROID.RECORD_AUDIO,
-          ]);
-          if (
-            grants['android.permission.WRITE_EXTERNAL_STORAGE'] ===
-              PermissionsAndroid.RESULTS.GRANTED &&
-            grants['android.permission.READ_EXTERNAL_STORAGE'] ===
-              PermissionsAndroid.RESULTS.GRANTED &&
-            grants['android.permission.RECORD_AUDIO'] ===
-              PermissionsAndroid.RESULTS.GRANTED
-          ) {
-            console.log('Permissions granted');
-          } else {
-            Alert.alert("The app will not function without these permissions. Please go into settings and correct, or reload the app")
+        const permissionsRequest = async () => {
+          try {
+            const grants = await PermissionsAndroid.requestMultiple([
+              PermissionsAndroid.PERMISSIONS.ANDROID.WRITE_EXTERNAL_STORAGE,
+              PermissionsAndroid.PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE,
+              PermissionsAndroid.PERMISSIONS.ANDROID.RECORD_AUDIO,
+            ]);
+            if (
+              grants['android.permission.WRITE_EXTERNAL_STORAGE'] ===
+                PermissionsAndroid.RESULTS.GRANTED &&
+              grants['android.permission.READ_EXTERNAL_STORAGE'] ===
+                PermissionsAndroid.RESULTS.GRANTED &&
+              grants['android.permission.RECORD_AUDIO'] ===
+                PermissionsAndroid.RESULTS.GRANTED
+            ) {
+              setGrantedPermissions(true)
+            } else {
+              Alert.alert(
+                "Insufficient Permissions",
+                "This app will not function without all permissions. We use these permissions to store and play audio data for your answer and others'. We do not access other files on your device.",
+                [
+                  {
+                    text: "Retry",
+                    onPress: permissionsRequest
+                  }
+                ]
+              )
+            }
+          } catch (err) {
+            setGrantedPermissions(true)
+            Alert.alert(
+              "Permissions Error",
+              "We don't know what just happened. If the app fails to function, try closing it completely and re-launching it."
+            )
           }
-        } catch (err) {
-          console.warn(err);
         }
+        permissionsRequest();
       }
     }
     asyncFun()
@@ -124,7 +148,7 @@ const App = () => {
   // listen to when app is sent to background+foreground to reload stacks appropriately
   React.useEffect(() => {
     // clear the last one (we had trouble using remove() so we do it the old way)
-    AppState.removeEventListener("change", appStateListener.current)
+    if (appStateListener.current) AppState.removeEventListener("change", appStateListener.current)
     // setup reload when put in background
     appStateListener.current = nextAppState => {
       // check if app has come to foreground
@@ -166,13 +190,13 @@ const App = () => {
   // error handling done in component
   const submitAnswerAndProceed = async (data:string) => {
     // see recorder docs regarding rn-fetch-blob if you have trouble uploading file
-    const result = await submitAnswer({
+    await submitAnswer({
       audio_data: data,
       question_uuid: question.key
     })
     await AsyncStorage.setItem("lastQuestionAnswered", JSON.stringify(question))
-    if (topStack === 1) swiper1.current.swipeRight()
-    else swiper2.current.swipeRight()
+    if (topStack === 1) swiper1.current?.swipeRight()
+    else swiper2.current?.swipeRight()
   }
 
   const rateAnswerAndAnimate = async (card: AnswerCard, rating: number) => {
@@ -194,7 +218,6 @@ const App = () => {
       const newQ = await getQuestion()
       const curQuestion = previousQuestionForced || question
       if (curQuestion.key !== newQ.key && loadedQuestion?.key !== newQ.key) {
-        // TODO get the previous answer's info
         const oldAnswerStats = await getAnswerStats()
         setStats(oldAnswerStats)
         setQuestion(newQ)
@@ -227,7 +250,7 @@ const App = () => {
     }
     catch (e) {
       // loading is critical. if it fails, do a hard reload
-      Alert.alert("Failed to load card. Please contact support if this keeps happening.")
+      Alert.alert("Failed to load card. Please check your internet connection or contact support")
       reloadStacks()
       throw new Error("Cannnot load single, reloading all")
     }
@@ -240,7 +263,7 @@ const App = () => {
       return question.key !== newQ.key
     }
     catch (e) {
-      Alert.alert("Failed to load question. Please contact support if this keeps happening.")
+      Alert.alert("Failed to load question. Please check your internet connection or contact support")
       return true
     }
   }
@@ -325,8 +348,24 @@ const App = () => {
           {/* For now we dont set `animating` based on `loadStack`. If we need performance boost, maybe try that */}
           <ActivityIndicator size="large" color="#F0F3F5" />
         </View>
-        {cards1.length ?
+        {cards1.length && grantedPermissions ?
           <Swiper
+            onSwiping={(x, y) => {
+              if (x > 50 && !animatedSwipeRight1.current) {
+                animatedSwipeRight1.current = true
+                answer1.current?.animateSwipeRight()
+              }
+              else if (x < 50) {
+                animatedSwipeRight1.current = false
+              }
+              if (x < -50 && !animatedSwipeLeft1.current) {
+                animatedSwipeLeft1.current = true
+                answer1.current?.animateSwipeLeft()
+              }
+              else if (x > -50) {
+                animatedSwipeLeft1.current = false
+              }
+            }}
             cards={cards1}
             renderCard={(card) => {
               if (card === 'Question') {
@@ -364,6 +403,8 @@ const App = () => {
                     completedShareTutorial={completedShareTutorial}
                     onCompleteFlagTutorial={onCompleteFlagTutorial}
                     onCompleteShareTutorial={onCompleteShareTutorial}
+                    ref={answer1}
+
                   />
                 )
               }
@@ -414,8 +455,24 @@ const App = () => {
           />
           : null
         }
-        {cards2.length ?
+        {cards2.length && grantedPermissions ?
           <Swiper
+            onSwiping={(x, y) => {
+              if (x > 50 && !animatedSwipeRight2.current) {
+                animatedSwipeRight2.current = true
+                answer2.current?.animateSwipeRight()
+              }
+              else if (x < 50) {
+                animatedSwipeRight2.current = false
+              }
+              if (x < -50 && !animatedSwipeLeft2.current) {
+                animatedSwipeLeft2.current = true
+                answer2.current?.animateSwipeLeft()
+              }
+              else if (x > -50) {
+                animatedSwipeLeft2.current = false
+              }
+            }}
             cards={cards2}
             renderCard={(card) => {
               if (card === 'Question') {
@@ -453,6 +510,7 @@ const App = () => {
                     completedShareTutorial={completedShareTutorial}
                     onCompleteFlagTutorial={onCompleteFlagTutorial}
                     onCompleteShareTutorial={onCompleteShareTutorial}
+                    ref={answer2}
                   />
                 )
               }

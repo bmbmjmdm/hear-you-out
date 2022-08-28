@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
   Platform,
   Alert,
+  Animated,
 } from 'react-native';
 import Modal from "react-native-modal";
 import Play from './Play.png';
@@ -15,6 +16,8 @@ import Pause from './Pause.png';
 import BottomButtons from './BottomButtons'
 import Share from './Share.png';
 import Flag from './Flag.png';
+import thumbsUpBlack from './thumbsUpBlack.png'
+import thumbsDownBlack from './thumbsDownBlack.png'
 import { Slider } from 'react-native-elements';
 import RNFS from 'react-native-fs'
 import AudioRecorderPlayer, { PlayBackType } from 'react-native-audio-recorder-player';
@@ -45,7 +48,7 @@ type AnswerProps = {
   onCompleteFlagTutorial: () => void,
   // an un-recoverable error has occured and we need to reload the app
   onError: () => void,
-  isShown: boolean
+  isShown: boolean,
 }
 
 const Answer = ({
@@ -64,8 +67,8 @@ const Answer = ({
     completedFlagTutorial,
     onCompleteFlagTutorial,
     onError,
-    isShown
-  }: AnswerProps) => {
+    isShown,
+  }: AnswerProps, ref) => {
   const screenSize = React.useContext(SizeContext)
   const [sliderValue, setSliderValue] = React.useState(0)
   const [length, setLength] = React.useState(0)
@@ -92,6 +95,10 @@ const Answer = ({
   // shaking
   const playerShaker = React.useRef()
   const [shookPlayer, setShookPlayer] = React.useState(false)
+
+  // overlays
+  const thumbUpOverlayOpacity = React.useRef(new Animated.Value(0))
+  const thumbDownOverlayOpacity = React.useRef(new Animated.Value(0))
 
   // initialize the player and setup callbacks
   const player = React.useRef(new AudioRecorderPlayer()).current
@@ -195,9 +202,30 @@ const Answer = ({
       setReady(true)
     }
   }, [meterData])
-
   
   // UI functions
+  
+  // when the user rates an answer, we overlay the screen with a bunch of color and a thumb
+  const animateOverlay = (opacityRef) => {
+    const animationList = [
+      Animated.timing(opacityRef.current, {
+        toValue: 1,
+        duration: 1,
+        useNativeDriver: true
+      }),
+      Animated.timing(opacityRef.current, {
+        toValue: 0,
+        duration: 500,
+        useNativeDriver: true
+      }),
+    ]
+    Animated.sequence(animationList).start()
+  }
+  // used by our parent when swiping to animate the screen
+  React.useImperativeHandle(ref, () => ({
+    animateSwipeLeft: () => animateOverlay(thumbDownOverlayOpacity),
+    animateSwipeRight: () => animateOverlay(thumbUpOverlayOpacity),
+  }))
 
   const onSlidingStart = () => {
     // dont let the user accidentily swipe the overall card
@@ -341,6 +369,7 @@ const Answer = ({
       return;
     }
     if (completedShareTutorial) {
+      animateOverlay(thumbUpOverlayOpacity)
       onApprove();
       return;
     }
@@ -353,6 +382,7 @@ const Answer = ({
       return;
     }
     if (completedFlagTutorial) {
+      animateOverlay(thumbDownOverlayOpacity)
       onDisapprove();
       return;
     }
@@ -393,154 +423,172 @@ const Answer = ({
   )
 
   return (
-    <View style={styles.container}>
-      <Modal
-        isVisible={modalVisible}
-        onBackdropPress={() => setModalVisible(false)}
-        animationIn="fadeIn"
-        animationOut="fadeOut"
-        useNativeDriver={true}
-      >
-        <ModalContents
-          text={modalText}
-          type={"generic"}
-          closeModal={() => setModalVisible(false)}
-          genericModalConfirmCallback={modalConfirm}
-        />
-      </Modal>
-      <Modal
-        isVisible={approveTutorialModalVisible}
-        onBackdropPress={() => setApproveTutorialModalVisible(false)}
-        animationIn="fadeIn"
-        animationOut="fadeOut"
-        useNativeDriver={true}
-      >
-        <ModalContents
-          type={"approve"}
-          onApprove={() => confirmApproveTutorial(onApprove)}
-          onShare={() => confirmApproveTutorial(shareAnswer)}
-        />
-      </Modal>
-      <Modal
-        isVisible={disapproveTutorialModalVisible}
-        onBackdropPress={() => setDisapproveTutorialModalVisible(false)}
-        animationIn="fadeIn"
-        animationOut="fadeOut"
-        useNativeDriver={true}
-      >
-        <ModalContents
-          type={"disapprove"}
-          onDisapprove={() => confirmDisapproveTutorial(onDisapprove)}
-          onReport={() => confirmDisapproveTutorial(onReport)}
-        />
-      </Modal>
-      
-      <FadeInElement
-        shouldFadeIn={currentTutorialElement === "question"}
-        isVisibleWithoutAnimation={completedTutorial}
-      >
-        <Text style={[styles.header, resizeTitle(screenSize)]}>
-          { question }
-        </Text>
-      </FadeInElement>
+    <View style={styles.outerContainer}>
+      <Animated.View style={[styles.overlayGreen, { opacity: thumbUpOverlayOpacity.current }]} pointerEvents={"none"}>
+        <Image source={thumbsUpBlack} style={styles.overlayThumb} />
+      </Animated.View>
+      <Animated.View style={[styles.overlayRed, { opacity: thumbDownOverlayOpacity.current }]} pointerEvents={"none"}>
+        <Image source={thumbsDownBlack} style={styles.overlayThumb} />
+      </Animated.View>
+      <View style={styles.container}>
+        <Modal
+          isVisible={modalVisible}
+          onBackdropPress={() => setModalVisible(false)}
+          animationIn="fadeIn"
+          animationOut="fadeOut"
+          useNativeDriver={true}
+        >
+          <ModalContents
+            text={modalText}
+            type={"generic"}
+            closeModal={() => setModalVisible(false)}
+            genericModalConfirmCallback={modalConfirm}
+          />
+        </Modal>
+        <Modal
+          isVisible={approveTutorialModalVisible}
+          onBackdropPress={() => setApproveTutorialModalVisible(false)}
+          animationIn="fadeIn"
+          animationOut="fadeOut"
+          useNativeDriver={true}
+        >
+          <ModalContents
+            type={"approve"}
+            onApprove={() => confirmApproveTutorial(() => {
+              animateOverlay(thumbUpOverlayOpacity)
+              onApprove()
+            })}
+            onShare={() => confirmApproveTutorial(shareAnswer)}
+          />
+        </Modal>
+        <Modal
+          isVisible={disapproveTutorialModalVisible}
+          onBackdropPress={() => setDisapproveTutorialModalVisible(false)}
+          animationIn="fadeIn"
+          animationOut="fadeOut"
+          useNativeDriver={true}
+        >
+          <ModalContents
+            type={"disapprove"}
+            onDisapprove={() => confirmDisapproveTutorial(() => {
+              animateOverlay(thumbDownOverlayOpacity)
+              onDisapprove()
+            })}
+            onReport={() => confirmDisapproveTutorial(onReport)}
+          />
+        </Modal>
+        
+        <FadeInElement
+          shouldFadeIn={currentTutorialElement === "question"}
+          isVisibleWithoutAnimation={completedTutorial}
+        >
+          <Text style={[styles.header, resizeTitle(screenSize)]}>
+            { question }
+          </Text>
+        </FadeInElement>
 
-      <FadeInElement
-        shouldFadeIn={currentTutorialElement === "play"}
-        isVisibleWithoutAnimation={completedTutorial}
-      >
-        <ShakeElement ref={playerShaker}>
-          <View style={{ marginTop: 30 }}>
-            <PointerArrow
-              beginAnimation={currentTutorialElement === "play"}
-              beganAction={playing}
-            />
-            {Object.values(circles)}
-            <TouchableOpacity
-              style={[styles.audioCircle, resizeAudioCircle(screenSize), playing ? styles.yellowCircle : styles.whiteCircle]}
-              onPress={playPressed}
-              activeOpacity={1}
-            >
-              <Image
-                source={playing ? Pause : Play}
-                style={{ width: resizePlayPause(screenSize) }}
-                resizeMode={'contain'}
-              />
-            </TouchableOpacity>
-          </View>
-        </ShakeElement>
-      </FadeInElement>
-
-      <FadeInElement
-        shouldFadeIn={currentTutorialElement === "misc"}
-        isVisibleWithoutAnimation={completedTutorial}
-      >
-        <View style={styles.miscButtons}>
-          <TouchableOpacity onPress={reportAnswer}>
-            <Image
-              source={Flag}
-              style={{ width: 35, marginRight: 20 }}
-              resizeMode={'contain'}
-            />
-          </TouchableOpacity>
-          <TouchableOpacity onPress={shareAnswer}>
-            <Image
-              source={Share}
-              style={{ width: 35, marginLeft: 20 }}
-              resizeMode={'contain'}
-            />
-          </TouchableOpacity>
-        </View>
-      </FadeInElement>
-
-      <View style={{flex: 1}}>
         <FadeInElement
           shouldFadeIn={currentTutorialElement === "play"}
           isVisibleWithoutAnimation={completedTutorial}
         >
-          {length ? 
-            <Slider
-              style={{width: 300, height: 40}}
-              minimumValue={0}
-              maximumValue={length}
-              minimumTrackTintColor="#848688"
-              maximumTrackTintColor="#F0F3F5"
-              allowTouchTrack={true}
-              thumbTintColor="#F0F3F5"
-              value={sliderValue}
-              onSlidingComplete={onSlidingComplete}
-              onSlidingStart={onSlidingStart}
-              thumbStyle={{ height: 30, width: 30 }}
-              trackStyle={{ height: 8, borderRadius: 99 }}
-            />
-            :
-            // we cannot change the maximumValue of Slider once its rendered, so we render a fake slider until we know length
-            <TouchableOpacity activeOpacity={1} onPress={informBeginPlaying}>
-              <View style={{ width: 300, height: 40, alignItems: "center", justifyContent: "center", flexDirection: "row" }}>
-                <View style={{ height: 30, width: 30, borderRadius: 999, backgroundColor:"#F0F3F5" }} />
-                <View style={{ width:270, height: 8, borderTopRightRadius: 99, borderBottomRightRadius: 99, backgroundColor: "#F0F3F5" }} />
-              </View>
+          <ShakeElement ref={playerShaker}>
+            <View style={{ marginTop: 30 }}>
+              <PointerArrow
+                beginAnimation={currentTutorialElement === "play"}
+                beganAction={playing}
+              />
+              {Object.values(circles)}
+              <TouchableOpacity
+                style={[styles.audioCircle, resizeAudioCircle(screenSize), playing ? styles.yellowCircle : styles.whiteCircle]}
+                onPress={playPressed}
+                activeOpacity={1}
+              >
+                <Image
+                  source={playing ? Pause : Play}
+                  style={{ width: resizePlayPause(screenSize) }}
+                  resizeMode={'contain'}
+                />
+              </TouchableOpacity>
+            </View>
+          </ShakeElement>
+        </FadeInElement>
+
+        <FadeInElement
+          shouldFadeIn={currentTutorialElement === "misc"}
+          isVisibleWithoutAnimation={completedTutorial}
+        >
+          <View style={styles.miscButtons}>
+            <TouchableOpacity onPress={reportAnswer}>
+              <Image
+                source={Flag}
+                style={{ width: 35, marginRight: 20 }}
+                resizeMode={'contain'}
+              />
             </TouchableOpacity>
-          }
+            <TouchableOpacity onPress={shareAnswer}>
+              <Image
+                source={Share}
+                style={{ width: 35, marginLeft: 20 }}
+                resizeMode={'contain'}
+              />
+            </TouchableOpacity>
+          </View>
+        </FadeInElement>
+
+        <View style={{flex: 1}}>
+          <FadeInElement
+            shouldFadeIn={currentTutorialElement === "play"}
+            isVisibleWithoutAnimation={completedTutorial}
+          >
+            {length ? 
+              <Slider
+                style={{width: 300, height: 40}}
+                minimumValue={0}
+                maximumValue={length}
+                minimumTrackTintColor="#848688"
+                maximumTrackTintColor="#F0F3F5"
+                allowTouchTrack={true}
+                thumbTintColor="#F0F3F5"
+                value={sliderValue}
+                onSlidingComplete={onSlidingComplete}
+                onSlidingStart={onSlidingStart}
+                thumbStyle={{ height: 30, width: 30 }}
+                trackStyle={{ height: 8, borderRadius: 99 }}
+              />
+              :
+              // we cannot change the maximumValue of Slider once its rendered, so we render a fake slider until we know length
+              <TouchableOpacity activeOpacity={1} onPress={informBeginPlaying}>
+                <View style={{ width: 300, height: 40, alignItems: "center", justifyContent: "center", flexDirection: "row" }}>
+                  <View style={{ height: 30, width: 30, borderRadius: 999, backgroundColor:"#F0F3F5" }} />
+                  <View style={{ width:270, height: 8, borderTopRightRadius: 99, borderBottomRightRadius: 99, backgroundColor: "#F0F3F5" }} />
+                </View>
+              </TouchableOpacity>
+            }
+          </FadeInElement>
+        </View>
+
+        <FadeInElement
+          shouldFadeIn={currentTutorialElement === "bottom"}
+          isVisibleWithoutAnimation={completedTutorial}
+          style={{width: "100%"}}
+        >
+          <BottomButtons
+            theme={"answer"}
+            xPressed={tryDisapproveAnswer}
+            checkPressed={tryApproveAnswer}
+            miscPressed={startedPerm.current ? onPass : informBeginPlaying}
+          />
         </FadeInElement>
       </View>
-
-      <FadeInElement
-        shouldFadeIn={currentTutorialElement === "bottom"}
-        isVisibleWithoutAnimation={completedTutorial}
-        style={{width: "100%"}}
-      >
-        <BottomButtons
-          theme={"answer"}
-          xPressed={tryDisapproveAnswer}
-          checkPressed={tryApproveAnswer}
-          miscPressed={startedPerm.current ? onPass : informBeginPlaying}
-        />
-      </FadeInElement>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
+  outerContainer: {
+    flex: 1,
+  },
+
   container: {
     flex: 1,
     paddingHorizontal: 20,
@@ -576,6 +624,33 @@ const styles = StyleSheet.create({
   yellowCircle: {
     backgroundColor: '#659B5E',
   },
+
+  overlayGreen: {
+    height: "100%",
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    position: "absolute",
+    zIndex: 99999,
+    elevation: 99999,
+    backgroundColor: "#659B5E"
+  },
+
+  overlayRed: {
+    height: "100%",
+    width: "100%",
+    justifyContent: "center",
+    alignItems: "center",
+    position: "absolute",
+    zIndex: 99999,
+    elevation: 99999,
+    backgroundColor: "#AA5042"
+  },
+
+  overlayThumb: {
+    width: 300,
+    height: 300,
+  }
 });
 
-export default Answer;
+export default React.forwardRef(Answer);

@@ -68,8 +68,9 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
 
   // timer
   const [recordTime, setRecordTime] = React.useState(0)
-  const timing = React.useRef(false)
-  const interval = React.useRef(null)
+  const timingRecord = React.useRef(false)
+  const intervalRecord = React.useRef(null)
+  const intervalPlayback = React.useRef(null)
   // we call animateCircle from a scope that doesnt have access to recordTime, so we box the state here for it and update it each render
   const recordTimeForCircles = React.useRef(0)
   recordTimeForCircles.current = recordTime
@@ -85,6 +86,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
   const [recording, setRecording] = React.useState(false)
   // whether we are playing back what we've recorded so far
   const [playing, setPlaying] = React.useState(false)
+  const [playTime, setPlayTime] = React.useState(0)
   // each time we playback, we need to stop our recording, playback, and then start a new one when the user continues recording (we're not allowed to playback while paused)
   const needsNewFile = React.useRef(false)
   // if we stop a recording that isnt the original file, concat it with the original file 
@@ -99,9 +101,9 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
   // run this effect ONCE when this component mounts
   React.useEffect(() => {
     const asyncFun = async () => {
-      // our timer is constantly running, we just turn it off and on based on recording/timing
-      interval.current = setInterval(() => {
-        if (timing.current) {
+      // our timer is constantly running, we just turn it off and on based on recording
+      intervalRecord.current = setInterval(() => {
+        if (timingRecord.current) {
           setRecordTime((prevTime) => {
             if (prevTime >= 300) {
               recordPaused(true)
@@ -141,7 +143,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
     asyncFun()
     return () => {
       const asyncFunRet = async () => {
-        clearInterval(interval.current)
+        clearInterval(intervalRecord.current)
         try {
           recorder.removeRecordBackListener()
           await stopRecorderAndConcat()
@@ -182,12 +184,11 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
     try {
       // stop playing
       if (playing) {
-        await recorder.stopPlayer()
-        setPlaying(false)
+        stopPlaying()
       }
       // set recording & start timer
       setRecording(true)
-      timing.current = true
+      timingRecord.current = true
       // we've started already
       if (started) {
         // we've played back and need to start a new file to concat
@@ -226,7 +227,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
         await recorder.resumeRecorder()
         await recorder.pauseRecorder()
         setRecording(false)
-        timing.current = false
+        timingRecord.current = false
       }
       lock.current = false
     }
@@ -275,8 +276,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
     lock.current = true
     try {
       if (playing) {
-        await recorder.stopPlayer()
-        setPlaying(false)
+        await stopPlaying()
       }
       setStarted(false)
       setRecordTime(0)
@@ -332,8 +332,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
     try {
       setSubmitting(true)
       if (playing) {
-        await recorder.stopPlayer()
-        setPlaying(false)
+        await stopPlaying()
       }
       await stopRecorderAndConcat()
       setModalVisible(false)
@@ -358,12 +357,23 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
     lock.current = true
     try {
       if (playing) {
-        await recorder.stopPlayer()
+        await stopPlaying()
       }
-      setPlaying(true)
-      needsNewFile.current = true
-      await stopRecorderAndConcat()
-      await recorder.startPlayer(originalFile)
+      else {
+        setPlaying(true)
+        needsNewFile.current = true
+        await stopRecorderAndConcat()
+        await recorder.startPlayer(originalFile)
+        intervalPlayback.current = setInterval(() => {
+          setPlayTime((prevTime) => {
+            if (prevTime >= recordTime) {
+              stopPlaying()
+              return 0
+            }
+            return prevTime + 1
+          })
+        }, 1000)
+      }
     }
     catch (e) {
       // Don't throw the user out for this. They can still record, restart, and submit possibly
@@ -372,6 +382,14 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
 
     }
     lock.current = false
+  }
+
+  const stopPlaying = async () => {
+    setPlayTime(0);
+    setPlaying(false)
+    if (intervalPlayback.current) clearInterval(intervalPlayback.current)
+    intervalPlayback.current = null
+    await recorder.stopPlayer()
   }
 
   // this may throw an error, handle it
@@ -413,9 +431,9 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
     }
   }, [])
 
-  const getConvertedRecordTime = () => {
-    const minutes = Math.floor(recordTime / 60)
-    const seconds = recordTime % 60
+  const getConvertedTime = (timeInSeconds) => {
+    const minutes = Math.floor(timeInSeconds / 60)
+    const seconds = timeInSeconds % 60
     const needsLeadingZero = seconds < 10
     return `${minutes}:${needsLeadingZero ? '0' : ''}${seconds}`
   }
@@ -476,7 +494,7 @@ return (
         </ShakeElement>
 
         <Text style={[styles.timer, recordTime < 240 ? {} : styles.timerWarning]}>
-          { getConvertedRecordTime() }
+          { getConvertedTime(recordTime) }
         </Text>
       </FadeInElement>
       
@@ -502,6 +520,11 @@ return (
           checkPressed={started ? submitRecording : informBeginRecording}
           miscPressed={started ? hearRecording : informBeginRecording}
           submitting={submitting}
+          miscComponent={ !playing ? null : (
+            <Text style={styles.playbackTime}>
+              { getConvertedTime(playTime) }
+            </Text>
+          )}
         />
       </FadeInElement>
     </View>
@@ -529,6 +552,12 @@ const styles = StyleSheet.create({
     marginTop: 10,
     marginBottom: 10,
     color: "#F2F5DE"
+  },
+
+  playbackTime: {
+    fontSize: 18,
+    textAlign: 'center',
+    color: "#FFF689"
   },
 
   timerWarning: {

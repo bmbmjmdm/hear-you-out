@@ -15,3 +15,47 @@ python -m venv .venv
 source .venv/bin/activate
 python -m pip install -r requirements.txt -r local_requirements.txt
 
+## deploying
+
+probably only want to deploy what's on the prod branch. so that there is a log of the exact code that was publicly running.
+
+so assuming that branch is ready to go: prod-deploy.sh:
+```
+git stash
+git checkout prod
+deta deploy
+deta cron set "10 minutes"
+git unstash
+
+```
+
+### deploying to prod
+
+`deta deploy` iirc
+`deta cron set "10 minutes"`
+
+not sure if i need to reset the cron like that but i assume it's idempotent
+
+the cronjob is defined in main.py:
+
+the cronjob run every 10 min and is responsible for :
+- checking whether it is time to rotate the active question. it does this by
+  - first calculating how many hours the question has been active for (by comparing the current datetime (in utc) to the 'asked_on' date of the question in the questions database).
+  - it then compares this value (how long it has been active for) with the configuration variable hours_between_questions. if the former is larger, it is time to rotate the active question.
+
+rotate the active question:
+- scan the questions_list.yaml for the question that comes after as ordered in the yaml (do away with the key in the yaml and have the cronjob func autogen it)
+- unset the flag on the current active question
+- populates a new 'active_Question' table that just tracks the uuid of the current active
+- set the flag on the new active question
+- delete the data belonging to that question from the drive
+
+so getQuestion just checks the new active_question table for the uuid, then grabs that question content from the questions table
+
+test the cronjob function by staging test db and calling it directly
+
+### deploying to dev
+
+we have a 2nd project (with different set of main+test DBs) for the dev instance. we can always keep auth enabled for this so it is not publicly accessible.
+
+github action to deploy pushes to dev branch to this project+micro.

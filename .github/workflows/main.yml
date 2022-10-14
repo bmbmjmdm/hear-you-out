@@ -25,7 +25,7 @@ jobs:
         with:
           deta-access-token: ${{ secrets.DETA_TOKEN }} #Deta access token https://docs.deta.sh/docs/cli/auth
           deta-name: "dev-hear-you-out" #Deta Micro name https://docs.deta.sh/docs/cli/commands/#deta-clone
-          #deta-project: "project-name" #Optional: Deta project name https://docs.deta.sh/docs/cli/commands/#deta-clone
+          deta-project: "dev-hear-you-out" #Optional: Deta project name https://docs.deta.sh/docs/cli/commands/#deta-clone
           deta-project-dir: "backend" #Optional: directory to be deployed on Deta. Default is the root "."
 
       # Runs a single command using the runners shell

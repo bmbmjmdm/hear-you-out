@@ -9,7 +9,7 @@ from deta import Drive, Base
 from fastapi import FastAPI, Response
 from fastapi.testclient import TestClient
 
-from ..main import QuestionModel, NoAnswersResponse, AnswerListen, yaml_to_questions
+from ..main import QuestionBase, NoAnswersResponse, AnswerListen, yaml_to_questions
 
 from ..config import Settings
 
@@ -91,21 +91,17 @@ def client(app: FastAPI) -> TestClient:
 
 @pytest.fixture
 def set_1_question(test_dbs, test_drives,
-                   settings: Settings = get_settings() ) -> QuestionModel:
+                   settings: Settings = get_settings() ) -> QuestionBase:
     # should I update this to use local tests/question_list_1_entry.yaml
     # this doesn't add a q per se, it sets entire list to single q
     key = 'set_1_question key'
     text = 'none'
     checklist = ['a', 'b']
+    # asked_on = datetime.utcnow() # .today()
+    # hours_between_questions = datetime.timedelta(hours=96)
+    qm = QuestionBase(key=key, text=text, checklist=checklist)
 
-    # yaml data model:
-    # questions:
-    # - key: 1
-    #   text: "What is one idea, novel or otherwise, that you'd like more people to hear about?"
-    #   checklist: ["item 1"]
-
-    qm = QuestionModel(key=key, text=text, checklist=checklist)
-    # model_dicts = [QuestionModel(*q).dict() for q in questions]
+    # model_dicts = [QuestionBase(*q).dict() for q in questions]
     yaml_string = yaml.dump({'questions': [qm.dict()]}, sort_keys=False) # don't sort keys so key remains first
     
     qfilename = settings.qfilename
@@ -119,7 +115,14 @@ def set_1_question(test_dbs, test_drives,
     
     test_drives['questions'].delete(qfilename)
     test_dbs['questions'].delete(key)
+    
+# def test_load_question(test_dbs,
+#                        set_1_question: QuestionBase):
+#     quuid = test_dbs['questions'].get(set_1_question.key)
+#     assert quuid is None
 
+#     loadQuestion(set_1_question)
+    
 # keeping these around for if I ever want one-off mass-delete functionality
     
 # def fetch_all_from_drive(drive):
@@ -194,7 +197,7 @@ def getQuestion(client: TestClient) -> Callable:
     # err, don't know how many times it's been asked, so need to copy
     # state from before yielding insteadd.
 
-def test_get_question(set_1_question: QuestionModel, # Arrange
+def test_get_question(set_1_question: QuestionBase, # Arrange
                       test_dbs,
                       getQuestion: Callable) -> None:
 
@@ -212,6 +215,8 @@ def test_get_question(set_1_question: QuestionModel, # Arrange
     # make sure it incremented
     assert test_dbs['questions'].get(set_1_question.key)['num_asks'] == 2
 
+def test_active_question(test_dbs
+    
 def test_no_questions_available(getQuestion: Callable) -> None:
     qresponse = getQuestion()
     assert qresponse.status_code == 500
@@ -292,6 +297,9 @@ def test_submit_answer(client: TestClient,
     assert metadata['num_disagrees'] == 0
     assert metadata['num_abstains'] == 0
     assert metadata['num_serves'] == 0
+
+    qrow = test_dbs['questions'].get(question_uuid)
+    assert qrow['num_answers'] == 1
     
     # ...do we want to explicitly test that this answer_id doesn't exist beforehand?
     # bc if so, need to do an Assert before the Act...
@@ -337,7 +345,7 @@ def test_get_answer_no_answers(client: TestClient,
 def test_question_yaml_parsing(settings: Settings = get_settings()):
     with open(settings.local_qpath, 'r') as f:
         qfilecontents = f.read()
-        qm = QuestionModel(**(yaml_to_questions(qfilecontents))[0])
+        qm = QuestionBase(**(yaml_to_questions(qfilecontents))[0])
         assert True
         return
     assert False
@@ -352,12 +360,12 @@ def test_question_list_schema_in_sync(
 
     remote_qpath = settings.qfilename
     qcontents_prod = get_drives()['questions'].get(remote_qpath).read().decode().strip()
-    prod_model = QuestionModel(**(yaml_to_questions(qcontents_prod)[0]))
+    prod_model = QuestionBase(**(yaml_to_questions(qcontents_prod)[0]))
 
     with open(settings.local_qpath, 'r') as f:
         qcontents_local = f.read()
 
-    local_model = QuestionModel(**(yaml_to_questions(qcontents_local)[0]))
+    local_model = QuestionBase(**(yaml_to_questions(qcontents_local)[0]))
 
     assert local_model.schema() == prod_model.schema()
 

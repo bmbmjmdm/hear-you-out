@@ -30,6 +30,7 @@ except:
 # - - C-c C-s elpy rgrep symbol
 # - - jedi and company for code completion i think
 # - - C-c C-e for symbol multi-edit
+# - - ok now trying out pyright and cordu (and not cape?)
 # + update yaml to map category name to checklist (node anchors?)
 # - update yaml to set schedule 
 # - qetQuestion algo
@@ -99,22 +100,37 @@ def get_dbs():
 #questions_drive, answers_drive = get_drives()
 #questions_db, answers_db = get_dbs()
 
-class QuestionModel(YamlModel):
+# QuestionBase interops with the yaml file
+class QuestionBase(YamlModel): 
     key: str
     text: str
     checklist: List[str]
+    hours_between_questions: datetime.timedelta # in hours
+
+class QuestionServe(QuestionBase):
+    asked_on: datetime.datetime
 
 # LEFT OFF
-# - updating test case s/num_asks/num_answers;
+# - updating test case num_answers
+#      - also for scheduled_duration and is_the_active_question
+#      - QuestionModel to QuestionServe test cases and main
 # - recording asked_on;
 # - - i think we should also store the schedule as it is when Q asked
 # - - and actually this hsould be recorded in a known place to avoid yaml combing
 # - - - new column? can we constrain it to only be true for 1 row?
+# - - - wait no, bc if we do that, when would we check for question change?
+# - - - - cron jobs look pretty easy, it's just then wouldn't have as part of the config, but instead as part of the deploy infra. so would need to redeploy for changes to take effect (vs just drop in a new config file)
+# - - - - actually cron job could still load schedule from config, instead of storing it
+#         as a question column
+# - - - - in any case cron would compare schedule to date Q was asked_on, and if past, would change the active question to the one with the next highest IDd one (I should change IDs to jump by 10 to give room for last minute entries), then delete Answers from drive (not from db), 
 # - new endpoint to calc days til
-# - getQuestion logic to use helper from new endpoint to decide which Q to server
-class QuestionDB(QuestionModel):
+# - - nope actually decided to include it in questionServe
+# - getQuestion logic to use helper to decide which Q to serve
+# - - unit test for this
+class QuestionDB(QuestionBase):
+    num_asks: int = 0
     num_answers: int = 0
-    asked_on: datetime
+    is_the_active_question: bool
 
 class SubmitAnswerPost(BaseModel):
     audio_data: bytes # should this be str since its b64 encoded? maybe create new Type
@@ -181,7 +197,7 @@ async def root():
     return {'hey': 'world'}
 
 # return 500 if no questions (vs 200 with a FailState response model)
-@app.get("/getQuestion", response_model=QuestionModel)
+@app.get("/getQuestion", response_model=QuestionServe)
 async def get_question(drive: dict = Depends(get_drives),
                        db: dict = Depends(get_dbs),
                        settings: Settings = Depends(get_settings)):
@@ -189,6 +205,19 @@ async def get_question(drive: dict = Depends(get_drives),
     # - think i want to go with base (need them anwyay). and can dev separate micro to insert Qs to it! or separate endpoint, with special auth?
     # - cron job to delete old files 30min after question change (if they are on a schedule)
 
+    active_question_rows = db['questions'].fetch({"is_the_active_question": True})
+    if len(active_question_rows) != 1:
+        # no active question, so read from the list and see what the next one should be
+        pass
+
+    # LEFT OFF doing test case for this and below logic,
+    #          and calculating expiration based on asked_on and...
+    #          oh i guess we do need to read yaml file every micro call? bah...
+    #          hmm guess i should store the expiration in the question row,
+    #          so i should store expiration in question row to avoid the drive call in most cases for faster exec time
+    #          so should clarify in READMe that to change duration of active question, need to edit it's row in the db. but to change duration of future questions, change it in the yaml
+    is_expired = active_question['asked_on']
+    
     question_list_stream = drive['questions'].get(settings.qfilename)
     if question_list_stream is None:
         return PlainTextResponse("what's a question, really?", status_code=500)
@@ -198,18 +227,31 @@ async def get_question(drive: dict = Depends(get_drives),
     # compare the entry with the given datetime TODO
     
     questions = yaml_to_questions(data_streamed)
-    # LEFT OFF algo to use release_on field in question yaml to select. write down potential error states
-    q = choice(questions)
-    q_model = QuestionModel(**q)
-    #q = questions[1]
+    # LEFT OFF calculating current question by comparing active column with
+    #          what the yaml says. if there is a new active Q, need to kickoff
+    #          processing micro to cleanup old audio files. (and
+    #     - think I want to create new DB that just tracks current Q id and expire time
+    q = choice(questions)     #q = questions[1]
+    q_model = QuestionBase(**q)
+    quuid = str(q['key']) # (str() bc yaml file has integers as key)
 
     # make sure row exists for question in db
-    # (str() bc yaml file has integers as key)
-    if db['questions'].get(str(q['key'])) is None:
-        q_db = QuestionDB(**q_model.dict()) #TODO better way? look at pydantic model docs
+    if (q_row := db['questions'].get(quuid)) is None:
+        current_time = datetime.utcnow()
+        q_row = QuestionDB(**q_model.dict(),#TODO better way? look at pydantic model docs
+                           num_asks=1,
+                           num_answers=0,
+                           is_the_active_question=True,
+                           asked_on=current_time) 
         db['questions'].insert(q_db.dict())
+        q_response = QuestionServe(q_row)
+    else:
+        db['questions'].update(key=str(quuid),
+                               updates={"num_asks": db['questions'].util.increment(1)})
+        q_response = QuestionServe(q_row)
+        
 
-    return q_model.dict()
+    return q_response.dict()
 
 @app.post("/submitAnswer", response_model=SubmitAnswerResponse)
 async def submit_answer(ans: SubmitAnswerPost,

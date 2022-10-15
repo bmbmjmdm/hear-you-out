@@ -1,4 +1,4 @@
-days_between_questions: 3
+hours_between_questions: 3
 category_1_checklist: &cat1list
   ["cat1 1", "cat1 2"]
 category_2_checklist: &cat2list

@@ -10,7 +10,7 @@ from pydantic_yaml import YamlModel
 from functools import lru_cache
 from typing import List, Optional, Union, Iterable
 from random import uniform, choice
-from deta import Deta, Drive, Base
+from deta import Deta, Drive, Base, App
 from discord_webhook import DiscordWebhook
 from fastapi.responses import  PlainTextResponse
 from fastapi import FastAPI, Depends, HTTPException
@@ -34,6 +34,7 @@ except:
 # + update yaml to map category name to checklist (node anchors?)
 # - update yaml to set schedule 
 # - qetQuestion algo
+# - - make it wrap to beginning if it reached the end of the list
 # - new endpoint for days till next Q
 # - getAnswer algo
 # - automated/documented deploy process (separate dev micro)
@@ -71,12 +72,38 @@ Secret_key = os.environ.get('DETA_PROJECT_KEY')
 Discord_flag_url = os.environ.get('DISCORD_FLAG_WEBHOOK') # todo error if not set unless overridden
 Is_dev_build = os.environ.get('IS_DEV_BUILD')
 if Is_dev_build == "True":
-    app = FastAPI()
+    app = App(FastAPI())
 else:
-    app = FastAPI(redoc_url=None, docs_url=None)
+    app = App(FastAPI(redoc_url=None, docs_url=None))
     
 
 deta = Deta(Secret_key)
+
+### cron job to rotate questions
+
+@app.lib.cron()
+def cronjob1(event):
+    return rotate_active_question()
+    
+def rotate_active_question():
+    dbs = get_dbs()
+    resp = dbs['questions'].fetch(query={"is_the_active_question": True})
+    if len(resp.items) > 1:
+        pass # TODO send discord ping for this error state, and do what else?
+    elif len(resp.items) == 0:
+        return # abort if there is no active question to check
+    # else there's only 1 elem
+    q = resp.items[0]
+
+    now = datetime.utcnow() 
+    if q.asked_on + q.hours_between_questions >= now:
+        # TODO
+        return "rotating TODO"  # this should go into visor i think?
+    
+    return
+
+
+### app below
 
 # these are dependencies injected into path functions
 # todo make more ergonomic in terms of DX
@@ -101,13 +128,13 @@ def get_dbs():
 #questions_db, answers_db = get_dbs()
 
 # QuestionBase interops with the yaml file
-class QuestionBase(YamlModel): 
+class QuestionCore(YamlModel): 
     key: str
     text: str
     checklist: List[str]
     hours_between_questions: datetime.timedelta # in hours
 
-class QuestionServe(QuestionBase):
+class QuestionServe(QuestionCore):
     asked_on: datetime.datetime
 
 # LEFT OFF
@@ -127,7 +154,7 @@ class QuestionServe(QuestionBase):
 # - - nope actually decided to include it in questionServe
 # - getQuestion logic to use helper to decide which Q to serve
 # - - unit test for this
-class QuestionDB(QuestionBase):
+class QuestionDB(QuestionServe):
     num_asks: int = 0
     num_answers: int = 0
     is_the_active_question: bool
@@ -174,13 +201,13 @@ def gen_uuid(): # TODO
     good_enough = good_enough.replace(".","") # remove the dot
     return f"{good_enough}"
 
-def yaml_to_questions(contents_yaml: str) -> List[str]:
+def yaml_to_question(contents_yaml: str) -> List[QuestionCore]:
     if contents_yaml is None:
         raise Exception(f"empty file")
 
     questions_yaml = yaml.safe_load(contents_yaml)
     questions = questions_yaml['questions']
-    return questions
+    return [QuestionCore(**x) for x in questions]
 
 # handle all exceptions thrown in code below with a 500 http response
 # todo test what happens when this isn't here
@@ -206,8 +233,10 @@ async def get_question(drive: dict = Depends(get_drives),
     # - cron job to delete old files 30min after question change (if they are on a schedule)
 
     active_question_rows = db['questions'].fetch({"is_the_active_question": True})
-    if len(active_question_rows) != 1:
+    if active_question_rows.count != 1:
         # no active question, so read from the list and see what the next one should be
+        # wrap to beginning 
+        # what should happen if there are none in the list?
         pass
 
     # LEFT OFF doing test case for this and below logic,
@@ -231,9 +260,8 @@ async def get_question(drive: dict = Depends(get_drives),
     #          what the yaml says. if there is a new active Q, need to kickoff
     #          processing micro to cleanup old audio files. (and
     #     - think I want to create new DB that just tracks current Q id and expire time
-    q = choice(questions)     #q = questions[1]
-    q_model = QuestionBase(**q)
-    quuid = str(q['key']) # (str() bc yaml file has integers as key)
+    q_model = choice(questions)     #q = questions[1]
+    quuid = str(q_model['key']) # (str() bc yaml file has integers as key)
 
     # make sure row exists for question in db
     if (q_row := db['questions'].get(quuid)) is None:

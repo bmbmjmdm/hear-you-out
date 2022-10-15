@@ -9,7 +9,7 @@ from deta import Drive, Base
 from fastapi import FastAPI, Response
 from fastapi.testclient import TestClient
 
-from ..main import QuestionBase, NoAnswersResponse, AnswerListen, yaml_to_questions
+from ..main import QuestionCore, NoAnswersResponse, AnswerListen, rotate_active_question, yaml_to_questions
 
 from ..config import Settings
 
@@ -91,10 +91,10 @@ def client(app: FastAPI) -> TestClient:
 
 @pytest.fixture
 def upload_question_yaml(test_drives,
-                         settings: Settings = get_settings() ) -> [QuestionBase]:
+                         settings: Settings = get_settings() ) -> [QuestionCore]:
     with open(settings.local_qpath, 'r') as f:
         qfilecontents = f.read()
-        qBases = [QuestionBase(x) for x in **(yaml_to_questions(qfilecontents))]
+        qBases = [QuestionCore(**x) for x in yaml_to_questions(qfilecontents)]
 
     qfilename = settings.qfilename
     qfile = test_drives['questions'].get(qfilename)
@@ -109,7 +109,7 @@ def upload_question_yaml(test_drives,
 
 @pytest.fixture
 def set_1_question(test_dbs, test_drives,
-                   settings: Settings = get_settings() ) -> QuestionBase:
+                   settings: Settings = get_settings() ) -> QuestionCore:
     # should I update this to use local tests/question_list_1_entry.yaml
     # this doesn't add a q per se, it sets entire list to single q
     key = 'set_1_question key'
@@ -117,7 +117,7 @@ def set_1_question(test_dbs, test_drives,
     checklist = ['a', 'b']
     # asked_on = datetime.utcnow() # .today()
     # hours_between_questions = datetime.timedelta(hours=96)
-    qm = QuestionBase(key=key, text=text, checklist=checklist)
+    qm = QuestionCore(key=key, text=text, checklist=checklist)
 
     # model_dicts = [QuestionBase(*q).dict() for q in questions]
     yaml_string = yaml.dump({'questions': [qm.dict()]}, sort_keys=False) # don't sort keys so key remains first
@@ -215,7 +215,7 @@ def getQuestion(client: TestClient) -> Callable:
     # err, don't know how many times it's been asked, so need to copy
     # state from before yielding insteadd.
 
-def test_get_question(set_1_question: QuestionBase, # Arrange
+def test_get_question(set_1_question: QuestionCore, # Arrange
                       test_dbs,
                       getQuestion: Callable) -> None:
 
@@ -234,43 +234,76 @@ def test_get_question(set_1_question: QuestionBase, # Arrange
     assert test_dbs['questions'].get(set_1_question.key)['num_asks'] == 2
 
 def test_active_question(test_dbs,
-                         upload_question_yaml: list[QuestionBase], # takes care of the drive
+                         upload_question_yaml: list[QuestionCore], # takes care of the drive
                          getQuestion: Callable) -> None:
-    # nothing in db beforehand
-    assert test_dbs['questions'].fetch() is None
+    # nothing in questions db beforehand
+    assert test_dbs['questions'].fetch().count == 0
 
     # hit the getQuestion endpoint
     qresponse = getQuestion() # Act
 
     # now there is an active question
-    q = test_dbs['questions'].fetch()
-    assert q is not None
-    assert q.items[0]['is_the_active_question'] is True
+    results = test_dbs['questions'].fetch()
+    assert results.count == 1
+    assert results.items[0]['is_the_active_question'] is True
 
 def test_question_rotation(test_dbs,
-                           upload_question_yaml: list[QuestionBase], # takes care of the drive
+                           upload_question_yaml: list[QuestionCore], # takes care of the drive
                            getQuestion: Callable) -> None:
+    assert len(upload_question_yaml) >= 2 # we need at least 2 to rotate
+
     # nothing in db beforehand
-    assert test_dbs['questions'].fetch() is None
+    assert test_dbs['questions'].fetch().count == 0
 
     # hit the getQuestion endpoint
     qresponse = getQuestion() # Act
 
     # now there is an active question
-    q = test_dbs['questions'].fetch()
-    assert q is not None
+    results = test_dbs['questions'].fetch()
+    assert results.count == 1
+    assert results.items[0]['is_the_active_question'] is True
 
     # call getQuestion again after a second and make sure all good
     import time
     time.sleep(2)
-    qresponse = getQuestion() # Act
+    qresponse2 = getQuestion() # Act
+
+    assert qresponse['key'] == qresponse2['key']
     
-    # modify expiration for testing purpose
-    # call cron function
+    # modify expiration for testing purpose and then call cron function
+    test_dbs['questions'].update(key=qresponse['key'], updates={'hours_between_questions': 0})
+    rotate_active_question()
 
     # call getQuestion again, after expiration, and verify Q rotation
-    pass
-    
+    qresponse3 = getQuestion() # Act
+
+    assert qresponse3['key'] != qresponse['key']
+
+# if we reach the end of the question list, start back at the beginning
+def test_question_wrap(test_dbs,
+                       upload_question_yaml: list[QuestionCore], # takes care of the drive
+                       getQuestion: Callable) -> None:
+    assert len(upload_question_yaml) >= 2 # we need at least 2 to wrap
+
+    # nothing in db beforehand
+    assert test_dbs['questions'].fetch().count == 0
+
+    seen_questions = {}
+    first_question = upload_question_yaml[0]
+    for question in upload_question_yaml:
+        qresponse = getQuestion()
+        actual_key = qresponse['key']
+        assert question['key'] == actual_key
+        assert seen_questions.get(actual_key) is None
+        # modify expiration for testing purpose and then call cron function
+        test_dbs['questions'].update(key=actual_key, updates={'hours_between_questions': 0})
+        rotate_active_question()
+
+    # confirm we're back at the beginning now
+    qresponse = getQuestion()
+    actual_key = qresponse['key']
+    assert upload_question_yaml[0]['key'] == actual_key
+
 def test_no_questions_available(getQuestion: Callable) -> None:
     qresponse = getQuestion()
     assert qresponse.status_code == 500
@@ -399,8 +432,8 @@ def test_get_answer_no_answers(client: TestClient,
 def test_question_yaml_parsing(settings: Settings = get_settings()):
     with open(settings.local_qpath, 'r') as f:
         qfilecontents = f.read()
-        qm = QuestionBase(**(yaml_to_questions(qfilecontents))[0])
-        assert True
+        qm: QuestionCore = yaml_to_questions(qfilecontents)[0]
+        assert isinstance(qm, QuestionCore)
         return
     assert False
 
@@ -414,12 +447,12 @@ def test_question_list_schema_in_sync(
 
     remote_qpath = settings.qfilename
     qcontents_prod = get_drives()['questions'].get(remote_qpath).read().decode().strip()
-    prod_model = QuestionBase(**(yaml_to_questions(qcontents_prod)[0]))
+    prod_model: QuestionCore = yaml_to_questions(qcontents_prod)[0]
 
     with open(settings.local_qpath, 'r') as f:
         qcontents_local = f.read()
 
-    local_model = QuestionBase(**(yaml_to_questions(qcontents_local)[0]))
+    local_model: QuestionCore = yaml_to_questions(qcontents_local)[0]
 
     assert local_model.schema() == prod_model.schema()
 

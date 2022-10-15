@@ -90,6 +90,24 @@ def client(app: FastAPI) -> TestClient:
 #        how to do this despite dependency_overrides above? avoid using endpoint?
 
 @pytest.fixture
+def upload_question_yaml(test_drives,
+                         settings: Settings = get_settings() ) -> [QuestionBase]:
+    with open(settings.local_qpath, 'r') as f:
+        qfilecontents = f.read()
+        qBases = [QuestionBase(x) for x in **(yaml_to_questions(qfilecontents))]
+
+    qfilename = settings.qfilename
+    qfile = test_drives['questions'].get(qfilename)
+    if qfile is None:
+        test_drives['questions'].put(qfilename, qfilecontents)
+    else:
+        raise Exception(f"{qfilename} already in drive, not overwriting just in case")
+
+    yield qBases
+
+    test_drives['questions'].delete(qfilename)
+
+@pytest.fixture
 def set_1_question(test_dbs, test_drives,
                    settings: Settings = get_settings() ) -> QuestionBase:
     # should I update this to use local tests/question_list_1_entry.yaml
@@ -215,7 +233,43 @@ def test_get_question(set_1_question: QuestionBase, # Arrange
     # make sure it incremented
     assert test_dbs['questions'].get(set_1_question.key)['num_asks'] == 2
 
-def test_active_question(test_dbs
+def test_active_question(test_dbs,
+                         upload_question_yaml: list[QuestionBase], # takes care of the drive
+                         getQuestion: Callable) -> None:
+    # nothing in db beforehand
+    assert test_dbs['questions'].fetch() is None
+
+    # hit the getQuestion endpoint
+    qresponse = getQuestion() # Act
+
+    # now there is an active question
+    q = test_dbs['questions'].fetch()
+    assert q is not None
+    assert q.items[0]['is_the_active_question'] is True
+
+def test_question_rotation(test_dbs,
+                           upload_question_yaml: list[QuestionBase], # takes care of the drive
+                           getQuestion: Callable) -> None:
+    # nothing in db beforehand
+    assert test_dbs['questions'].fetch() is None
+
+    # hit the getQuestion endpoint
+    qresponse = getQuestion() # Act
+
+    # now there is an active question
+    q = test_dbs['questions'].fetch()
+    assert q is not None
+
+    # call getQuestion again after a second and make sure all good
+    import time
+    time.sleep(2)
+    qresponse = getQuestion() # Act
+    
+    # modify expiration for testing purpose
+    # call cron function
+
+    # call getQuestion again, after expiration, and verify Q rotation
+    pass
     
 def test_no_questions_available(getQuestion: Callable) -> None:
     qresponse = getQuestion()

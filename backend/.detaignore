@@ -2,3 +2,5 @@ questions.yaml
 tests/
 *~
 .venv/
+.env
+.secrets

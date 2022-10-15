@@ -3,6 +3,7 @@ cli.sh
 
 .venv/
 .env
+.secrets
 .deta/
 __pycache__/
 

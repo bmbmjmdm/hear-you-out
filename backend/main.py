@@ -98,6 +98,8 @@ def rotate_active_question():
     now = datetime.utcnow() 
     if q.asked_on + q.hours_between_questions >= now:
         # TODO
+        nextq: QuestionCore = find_next_question()
+        # clean up drive of old audio answers (archive? publish transcripts?
         return "rotating TODO"  # this should go into visor i think?
     
     return
@@ -129,7 +131,7 @@ def get_dbs():
 
 # QuestionBase interops with the yaml file
 class QuestionCore(YamlModel): 
-    key: str
+    id: str
     text: str
     checklist: List[str]
     hours_between_questions: datetime.timedelta # in hours
@@ -141,23 +143,15 @@ class QuestionServe(QuestionCore):
 # - updating test case num_answers
 #      - also for scheduled_duration and is_the_active_question
 #      - QuestionModel to QuestionServe test cases and main
-# - recording asked_on;
-# - - i think we should also store the schedule as it is when Q asked
-# - - and actually this hsould be recorded in a known place to avoid yaml combing
-# - - - new column? can we constrain it to only be true for 1 row?
-# - - - wait no, bc if we do that, when would we check for question change?
-# - - - - cron jobs look pretty easy, it's just then wouldn't have as part of the config, but instead as part of the deploy infra. so would need to redeploy for changes to take effect (vs just drop in a new config file)
-# - - - - actually cron job could still load schedule from config, instead of storing it
-#         as a question column
-# - - - - in any case cron would compare schedule to date Q was asked_on, and if past, would change the active question to the one with the next highest IDd one (I should change IDs to jump by 10 to give room for last minute entries), then delete Answers from drive (not from db), 
-# - new endpoint to calc days til
-# - - nope actually decided to include it in questionServe
+# - recording asked_on, cycle, key
 # - getQuestion logic to use helper to decide which Q to serve
 # - - unit test for this
 class QuestionDB(QuestionServe):
     num_asks: int = 0
     num_answers: int = 0
     is_the_active_question: bool
+    cycle: int = 0 # how many times this question has been asked, if the yaml stops growing and we recycle it
+    key: str # cycle + id
 
 class SubmitAnswerPost(BaseModel):
     audio_data: bytes # should this be str since its b64 encoded? maybe create new Type
@@ -223,6 +217,32 @@ def yaml_to_question(contents_yaml: str) -> List[QuestionCore]:
 async def root():
     return {'hey': 'world'}
 
+# intended to consume the yaml contents and
+# return the first one that is not already in the questions db
+def find_next_question(db: dict = Depends(get_dbs),
+                       drive: dict = Depends(get_drives)) -> QuestionCore:
+    question_list_stream = drive['questions'].get(settings.qfilename)
+    if question_list_stream is None:
+        raise Exception("no question list found")
+        #return PlainTextResponse("what's a question, really?", status_code=500)
+
+    data_streamed = question_list_stream.read().decode().strip() # strip to remove trailing newline
+    # read store of questions every invocation
+    # compare the entry with the given datetime TODO
+    
+    questions: [QuestionCore] = yaml_to_questions(data_streamed)
+
+    for q in questions:
+        key = q['cycle'] + q['id']
+        if db['questions'].get(key=key) is None:
+            return q
+
+    # if we haven't returned yet, then we need to start a new cycle.
+    # so here we update the cycle attribute for all db entries.
+    # this will have the effect of starting from the beginning.
+    for dbq in db['questions'].fetch # LEFT OFF ugh need to page to go through and update all Qs cycle++
+    
+
 # return 500 if no questions (vs 200 with a FailState response model)
 @app.get("/getQuestion", response_model=QuestionServe)
 async def get_question(drive: dict = Depends(get_drives),
@@ -237,31 +257,13 @@ async def get_question(drive: dict = Depends(get_drives),
         # no active question, so read from the list and see what the next one should be
         # wrap to beginning 
         # what should happen if there are none in the list?
-        pass
+        q_model: QuestionCore = find_next_question()
+    else:
+        q_model: QuestionCore = active_question_rows.items[0]
 
-    # LEFT OFF doing test case for this and below logic,
-    #          and calculating expiration based on asked_on and...
-    #          oh i guess we do need to read yaml file every micro call? bah...
-    #          hmm guess i should store the expiration in the question row,
-    #          so i should store expiration in question row to avoid the drive call in most cases for faster exec time
-    #          so should clarify in READMe that to change duration of active question, need to edit it's row in the db. but to change duration of future questions, change it in the yaml
-    is_expired = active_question['asked_on']
-    
-    question_list_stream = drive['questions'].get(settings.qfilename)
-    if question_list_stream is None:
-        return PlainTextResponse("what's a question, really?", status_code=500)
-
-    data_streamed = question_list_stream.read().decode().strip() # strip to remove trailing newline
-    # read store of questions every invocation
-    # compare the entry with the given datetime TODO
-    
-    questions = yaml_to_questions(data_streamed)
-    # LEFT OFF calculating current question by comparing active column with
-    #          what the yaml says. if there is a new active Q, need to kickoff
-    #          processing micro to cleanup old audio files. (and
-    #     - think I want to create new DB that just tracks current Q id and expire time
-    q_model = choice(questions)     #q = questions[1]
-    quuid = str(q_model['key']) # (str() bc yaml file has integers as key)
+    # here we set the key of the question to be the cycle+id.
+    # doing this here allows us to manipulate the cycle attribute in find_next_question
+    quuid = str(q_model['cycle'] + q_model['id']) # (str() bc yaml file has integers as key)
 
     # make sure row exists for question in db
     if (q_row := db['questions'].get(quuid)) is None:

@@ -59,3 +59,7 @@ test the cronjob function by staging test db and calling it directly
 we have a 2nd project (with different set of main+test DBs) for the dev instance. we can always keep auth enabled for this so it is not publicly accessible.
 
 github action to deploy pushes to dev branch to this project+micro.
+
+## misc
+
+TODO should clarify in READMe that to change duration of active question, need to edit it's row in the db. but to change duration of future questions, change it in the yaml

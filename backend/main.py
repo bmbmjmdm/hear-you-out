@@ -35,9 +35,8 @@ except:
 # - update yaml to set schedule 
 # - qetQuestion algo
 # - - make it wrap to beginning if it reached the end of the list
-# - new endpoint for days till next Q
 # - getAnswer algo
-# - automated/documented deploy process (separate dev micro)
+# - automated/documented deploy process (separate dev deta project)
 # - - deploy a fix to the dev BE
 #     point the dev FE to the dev BE and test out the fix
 #     confirm it works
@@ -81,26 +80,49 @@ deta = Deta(Secret_key)
 
 ### cron job to rotate questions
 
+# LEFT OFF potentiallly moving this cronjob to separate file so that i can run pytest without `from deta import App`. that, or maybe i need to update my deta lib or cli so App is locally available?
+# (see error when running pytest)
+
 @app.lib.cron()
 def cronjob1(event):
     return rotate_active_question()
     
 def rotate_active_question():
-    dbs = get_dbs()
-    resp = dbs['questions'].fetch(query={"is_the_active_question": True})
+    db = get_dbs()
+    resp = db['questions'].fetch(query={"is_the_active_question": True})
     if len(resp.items) > 1:
-        pass # TODO send discord ping for this error state, and do what else?
+        return "ABORT more than one active q"
     elif len(resp.items) == 0:
-        return # abort if there is no active question to check
+        return "ABORT no active q to rotate"
     # else there's only 1 elem
     q = resp.items[0]
 
-    now = datetime.utcnow() 
-    if q.asked_on + q.hours_between_questions >= now:
-        # TODO
-        nextq: QuestionCore = find_next_question()
-        # clean up drive of old audio answers (archive? publish transcripts?
-        return "rotating TODO"  # this should go into visor i think?
+    now = datetime.datetime.now() 
+    if q.asked_on + datetime.timedetla(hours=q.hours_between_questions) >= now:
+        try:
+            nextq: QuestionCore = find_next_question()
+        except Exception as e:
+            print(e)
+            # TODO discord ping on all error states?
+            return f"{now} ERROR ROTATING QUESTION: no questions in file"
+            
+
+        db['questions'].update(key=q['key'], updates={"is_the_active_question": False})
+        
+        current_time = datetime.utcnow()
+        q_db = QuestionDB(**nextq.dict(),#TODO better way? look at pydantic model docs
+                          num_asks=0,
+                          num_answers=0,
+                          is_the_active_question=True,
+                          asked_on=now)
+        db['questions'].insert(q_db.dict())
+
+
+        # TODO clean up drive of old audio answers
+        # - (archive? publish transcripts? topic modeling?)
+        # - prolly wanna use dirs to organize files per question startdate/uuid
+
+        return f"rotating old q '{q}'\n\tnew q: {nextq}" # deta visor
     
     return
 
@@ -131,27 +153,21 @@ def get_dbs():
 
 # QuestionBase interops with the yaml file
 class QuestionCore(YamlModel): 
-    id: str
+    key: str
     text: str
     checklist: List[str]
-    hours_between_questions: datetime.timedelta # in hours
+    hours_between_questions: int # in hours
 
 class QuestionServe(QuestionCore):
     asked_on: datetime.datetime
 
 # LEFT OFF
 # - updating test case num_answers
-#      - also for scheduled_duration and is_the_active_question
 #      - QuestionModel to QuestionServe test cases and main
-# - recording asked_on, cycle, key
-# - getQuestion logic to use helper to decide which Q to serve
-# - - unit test for this
 class QuestionDB(QuestionServe):
     num_asks: int = 0
     num_answers: int = 0
     is_the_active_question: bool
-    cycle: int = 0 # how many times this question has been asked, if the yaml stops growing and we recycle it
-    key: str # cycle + id
 
 class SubmitAnswerPost(BaseModel):
     audio_data: bytes # should this be str since its b64 encoded? maybe create new Type
@@ -218,7 +234,9 @@ async def root():
     return {'hey': 'world'}
 
 # intended to consume the yaml contents and
-# return the first one that is not already in the questions db
+# return the first one that is not already in the questions db.
+# if all Qs in last have been asked, will just randomly choose.
+# (change Q keys in text file to start fresh)
 def find_next_question(db: dict = Depends(get_dbs),
                        drive: dict = Depends(get_drives)) -> QuestionCore:
     question_list_stream = drive['questions'].get(settings.qfilename)
@@ -233,15 +251,13 @@ def find_next_question(db: dict = Depends(get_dbs),
     questions: [QuestionCore] = yaml_to_questions(data_streamed)
 
     for q in questions:
-        key = q['cycle'] + q['id']
-        if db['questions'].get(key=key) is None:
+        #key = q['cycle'] + q['id']
+        if db['questions'].get(key=q['key']) is None:
             return q
 
-    # if we haven't returned yet, then we need to start a new cycle.
-    # so here we update the cycle attribute for all db entries.
-    # this will have the effect of starting from the beginning.
-    for dbq in db['questions'].fetch # LEFT OFF ugh need to page to go through and update all Qs cycle++
-    
+    # if we haven't returned yet, then we've already asked all Qs in list.
+    # so now let's just rotate randomly so the app is still at least usable 
+    return choice(questions)
 
 # return 500 if no questions (vs 200 with a FailState response model)
 @app.get("/getQuestion", response_model=QuestionServe)
@@ -254,34 +270,26 @@ async def get_question(drive: dict = Depends(get_drives),
 
     active_question_rows = db['questions'].fetch({"is_the_active_question": True})
     if active_question_rows.count != 1:
+        # either 0 or >1. in either case, can treat as no active question.
         # no active question, so read from the list and see what the next one should be
-        # wrap to beginning 
-        # what should happen if there are none in the list?
-        q_model: QuestionCore = find_next_question()
+        # if nothing in list, return 500
+        try: 
+            q_model: QuestionCore = find_next_question()
+        except Exception as e:
+            print(e)
+            return PlainTextResponse(f"error", status_code=500)        
     else:
         q_model: QuestionCore = active_question_rows.items[0]
 
     # here we set the key of the question to be the cycle+id.
     # doing this here allows us to manipulate the cycle attribute in find_next_question
-    quuid = str(q_model['cycle'] + q_model['id']) # (str() bc yaml file has integers as key)
-
-    # make sure row exists for question in db
-    if (q_row := db['questions'].get(quuid)) is None:
-        current_time = datetime.utcnow()
-        q_row = QuestionDB(**q_model.dict(),#TODO better way? look at pydantic model docs
-                           num_asks=1,
-                           num_answers=0,
-                           is_the_active_question=True,
-                           asked_on=current_time) 
-        db['questions'].insert(q_db.dict())
-        q_response = QuestionServe(q_row)
-    else:
-        db['questions'].update(key=str(quuid),
-                               updates={"num_asks": db['questions'].util.increment(1)})
-        q_response = QuestionServe(q_row)
-        
-
-    return q_response.dict()
+    #quuid = str(q_model['cycle'] + q_model['id']) # (str() bc yaml file has integers as key)
+    quuid = q_model['key']
+    q_row = db['questions'].get(quuid)
+    db['questions'].update(key=str(quuid),
+                           updates={"num_asks": db['questions'].util.increment(1)})
+    q_response = QuestionServe(q_row)
+    return q_response
 
 @app.post("/submitAnswer", response_model=SubmitAnswerResponse)
 async def submit_answer(ans: SubmitAnswerPost,

@@ -7,7 +7,10 @@ web browse to <ip>:8000/docs
 
 ### running tests
 
+hear-you-out/backend$ `source .venv/bin/activate`
 hear-you-out/backend$ `pytest`
+
+# TODO configure to use dev deta project for running tests
 
 ### install
 
@@ -36,6 +39,14 @@ git unstash
 
 not sure if i need to reset the cron like that but i assume it's idempotent
 
+### deploying to dev
+
+we have a 2nd project (with different set of main+test DBs) for the dev instance. we can always keep auth enabled for this so it is not publicly accessible.
+
+github action to deploy pushes to dev branch to this project+micro.
+
+## question rotation
+
 the cronjob is defined in main.py:
 
 the cronjob run every 10 min and is responsible for :
@@ -44,21 +55,14 @@ the cronjob run every 10 min and is responsible for :
   - it then compares this value (how long it has been active for) with the configuration variable hours_between_questions. if the former is larger, it is time to rotate the active question.
 
 rotate the active question:
-- scan the questions_list.yaml for the question that comes after as ordered in the yaml (do away with the key in the yaml and have the cronjob func autogen it)
+- scan the questions_list.yaml for the first question in order that isn't yet in DB
 - unset the flag on the current active question
-- populates a new 'active_Question' table that just tracks the uuid of the current active
-- set the flag on the new active question
-- delete the data belonging to that question from the drive
+- insert and set the flag on the new active question 
+- post-process the data belonging to that question from the drive
 
 so getQuestion just checks the new active_question table for the uuid, then grabs that question content from the questions table
 
 test the cronjob function by staging test db and calling it directly
-
-### deploying to dev
-
-we have a 2nd project (with different set of main+test DBs) for the dev instance. we can always keep auth enabled for this so it is not publicly accessible.
-
-github action to deploy pushes to dev branch to this project+micro.
 
 ## misc
 

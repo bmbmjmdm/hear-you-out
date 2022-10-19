@@ -1,6 +1,7 @@
 import sys
 import yaml
 import pytest
+import datetime
 
 from typing import Callable
 
@@ -91,10 +92,10 @@ def client(app: FastAPI) -> TestClient:
 
 @pytest.fixture
 def upload_question_yaml(test_drives,
-                         settings: Settings = get_settings() ) -> [QuestionCore]:
+                         settings: Settings = get_settings()) -> [QuestionCore]:
     with open(settings.local_qpath, 'r') as f:
         qfilecontents = f.read()
-        qBases = [QuestionCore(**x) for x in yaml_to_questions(qfilecontents)]
+        qCores = yaml_to_questions(qfilecontents)
 
     qfilename = settings.qfilename
     qfile = test_drives['questions'].get(qfilename)
@@ -103,7 +104,7 @@ def upload_question_yaml(test_drives,
     else:
         raise Exception(f"{qfilename} already in drive, not overwriting just in case")
 
-    yield qBases
+    yield qCores
 
     test_drives['questions'].delete(qfilename)
 
@@ -116,8 +117,11 @@ def set_1_question(test_dbs, test_drives,
     text = 'none'
     checklist = ['a', 'b']
     # asked_on = datetime.utcnow() # .today()
-    # hours_between_questions = datetime.timedelta(hours=96)
-    qm = QuestionCore(id=key, text=text, checklist=checklist)
+    hours_between_questions = 96
+    qm = QuestionCore(key=key,
+                      text=text,
+                      checklist=checklist,
+                      hours_between_questions=hours_between_questions)
 
     # model_dicts = [QuestionBase(*q).dict() for q in questions]
     yaml_string = yaml.dump({'questions': [qm.dict()]}, sort_keys=False) # don't sort keys so key remains first
@@ -220,18 +224,18 @@ def test_get_question(set_1_question: QuestionCore, # Arrange
                       getQuestion: Callable) -> None:
 
     # (gets input into DB during first ask)
-    assert test_dbs['questions'].get(set_1_question.id) is None
+    assert test_dbs['questions'].get(set_1_question.key) is None
 
     qresponse = getQuestion() # Act
 
     assert qresponse.status_code == 200
     assert qresponse.json() == set_1_question.dict()
-    assert test_dbs['questions'].get(set_1_question.id)['num_asks'] == 1
+    assert test_dbs['questions'].get(set_1_question.key)['num_asks'] == 1
 
     getQuestion() # Act again
 
     # make sure it incremented
-    assert test_dbs['questions'].get(set_1_question.id)['num_asks'] == 2
+    assert test_dbs['questions'].get(set_1_question.key)['num_asks'] == 2
 
 def test_active_question(test_dbs,
                          upload_question_yaml: list[QuestionCore], # takes care of the drive

@@ -10,7 +10,7 @@ from pydantic_yaml import YamlModel
 from functools import lru_cache
 from typing import List, Optional, Union, Iterable
 from random import uniform, choice
-from deta import Deta, Drive, Base, App
+from deta import Deta, Drive, Base
 from discord_webhook import DiscordWebhook
 from fastapi.responses import  PlainTextResponse
 from fastapi import FastAPI, Depends, HTTPException
@@ -71,24 +71,16 @@ Secret_key = os.environ.get('DETA_PROJECT_KEY')
 Discord_flag_url = os.environ.get('DISCORD_FLAG_WEBHOOK') # todo error if not set unless overridden
 Is_dev_build = os.environ.get('IS_DEV_BUILD')
 if Is_dev_build == "True":
-    app = App(FastAPI())
+    app = FastAPI()
 else:
-    app = App(FastAPI(redoc_url=None, docs_url=None))
+    app = FastAPI(redoc_url=None, docs_url=None)
     
 
 deta = Deta(Secret_key)
 
-### cron job to rotate questions
-
-# LEFT OFF potentiallly moving this cronjob to separate file so that i can run pytest without `from deta import App`. that, or maybe i need to update my deta lib or cli so App is locally available?
-# (see error when running pytest)
-
-@app.lib.cron()
-def cronjob1(event):
-    return rotate_active_question()
-    
-def rotate_active_question():
-    db = get_dbs()
+# TODO better way to pass through params drive and settings to find_next_question?
+def rotate_active_question(drive, db, settings):
+    #db = get_dbs()
     resp = db['questions'].fetch(query={"is_the_active_question": True})
     if len(resp.items) > 1:
         return "ABORT more than one active q"
@@ -100,7 +92,7 @@ def rotate_active_question():
     now = datetime.datetime.now() 
     if q.asked_on + datetime.timedetla(hours=q.hours_between_questions) >= now:
         try:
-            nextq: QuestionCore = find_next_question()
+            nextq: QuestionCore = find_next_question(drive, db, settings)
         except Exception as e:
             print(e)
             # TODO discord ping on all error states?
@@ -211,13 +203,14 @@ def gen_uuid(): # TODO
     good_enough = good_enough.replace(".","") # remove the dot
     return f"{good_enough}"
 
-def yaml_to_question(contents_yaml: str) -> List[QuestionCore]:
+def yaml_to_questions(contents_yaml: str) -> List[QuestionCore]:
     if contents_yaml is None:
         raise Exception(f"empty file")
 
     questions_yaml = yaml.safe_load(contents_yaml)
+    hrs = questions_yaml['hours_between_questions']
     questions = questions_yaml['questions']
-    return [QuestionCore(**x) for x in questions]
+    return [QuestionCore(**x, hours_between_questions=hrs) for x in questions]
 
 # handle all exceptions thrown in code below with a 500 http response
 # todo test what happens when this isn't here
@@ -233,23 +226,31 @@ def yaml_to_question(contents_yaml: str) -> List[QuestionCore]:
 async def root():
     return {'hey': 'world'}
 
+
+
+
+
+
+# LEFT OFF how to pass in these params to this func? maybe pass  contents of file instead of settings? or figure out how to call this from the test harness with the right value...what is the right value? I think use local file in tests/ dir
+#
 # intended to consume the yaml contents and
 # return the first one that is not already in the questions db.
 # if all Qs in last have been asked, will just randomly choose.
 # (change Q keys in text file to start fresh)
-def find_next_question(db: dict = Depends(get_dbs),
-                       drive: dict = Depends(get_drives)) -> QuestionCore:
+def find_next_question(db: dict, drive: dict, settings: Settings) -> QuestionCore:
+    print(settings)
     question_list_stream = drive['questions'].get(settings.qfilename)
     if question_list_stream is None:
         raise Exception("no question list found")
         #return PlainTextResponse("what's a question, really?", status_code=500)
+    print(2)
 
     data_streamed = question_list_stream.read().decode().strip() # strip to remove trailing newline
     # read store of questions every invocation
     # compare the entry with the given datetime TODO
-    
-    questions: [QuestionCore] = yaml_to_questions(data_streamed)
 
+
+    questions: [QuestionCore] = yaml_to_questions(data_streamed)
     for q in questions:
         #key = q['cycle'] + q['id']
         if db['questions'].get(key=q['key']) is None:
@@ -274,7 +275,7 @@ async def get_question(drive: dict = Depends(get_drives),
         # no active question, so read from the list and see what the next one should be
         # if nothing in list, return 500
         try: 
-            q_model: QuestionCore = find_next_question()
+            q_model: QuestionCore = find_next_question(drive, db, settings)
         except Exception as e:
             print(e)
             return PlainTextResponse(f"error", status_code=500)        

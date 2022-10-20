@@ -35,6 +35,9 @@ except:
 # - update yaml to set schedule 
 # - qetQuestion algo
 # - - make it wrap to beginning if it reached the end of the list
+# - organize code to not all be in 1 file
+# - - do api version prefix at same time
+# - - - see https://christophergs.com/tutorials/ultimate-fastapi-tutorial-pt-8-project-structure-api-versioning/
 # - getAnswer algo
 # - automated/documented deploy process (separate dev deta project)
 # - - deploy a fix to the dev BE
@@ -51,9 +54,6 @@ except:
 # - which endpoints should have associated pydantic models?
 # - - all of them? no, only the ones that return content, not the ones that just ack
 # - add openAPI config info, see: https://lyz-code.github.io/blue-book/fastapi/
-# - add api version, like https://christophergs.com/tutorials/ultimate-fastapi-tutorial-pt-8-project-structure-api-versioning/
-# - - would need to break api compatibility by switching to this structure,
-#     hopefully dale wouldn't mind
 
 from .config import Settings
 

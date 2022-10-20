@@ -10,7 +10,7 @@ from deta import Drive, Base
 from fastapi import FastAPI, Response
 from fastapi.testclient import TestClient
 
-from ..main import QuestionCore, NoAnswersResponse, AnswerListen, rotate_active_question, yaml_to_questions
+from ..main import QuestionYaml, QuestionCore, NoAnswersResponse, AnswerListen, rotate_active_question, yaml_to_questions
 
 from ..config import Settings
 
@@ -111,24 +111,27 @@ def upload_question_yaml(test_drives,
 @pytest.fixture
 def set_1_question(test_dbs, test_drives,
                    settings: Settings = get_settings() ) -> QuestionCore:
-    # should I update this to use local tests/question_list_1_entry.yaml
     # this doesn't add a q per se, it sets entire list to single q
-    key = 'set_1_question key'
-    text = 'none'
-    checklist = ['a', 'b']
-    # asked_on = datetime.utcnow() # .today()
-    hours_between_questions = 96
-    qm = QuestionCore(key=key,
-                      text=text,
-                      checklist=checklist,
-                      hours_between_questions=hours_between_questions)
-
-    # model_dicts = [QuestionBase(*q).dict() for q in questions]
-    yaml_string = yaml.dump({'questions': [qm.dict()]}, sort_keys=False) # don't sort keys so key remains first
-    
     qfilename = settings.qfilename
     qfile = test_drives['questions'].get(qfilename)
+
     if qfile is None:
+        # should I update this to use local tests/question_list_1_entry.yaml, or question_list in the test instance? TODO
+        key = 'set_1_question key'
+        text = 'none'
+        checklist = ['a', 'b']
+        # asked_on = datetime.utcnow() # .today()
+        hours_between_questions = 96
+        qm = QuestionYaml(key=key,
+                          text=text,
+                          checklist=checklist)
+                         
+
+        # model_dicts = [QuestionBase(*q).dict() for q in questions]
+        yaml_string = yaml.dump({'questions': [qm.dict()],
+                                 'hours_between_questions': hours_between_questions},
+                                sort_keys=False) # don't sort keys so key remains first
+    
         test_drives['questions'].put(qfilename, yaml_string)
     else:
         raise Exception(f"{qfilename} already in drive, not overwriting just in case")

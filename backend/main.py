@@ -143,13 +143,16 @@ def get_dbs():
 #questions_drive, answers_drive = get_drives()
 #questions_db, answers_db = get_dbs()
 
-# QuestionBase interops with the yaml file
-class QuestionCore(YamlModel): 
+# QuestionYaml interops with the yaml file
+class QuestionYaml(YamlModel): 
     key: str
     text: str
     checklist: List[str]
-    hours_between_questions: int # in hours
 
+# can we consolidate this with Serve or DB?
+class QuestionCore(QuestionYaml): 
+    hours_between_questions: int # in hours
+    
 class QuestionServe(QuestionCore):
     asked_on: datetime.datetime
 
@@ -226,11 +229,6 @@ def yaml_to_questions(contents_yaml: str) -> List[QuestionCore]:
 async def root():
     return {'hey': 'world'}
 
-
-
-
-
-
 # LEFT OFF how to pass in these params to this func? maybe pass  contents of file instead of settings? or figure out how to call this from the test harness with the right value...what is the right value? I think use local file in tests/ dir
 #
 # intended to consume the yaml contents and
@@ -238,22 +236,21 @@ async def root():
 # if all Qs in last have been asked, will just randomly choose.
 # (change Q keys in text file to start fresh)
 def find_next_question(db: dict, drive: dict, settings: Settings) -> QuestionCore:
-    print(settings)
     question_list_stream = drive['questions'].get(settings.qfilename)
     if question_list_stream is None:
         raise Exception("no question list found")
         #return PlainTextResponse("what's a question, really?", status_code=500)
-    print(2)
 
     data_streamed = question_list_stream.read().decode().strip() # strip to remove trailing newline
     # read store of questions every invocation
     # compare the entry with the given datetime TODO
 
-
+    print(data_streamed)
     questions: [QuestionCore] = yaml_to_questions(data_streamed)
     for q in questions:
+        print(q)
         #key = q['cycle'] + q['id']
-        if db['questions'].get(key=q['key']) is None:
+        if db['questions'].get(key=q.key) is None:
             return q
 
     # if we haven't returned yet, then we've already asked all Qs in list.
@@ -265,31 +262,35 @@ def find_next_question(db: dict, drive: dict, settings: Settings) -> QuestionCor
 async def get_question(drive: dict = Depends(get_drives),
                        db: dict = Depends(get_dbs),
                        settings: Settings = Depends(get_settings)):
-    # get today's question...how? from drive? from base? from internet endpoint? from file?/src
-    # - think i want to go with base (need them anwyay). and can dev separate micro to insert Qs to it! or separate endpoint, with special auth?
-    # - cron job to delete old files 30min after question change (if they are on a schedule)
-
     active_question_rows = db['questions'].fetch({"is_the_active_question": True})
+    print(active_question_rows.items)
     if active_question_rows.count != 1:
         # either 0 or >1. in either case, can treat as no active question.
         # no active question, so read from the list and see what the next one should be
         # if nothing in list, return 500
-        try: 
-            q_model: QuestionCore = find_next_question(drive, db, settings)
+        try:
+            # LEFT OFF making asked_on json serializable...use actual datetimestamp and type is just str?
+            q_model: QuestionCore = find_next_question(db, drive, settings)
+            q_row: QuestionDB = QuestionDB(is_the_active_question = True,
+                                           asked_on = str(datetime.datetime.now()),
+                                           **q_model.dict())
+            print(q_row)
+            db['questions'].insert(q_row.dict())
+            print(5)
         except Exception as e:
-            print(e)
+            print(f"err {e}")
             return PlainTextResponse(f"error", status_code=500)        
     else:
-        q_model: QuestionCore = active_question_rows.items[0]
+        q_row: QuestionDB = active_question_rows.items[0]
 
     # here we set the key of the question to be the cycle+id.
     # doing this here allows us to manipulate the cycle attribute in find_next_question
     #quuid = str(q_model['cycle'] + q_model['id']) # (str() bc yaml file has integers as key)
+    print(q_row)
     quuid = q_model['key']
-    q_row = db['questions'].get(quuid)
     db['questions'].update(key=str(quuid),
                            updates={"num_asks": db['questions'].util.increment(1)})
-    q_response = QuestionServe(q_row)
+    q_response = QuestionServe(**q_row.dict())
     return q_response
 
 @app.post("/submitAnswer", response_model=SubmitAnswerResponse)

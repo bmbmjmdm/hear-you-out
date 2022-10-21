@@ -29,12 +29,13 @@ except:
 # - - C-c C-d for elpy docs
 # - - C-c C-s elpy rgrep symbol
 # - - jedi and company for code completion i think
+# - - - dabbrev too
 # - - C-c C-e for symbol multi-edit
 # - - ok now trying out pyright and cordu (and not cape?)
 # + update yaml to map category name to checklist (node anchors?)
 # - update yaml to set schedule 
 # - qetQuestion algo
-# - - make it wrap to beginning if it reached the end of the list
+# - - make it choose randomly if it reached the end of the list
 # - organize code to not all be in 1 file
 # - - do api version prefix at same time
 # - - - see https://christophergs.com/tutorials/ultimate-fastapi-tutorial-pt-8-project-structure-api-versioning/
@@ -106,7 +107,7 @@ def rotate_active_question(drive, db, settings):
                           num_asks=0,
                           num_answers=0,
                           is_the_active_question=True,
-                          asked_on=now)
+                          asked_on=str(now))
         db['questions'].insert(q_db.dict())
 
 
@@ -154,7 +155,7 @@ class QuestionCore(QuestionYaml):
     hours_between_questions: int # in hours
     
 class QuestionServe(QuestionCore):
-    asked_on: datetime.datetime
+    asked_on: str # datetime.datetime
 
 # LEFT OFF
 # - updating test case num_answers
@@ -269,26 +270,18 @@ async def get_question(drive: dict = Depends(get_drives),
         # no active question, so read from the list and see what the next one should be
         # if nothing in list, return 500
         try:
-            # LEFT OFF making asked_on json serializable...use actual datetimestamp and type is just str?
             q_model: QuestionCore = find_next_question(db, drive, settings)
             q_row: QuestionDB = QuestionDB(is_the_active_question = True,
                                            asked_on = str(datetime.datetime.now()),
                                            **q_model.dict())
-            print(q_row)
             db['questions'].insert(q_row.dict())
-            print(5)
         except Exception as e:
             print(f"err {e}")
             return PlainTextResponse(f"error", status_code=500)        
     else:
         q_row: QuestionDB = active_question_rows.items[0]
 
-    # here we set the key of the question to be the cycle+id.
-    # doing this here allows us to manipulate the cycle attribute in find_next_question
-    #quuid = str(q_model['cycle'] + q_model['id']) # (str() bc yaml file has integers as key)
-    print(q_row)
-    quuid = q_model['key']
-    db['questions'].update(key=str(quuid),
+    db['questions'].update(key=str(q_row.key),
                            updates={"num_asks": db['questions'].util.increment(1)})
     q_response = QuestionServe(**q_row.dict())
     return q_response

@@ -232,6 +232,7 @@ def test_get_question(set_1_question: QuestionCore, # Arrange
     qresponse = getQuestion() # Act
 
     assert qresponse.status_code == 200
+    # LEFT OFF fixing this assert
     assert qresponse.json() == set_1_question.dict()
     assert test_dbs['questions'].get(set_1_question.key)['num_asks'] == 1
 

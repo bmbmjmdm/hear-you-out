@@ -160,6 +160,9 @@ class QuestionServe(QuestionCore):
 # LEFT OFF
 # - updating test case num_answers
 #      - QuestionModel to QuestionServe test cases and main
+# - and actually just fixing all test caes
+# - and making sure they capture the new activeQ functionality and
+#                   doesn't change other endpoint logic
 class QuestionDB(QuestionServe):
     num_asks: int = 0
     num_answers: int = 0
@@ -263,8 +266,8 @@ def find_next_question(db: dict, drive: dict, settings: Settings) -> QuestionCor
 async def get_question(drive: dict = Depends(get_drives),
                        db: dict = Depends(get_dbs),
                        settings: Settings = Depends(get_settings)):
+    # get the current question, if there is one
     active_question_rows = db['questions'].fetch({"is_the_active_question": True})
-    print(active_question_rows.items)
     if active_question_rows.count != 1:
         # either 0 or >1. in either case, can treat as no active question.
         # no active question, so read from the list and see what the next one should be
@@ -279,7 +282,7 @@ async def get_question(drive: dict = Depends(get_drives),
             print(f"err {e}")
             return PlainTextResponse(f"error", status_code=500)        
     else:
-        q_row: QuestionDB = active_question_rows.items[0]
+        q_row: QuestionDB = QuestionDB.parse_obj(active_question_rows.items[0])
 
     db['questions'].update(key=str(q_row.key),
                            updates={"num_asks": db['questions'].util.increment(1)})

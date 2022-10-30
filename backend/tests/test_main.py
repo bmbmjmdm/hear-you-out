@@ -211,7 +211,6 @@ def set_1_question(test_dbs, test_drives,
 ### getQuestion
 
 # returns a function so we can call it more than once in a test case.
-
 @pytest.fixture
 def getQuestion(client: TestClient) -> Callable:
     def _getQuestion():
@@ -222,6 +221,9 @@ def getQuestion(client: TestClient) -> Callable:
     # err, don't know how many times it's been asked, so need to copy
     # state from before yielding insteadd.
 
+def is_contained(dict1, dict2):
+    return all(key in dict2.keys() and dict1[key] == dict2[key] for key in dict1)
+    
 def test_get_question(set_1_question: QuestionCore, # Arrange
                       test_dbs,
                       getQuestion: Callable) -> None:
@@ -229,11 +231,17 @@ def test_get_question(set_1_question: QuestionCore, # Arrange
     # (gets input into DB during first ask)
     assert test_dbs['questions'].get(set_1_question.key) is None
 
+    before_time = datetime.datetime.now()
     qresponse = getQuestion() # Act
+    after_time = datetime.datetime.now()
 
     assert qresponse.status_code == 200
-    # LEFT OFF fixing this assert
-    assert qresponse.json() == set_1_question.dict()
+    # todo rewrite this test case to use upload_question_yaml and then change this logic
+    assert is_contained(set_1_question.dict(), qresponse.json())
+    from dateutil import parser
+    actual_time = parser.parse(qresponse.json()['asked_on'])
+    assert actual_time >= before_time
+    assert actual_time <= after_time
     assert test_dbs['questions'].get(set_1_question.key)['num_asks'] == 1
 
     getQuestion() # Act again

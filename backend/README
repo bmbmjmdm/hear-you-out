@@ -10,6 +10,10 @@ web browse to <ip>:8000/docs
 hear-you-out/backend$ `source .venv/bin/activate`
 hear-you-out/backend$ `pytest`
 
+for a specific set of tests that match the given name glob:
+
+hear-you-out/backend$ `pytest -k get_question`
+
 # TODO configure to use dev deta project for running tests
 
 ### install

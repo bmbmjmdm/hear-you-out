@@ -79,45 +79,49 @@ else:
 
 deta = Deta(Secret_key)
 
+# if there is no active question, this function finds the first one and sets one
+# if there is an active question, this one finds the next one and sets it
+# if there is more than one, this function doesn't do anything (system in weird state)
+# this function returns a string indicating abort/log of activity.
 # TODO better way to pass through params drive and settings to find_next_question?
-def rotate_active_question(drive, db, settings):
+def rotate_active_question(db: dict,
+                           drive: dict,
+                           settings: Settings) -> str:
     #db = get_dbs()
     resp = db['questions'].fetch(query={"is_the_active_question": True})
     if len(resp.items) > 1:
         return "ABORT more than one active q"
-    elif len(resp.items) == 0:
-        return "ABORT no active q to rotate"
-    # else there's only 1 elem
-    q = resp.items[0]
 
-    now = datetime.datetime.now() 
-    if q.asked_on + datetime.timedetla(hours=q.hours_between_questions) >= now:
-        try:
-            nextq: QuestionCore = find_next_question(drive, db, settings)
-        except Exception as e:
-            print(e)
-            # TODO discord ping on all error states?
-            return f"{now} ERROR ROTATING QUESTION: no questions in file"
-            
+    try:
+        nextq: QuestionCore = find_next_question(db, drive, settings)
+    except Exception as e:
+        print(e)
+        # TODO discord ping on all error states?
+        return f"{now} ERROR ROTATING QUESTION: no questions in file"
 
-        db['questions'].update(key=q['key'], updates={"is_the_active_question": False})
-        
-        current_time = datetime.utcnow()
-        q_db = QuestionDB(**nextq.dict(),#TODO better way? look at pydantic model docs
-                          num_asks=0,
-                          num_answers=0,
-                          is_the_active_question=True,
-                          asked_on=str(now))
-        db['questions'].insert(q_db.dict())
-
-
+    return_message = ""
+    # if there's an active question, deactivate it
+    if len(resp.items) == 1:
+        q = resp.items[0]
+        now = datetime.datetime.now() 
+        if q.asked_on + datetime.timedetla(hours=q.hours_between_questions) >= now:
+            db['questions'].update(key=q['key'], updates={"is_the_active_question": False})
+        return_message += f"unactived question {q}\n\n"
         # TODO clean up drive of old audio answers
         # - (archive? publish transcripts? topic modeling?)
         # - prolly wanna use dirs to organize files per question startdate/uuid
 
-        return f"rotating old q '{q}'\n\tnew q: {nextq}" # deta visor
-    
-    return
+    # set the new active question
+    current_time = datetime.datetime.now()
+    q_db = QuestionDB(**nextq.dict(),#TODO better way? look at pydantic model docs
+                      num_asks=0,
+                      num_answers=0,
+                      is_the_active_question=True,
+                      asked_on=str(current_time))
+    db['questions'].insert(q_db.dict())
+    return_message += f"\tnew q: {nextq}"
+
+    return return_message  # deta visor
 
 
 ### app below
@@ -261,6 +265,10 @@ def find_next_question(db: dict, drive: dict, settings: Settings) -> QuestionCor
     # so now let's just rotate randomly so the app is still at least usable 
     return choice(questions)
 
+# need to undo getQuestion state change in test fixture. implies side effects would be better kept outside the endpoint (to make for easier testing)
+# - should move the autoload to cron
+# LEFT OFF testing this (just impld the change but may not have been comprehensive).
+
 # return 500 if no questions (vs 200 with a FailState response model)
 @app.get("/getQuestion", response_model=QuestionServe)
 async def get_question(drive: dict = Depends(get_drives),
@@ -269,21 +277,22 @@ async def get_question(drive: dict = Depends(get_drives),
     # get the current question, if there is one
     active_question_rows = db['questions'].fetch({"is_the_active_question": True})
     if active_question_rows.count != 1:
-        # either 0 or >1. in either case, can treat as no active question.
-        # no active question, so read from the list and see what the next one should be
-        # if nothing in list, return 500
-        try:
-            q_model: QuestionCore = find_next_question(db, drive, settings)
-            q_row: QuestionDB = QuestionDB(is_the_active_question = True,
-                                           asked_on = str(datetime.datetime.now()),
-                                           **q_model.dict())
-            db['questions'].insert(q_row.dict())
-        except Exception as e:
-            print(f"err {e}")
-            return PlainTextResponse(f"error", status_code=500)        
-    else:
-        q_row: QuestionDB = QuestionDB.parse_obj(active_question_rows.items[0])
+        # # either 0 or >1. in either case, can treat as no active question.
+        # # no active question, so read from the list and see what the next one should be
+        # # if nothing in list, return 500
+        # try:
+        #     q_model: QuestionCore = find_next_question(db, drive, settings)
+        #     q_row: QuestionDB = QuestionDB(is_the_active_question = True,
+        #                                    asked_on = str(datetime.datetime.now()),
+        #                                    **q_model.dict())
+        #     db['questions'].insert(q_row.dict())
+        # except Exception as e:
+        #     print(f"err {e}")
+        #     return PlainTextResponse(f"error", status_code=500)
+        print(f"no active question atm")
+        return PlainTextResponse(f"no active question atm", status_code=500)
 
+    q_row: QuestionDB = QuestionDB.parse_obj(active_question_rows.items[0])
     db['questions'].update(key=str(q_row.key),
                            updates={"num_asks": db['questions'].util.increment(1)})
     q_response = QuestionServe(**q_row.dict())

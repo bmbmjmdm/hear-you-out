@@ -90,8 +90,10 @@ def client(app: FastAPI) -> TestClient:
 # TODO - actually want a test to check prod db for the correct formatted questions.
 #        how to do this despite dependency_overrides above? avoid using endpoint?
 
+# todo think I want to replace set_1_question with qupload_question_yaml in most instances
 @pytest.fixture
-def upload_question_yaml(test_drives,
+def upload_question_yaml(test_dbs,
+                         test_drives,
                          settings: Settings = get_settings()) -> [QuestionCore]:
     with open(settings.local_qpath, 'r') as f:
         qfilecontents = f.read()
@@ -104,12 +106,14 @@ def upload_question_yaml(test_drives,
     else:
         raise Exception(f"{qfilename} already in drive, not overwriting just in case")
 
+    rotate_active_question(test_dbs, test_drives, settings)
     yield qCores
 
     test_drives['questions'].delete(qfilename)
 
 @pytest.fixture
-def set_1_question(test_dbs, test_drives,
+def set_1_question(test_dbs,
+                   test_drives,
                    settings: Settings = get_settings() ) -> QuestionCore:
     # this doesn't add a q per se, it sets entire list to single q
     qfilename = settings.qfilename
@@ -221,7 +225,9 @@ def getQuestion(client: TestClient) -> Callable:
     # err, don't know how many times it's been asked, so need to copy
     # state from before yielding insteadd.
 
-def is_contained(dict1, dict2):
+    # need 
+
+def is_contained(dict1: dict, dict2: dict):
     return all(key in dict2.keys() and dict1[key] == dict2[key] for key in dict1)
     
 def test_get_question(set_1_question: QuestionCore, # Arrange
@@ -237,6 +243,8 @@ def test_get_question(set_1_question: QuestionCore, # Arrange
 
     assert qresponse.status_code == 200
     # todo rewrite this test case to use upload_question_yaml and then change this logic
+    print(set_1_question.dict())
+    print(qresponse.json())
     assert is_contained(set_1_question.dict(), qresponse.json())
     from dateutil import parser
     actual_time = parser.parse(qresponse.json()['asked_on'])
@@ -263,9 +271,11 @@ def test_active_question(test_dbs,
     assert results.count == 1
     assert results.items[0]['is_the_active_question'] is True
 
-def test_question_rotation(test_dbs,
+def test_question_rotation(test_dbs: dict,
+                           test_drives: dict,
                            upload_question_yaml: list[QuestionCore], # takes care of the drive
-                           getQuestion: Callable) -> None:
+                           getQuestion: Callable,
+                           settings: Settings = get_settings()) -> None:
     assert len(upload_question_yaml) >= 2 # we need at least 2 to rotate
 
     # nothing in db beforehand
@@ -288,17 +298,19 @@ def test_question_rotation(test_dbs,
     
     # modify expiration for testing purpose and then call cron function
     test_dbs['questions'].update(key=qresponse['key'], updates={'hours_between_questions': 0})
-    rotate_active_question()
+    rotate_active_question(test_dbs, test_drives, settings)
 
     # call getQuestion again, after expiration, and verify Q rotation
     qresponse3 = getQuestion() # Act
 
     assert qresponse3['key'] != qresponse['key']
 
-# if we reach the end of the question list, start back at the beginning
+# if we reach the end of the question list, then we pick randomly
 def test_question_wrap(test_dbs,
+                       test_drives,                      
                        upload_question_yaml: list[QuestionCore], # takes care of the drive
-                       getQuestion: Callable) -> None:
+                       getQuestion: Callable,
+                       settings: Settings = get_settings()) -> None:
     assert len(upload_question_yaml) >= 2 # we need at least 2 to wrap
 
     # nothing in db beforehand
@@ -313,13 +325,20 @@ def test_question_wrap(test_dbs,
         assert seen_questions.get(actual_key) is None
         # modify expiration for testing purpose and then call cron function
         test_dbs['questions'].update(key=actual_key, updates={'hours_between_questions': 0})
-        rotate_active_question()
+        rotate_active_question(test_dbs, test_drives, settings)
 
-    # TODO want to test distribution has an even spread. there's prob a lib for that
+    # test distribution of answers has an even (uniform) spread
+    # TODO call getQuestion a bunch and query how many times each q was served
+    #      then see if that distribution has a uniform distribution
+    # import numpy as np
+    # def is_uniform(array):
+    #     return np.allclose(np.mean(array), np.median(array))
+    # assert is_uniform(
     
     qresponse = getQuestion()
-    actual_key = qresponse['key']
-    assert upload_question_yaml[0]['key'] == actual_key
+    assert qresponse.status_code == 200
+    # actual_key = qresponse['key']
+    # assert upload_question_yaml[0]['key'] == actual_key
 
 def test_no_questions_available(getQuestion: Callable) -> None:
     qresponse = getQuestion()

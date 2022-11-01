@@ -12,7 +12,5 @@ def get_settings():
 # (see error when running pytest)
 @app.lib.cron()
 def cronjob1(event):
-    return rotate_active_question(get_drives(), get_dbs(), get_settings())
+    return rotate_active_question(get_dbs(), get_drives(), get_settings())
 
-# LEFT OFF need to get drive, db and settings from this file
-# can i just import and call get_settings, get_drives, and get_dbs?

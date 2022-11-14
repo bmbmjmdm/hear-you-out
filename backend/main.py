@@ -237,12 +237,13 @@ def yaml_to_questions(contents_yaml: str) -> List[QuestionCore]:
 async def root():
     return {'hey': 'world'}
 
-# LEFT OFF how to pass in these params to this func? maybe pass  contents of file instead of settings? or figure out how to call this from the test harness with the right value...what is the right value? I think use local file in tests/ dir
-#
+# todo reconsider parameters to this func: maybe pass contents of file instead of settings# todo call from tests with right value, probably local file in tests/ dir 
+
 # intended to consume the yaml contents and
 # return the first one that is not already in the questions db.
 # if all Qs in last have been asked, will just randomly choose.
 # (change Q keys in text file to start fresh)
+# TODO LEFT OFF this should take a string as file contents so its easier to test
 def find_next_question(db: dict, drive: dict, settings: Settings) -> QuestionCore:
     question_list_stream = drive['questions'].get(settings.qfilename)
     if question_list_stream is None:

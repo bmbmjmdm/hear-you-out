@@ -111,6 +111,9 @@ def upload_question_yaml(test_dbs,
 
     test_drives['questions'].delete(qfilename)
 
+# LEFT OFF need set_1_question bc it lets me know in test cases contents of getQ
+#          so need to edit it to use local questions file like upload_question_yaml
+#          vs made up Q it currently does
 @pytest.fixture
 def set_1_question(test_dbs,
                    test_drives,
@@ -229,16 +232,39 @@ def getQuestion(client: TestClient) -> Callable:
 
 def is_contained(dict1: dict, dict2: dict):
     return all(key in dict2.keys() and dict1[key] == dict2[key] for key in dict1)
-    
-def test_get_question(set_1_question: QuestionCore, # Arrange
-                      test_dbs,
-                      getQuestion: Callable) -> None:
 
-    # (gets input into DB during first ask)
+# TODO LEFT OFF probably need to change this to use upload yaml questions,
+
+def test_get_question_no_questions(set_1_question: QuestionCore, # Arrange
+                                   test_dbs,
+                                   getQuestion: Callable) -> None:
+    assert test_dbs['questions'].get(set_1_question.key) is None
+    qresponse = getQuestion() # Act
+    assert qresponse.status_code == 500
+
+
+def test_no_questions_available(getQuestion: Callable) -> None:
+    qresponse = getQuestion()
+    assert qresponse.status_code == 500
+
+    
+def test_get_question(): # TODO LEFT OFF right args for this test csae
+    
+    getQuestion() # Act again
+    assert test_dbs['questions'].get(set_1_question.key)['num_asks'] == 1
+    getQuestion() # Act again
+    # make sure it incremented
+    assert test_dbs['questions'].get(set_1_question.key)['num_asks'] == 2
+
+    pass
+    
+def test_initiate_questions(set_1_question: QuestionCore, # Arrange
+                            test_dbs,
+                            getQuestion: Callable) -> None:
     assert test_dbs['questions'].get(set_1_question.key) is None
 
     before_time = datetime.datetime.now()
-    qresponse = getQuestion() # Act
+    ## TODO call rotate func
     after_time = datetime.datetime.now()
 
     assert qresponse.status_code == 200
@@ -250,12 +276,7 @@ def test_get_question(set_1_question: QuestionCore, # Arrange
     actual_time = parser.parse(qresponse.json()['asked_on'])
     assert actual_time >= before_time
     assert actual_time <= after_time
-    assert test_dbs['questions'].get(set_1_question.key)['num_asks'] == 1
 
-    getQuestion() # Act again
-
-    # make sure it incremented
-    assert test_dbs['questions'].get(set_1_question.key)['num_asks'] == 2
 
 def test_active_question(test_dbs,
                          upload_question_yaml: list[QuestionCore], # takes care of the drive
@@ -271,6 +292,10 @@ def test_active_question(test_dbs,
     assert results.count == 1
     assert results.items[0]['is_the_active_question'] is True
 
+# TODO LEFT OFF question rotation when:
+# - there is more than 1 active qcontents
+# - when there is no file or is empty
+# - when there is only 1 question in the file (
 def test_question_rotation(test_dbs: dict,
                            test_drives: dict,
                            upload_question_yaml: list[QuestionCore], # takes care of the drive
@@ -281,9 +306,9 @@ def test_question_rotation(test_dbs: dict,
     # nothing in db beforehand
     assert test_dbs['questions'].fetch().count == 0
 
-    # hit the getQuestion endpoint
-    qresponse = getQuestion() # Act
-
+    # TODO LEFT OFF call upload_question_yaml? -> need to better define the test func params wrt mapping them to precise states in the state machine
+    # maybe want to draw a state machine diagram and see if I can auto gen the inferrable unit tests
+    
     # now there is an active question
     results = test_dbs['questions'].fetch()
     assert results.count == 1
@@ -339,10 +364,6 @@ def test_question_wrap(test_dbs,
     assert qresponse.status_code == 200
     # actual_key = qresponse['key']
     # assert upload_question_yaml[0]['key'] == actual_key
-
-def test_no_questions_available(getQuestion: Callable) -> None:
-    qresponse = getQuestion()
-    assert qresponse.status_code == 500
 
 ### submitAnswer
 

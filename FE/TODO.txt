@@ -4,3 +4,11 @@ https://stackoverflow.com/questions/31716413/xcode-not-automatically-creating-br
 
 useFrameworks! issues (or permissions issues for ios):
 https://github.com/zoontek/react-native-permissions
+
+
+react-native -version
+9.1.1
+npx react-native -version
+9.1.1
+npm -v
+7.24.2

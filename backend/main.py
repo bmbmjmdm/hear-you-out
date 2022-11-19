@@ -30,9 +30,16 @@ except:
 # - - C-c C-s elpy rgrep symbol
 # - - jedi and company for code completion i think
 # - - C-c C-e for symbol multi-edit
-# - update yaml to map category name to checklist (node anchors?)
+# + update yaml to map category name to checklist (node anchors?)
+# - update yaml to set schedule 
 # - qetQuestion algo
+# - new endpoint for days till next Q
 # - getAnswer algo
+# - automated/documented deploy process (separate dev micro)
+# - - deploy a fix to the dev BE
+#     point the dev FE to the dev BE and test out the fix
+#     confirm it works
+#     then we deploy the dev BE to the prod BE and everyone will have that new fix
 # - tests (see todo in test_main)
 # - - db+drive DI
 # - all other todos in the source code and on jir
@@ -97,8 +104,17 @@ class QuestionModel(YamlModel):
     text: str
     checklist: List[str]
 
+# LEFT OFF
+# - updating test case s/num_asks/num_answers;
+# - recording asked_on;
+# - - i think we should also store the schedule as it is when Q asked
+# - - and actually this hsould be recorded in a known place to avoid yaml combing
+# - - - new column? can we constrain it to only be true for 1 row?
+# - new endpoint to calc days til
+# - getQuestion logic to use helper from new endpoint to decide which Q to server
 class QuestionDB(QuestionModel):
-    num_asks: int = 0
+    num_answers: int = 0
+    asked_on: datetime
 
 class SubmitAnswerPost(BaseModel):
     audio_data: bytes # should this be str since its b64 encoded? maybe create new Type
@@ -182,6 +198,7 @@ async def get_question(drive: dict = Depends(get_drives),
     # compare the entry with the given datetime TODO
     
     questions = yaml_to_questions(data_streamed)
+    # LEFT OFF algo to use release_on field in question yaml to select. write down potential error states
     q = choice(questions)
     q_model = QuestionModel(**q)
     #q = questions[1]
@@ -191,10 +208,6 @@ async def get_question(drive: dict = Depends(get_drives),
     if db['questions'].get(str(q['key'])) is None:
         q_db = QuestionDB(**q_model.dict()) #TODO better way? look at pydantic model docs
         db['questions'].insert(q_db.dict())
-
-    # regardless of first time being asked or not (=0), increment num_asks
-    db['questions'].update(key=str(q['key']),
-                           updates={"num_asks": db['questions'].util.increment(1)})
 
     return q_model.dict()
 
@@ -227,6 +240,9 @@ async def submit_answer(ans: SubmitAnswerPost,
                                 question_uuid=question_uuid,
                                 entry_timestamp=ts)
     db['answers'].insert(new_row.dict())
+    db['questions'].update(key=str(question_uuid),
+                           updates={"num_answers": db['questions'].util.increment(1)})
+
 
     return {'answer_id': answer_uuid,
             'question_id': question_uuid,

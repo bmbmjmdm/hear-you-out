@@ -146,9 +146,9 @@ android {
     signingConfigs {
         debug {
             storeFile file('keystore.jks')
-            storePassword 'Your normal password with "hear you out"'
+            storePassword 'Your normal password with "hear you out" and no fucking'
             keyAlias 'key'
-            storePassword 'Your normal password with "hear you out"'
+            keyPassword 'Your normal password with "hear you out" and no fucking'
         }
     }
     buildTypes {
@@ -181,6 +181,7 @@ android {
 }
 
 dependencies {
+    implementation 'com.squareup.okhttp3:okhttp:4.9.0' 
     implementation fileTree(dir: "libs", include: ["*.jar"])
     //noinspection GradleDynamicVersion
     implementation "com.facebook.react:react-native:+"  // From node_modules

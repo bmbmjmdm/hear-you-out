@@ -1,0 +1,5 @@
+/local_secrets.py
+.DS_Store
+/gpt4.py
+__pycache__
+/output.csv

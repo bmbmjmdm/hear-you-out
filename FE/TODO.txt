@@ -12,3 +12,5 @@ npx react-native -version
 9.1.1
 npm -v
 7.24.2
+
+replace amplitude init key in App.tsx with the one defined in secrets.txt here

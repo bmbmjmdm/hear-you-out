@@ -322,4 +322,4 @@ cython_debug/
 #.idea/
 
 # PostgreSQL
-.postgres-data/
+postgres-data/

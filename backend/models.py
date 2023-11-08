@@ -9,6 +9,7 @@ from sqlalchemy import (
   DateTime,
   Float,
   types,
+  Table,
 )
 from sqlalchemy.dialects.postgresql import UUID, BYTEA, ARRAY
 from sqlalchemy.orm import relationship, mapped_column, Mapped, deferred
@@ -29,7 +30,7 @@ from database import Base
 #
 # Given the above, the database should have the following models:
 # User (id-uuid, the user ID; username-string, the user's username; password-string, the user's password)
-# Question (id-uuid, the question ID; text-string, the question text; checklist-list of strings, the checklist items)
+# Question (id-uuid, the question ID; text-string, the question text)
 # Answer (id-uuid, the answer ID; audio_data-bytes, the audio data;)
 # Flag (id-uuid, the flag ID; reason-string, the reason for flagging)
 # Vote (id-uuid, the vote ID; vote-int, the vote value)
@@ -40,7 +41,6 @@ from database import Base
 # AnswerEmbedding, a join table between Answer and Embedding (answer_id-uuid, the answer ID; embedding_id-uuid, the embedding ID)
 # 
 # Currently user is registered and logged via device ID, except for admin
-
 
 class BaseMixin:
   id: Mapped[uuid.UUID] = mapped_column(
@@ -59,6 +59,8 @@ class BaseMixin:
     nullable=False,
     default=True,
   )
+
+
 
 class User(BaseMixin, Base):
   __tablename__ = "users"
@@ -85,20 +87,35 @@ class User(BaseMixin, Base):
     default=False,
   )
 
-  answers = relationship("Answer", back_populates="user")
-  votes = relationship("Vote", back_populates="user")
-  flags = relationship("Flag", back_populates="user")
+  # relationships
+  answers: Mapped[List["Answer"]] = relationship(
+    "Answer",
+    back_populates="user",
+  )
+  votes: Mapped[List["Vote"]] = relationship(
+    "Vote",
+    back_populates="user",
+  )
+  flags: Mapped[List["Flag"]] = relationship(
+    "Flag",
+    back_populates="user",
+  )
+
 
 class Question(BaseMixin, Base):
   __tablename__ = "questions"
   text: Mapped[str] = mapped_column(
     nullable=False,
   )
-  answers = relationship("Answer", back_populates="question")
-
   of_the_day: Mapped[bool] = mapped_column(
     nullable=False,
     default=False,
+  )
+
+  # relationships
+  answers: Mapped[List["Answer"]] = relationship(
+    "Answer",
+    back_populates="question",
   )
 
 class Answer(BaseMixin, Base):
@@ -115,11 +132,27 @@ class Answer(BaseMixin, Base):
     nullable=False,
   )
 
-  user = relationship("User", back_populates="answers")
-  question = relationship("Question", back_populates="answers")
-  embeddings = relationship("Embedding", back_populates="answer")
-  votes = relationship("Vote", back_populates="answer")
-  flags = relationship("Flag", back_populates="answer")
+  # relationships
+  user: Mapped[User] = relationship(
+    "User",
+    back_populates="answers",
+  )
+  votes: Mapped[List["Vote"]] = relationship(
+    "Vote",
+    back_populates="answer",
+  )
+  flags: Mapped[List["Flag"]] = relationship(
+    "Flag",
+    back_populates="answer",
+  )
+  embeddings: Mapped[List["Embedding"]] = relationship(
+    "Embedding",
+    back_populates="answer",
+  )
+  question: Mapped[Question] = relationship(
+    "Question",
+    back_populates="answers",
+  )
 
 class Flag(BaseMixin, Base):
   __tablename__ = "flags"
@@ -135,8 +168,16 @@ class Flag(BaseMixin, Base):
     nullable=False,
   )
 
-  user = relationship("User", back_populates="flags")
-  answer = relationship("Answer", back_populates="flags")
+  # relationships
+  user: Mapped[User] = relationship(
+    "User",
+    back_populates="flags",
+  )
+  answer: Mapped[Answer] = relationship(
+    "Answer",
+    back_populates="flags",
+  )
+
 
 class Vote(BaseMixin, Base):
   __tablename__ = "votes"
@@ -152,8 +193,16 @@ class Vote(BaseMixin, Base):
     nullable=False,
   )
 
-  user = relationship("User", back_populates="votes")
-  answer = relationship("Answer", back_populates="votes")
+  # relationships
+  user: Mapped[User] = relationship(
+    "User",
+    back_populates="votes",
+  )
+  answer: Mapped[Answer] = relationship(
+    "Answer",
+    back_populates="votes",
+  )
+
 
 class Embedding(BaseMixin, Base):
   __tablename__ = "embeddings"
@@ -168,4 +217,11 @@ class Embedding(BaseMixin, Base):
     ForeignKey("answers.id"),
     nullable=False,
   )
-  answer = relationship("Answer", back_populates="embeddings")
+
+  # relationships
+  answer: Mapped[Answer] = relationship(
+    "Answer",
+    back_populates="embeddings",
+  )
+
+

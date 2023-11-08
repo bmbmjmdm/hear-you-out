@@ -13,6 +13,8 @@ from fastapi import (
 )
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.future import select
+
 from typing import List, Optional, Union
 from pydantic import BaseModel
 import uuid
@@ -37,22 +39,30 @@ router = APIRouter(
 async def get_question(
   db: AsyncSession = Depends(get_db),
   ids: Optional[List[uuid.UUID]] = Query(None),
+  limit: Optional[int] = Query(100),
+  offset: Optional[int] = Query(0),
 ):
   # Get questions, by default the question of the day, from database
+  query = select(models.Question).limit(limit).offset(offset)
 
-  if ids is None:
-    # get question of the day
-    # MADEUP
-    question = db.query(models.Question).filter(models.Question.is_active == True).first()
+  if ids is not None:
+    query = query.where(models.Question.key.in_(ids))
+    
+  questions = await db.execute(query)
+  questions = questions.unique().scalars().all()
 
 
-  if question is None:
+  print(questions)
+  if questions is None:
     raise HTTPException(
       status_code=status.HTTP_404_NOT_FOUND,
-      detail="No question found",
+      detail="No questions found",
     )
-  
-  return question
+  print(4)
+  # Convert to external model
+  questions = [schemas.QuestionExternalModel.model_validate(question) for question in questions]
+
+  return questions
 
 
 @router.post("/answers", response_model=List[schemas.AnswerExternalModel])

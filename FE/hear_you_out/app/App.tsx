@@ -186,6 +186,9 @@ const App = () => {
           }
         }
       }
+      else if (nextAppState === "background") {
+        amplitude.track('App sent to background or quit');
+      }
       appState.current = nextAppState;
     };
     AppState.addEventListener("change", appStateListener.current)

@@ -1,17 +1,6 @@
-## running locally in WSL2
+# Instructions to run the backend
+1. Move up to main directory
+2. docker compose up
+Congrats, you're running the backend!
 
-`ifconfig`
-source .venv/bin/activate
-hear-you-out/backend$ `uvicorn --host <ip> main:app`
-web browse to <ip>:8000/docs
-
-### running tests
-
-hear-you-out/backend$ `pytest`
-
-### install
-
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt -r local_requirements.txt
-
+There miiiight be some issues with alembic migrations being run on each startup, that shouldn't be an issue as long as you don't push the repo with those migrations nor edit db models.

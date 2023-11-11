@@ -6,7 +6,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from contextlib import asynccontextmanager
 
 from database import session_manager
-from routers import router
+from routers import core, auth
 
 
 def init_app(init_db=True):
@@ -23,8 +23,8 @@ def init_app(init_db=True):
     
     server = FastAPI(title="FastAPI server", lifespan=lifespan)
 
-    print(router)
-    server.include_router(router)
+    server.include_router(core.router)
+    server.include_router(auth.router)
     
     origins = [
     "http://localhost:8000",

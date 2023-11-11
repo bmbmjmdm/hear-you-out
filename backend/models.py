@@ -1,15 +1,15 @@
 # Models for database. SQLAlchemy, FastAPI, Pydantic, and PostgresSQL
 
 from sqlalchemy import (
-  Boolean,
-  Column,
-  ForeignKey,
-  Integer,
-  String,
-  DateTime,
-  Float,
-  types,
-  Table,
+    Boolean,
+    Column,
+    ForeignKey,
+    Integer,
+    String,
+    DateTime,
+    Float,
+    types,
+    Table,
 )
 from sqlalchemy.dialects.postgresql import UUID, BYTEA, ARRAY
 from sqlalchemy.orm import relationship, mapped_column, Mapped, deferred
@@ -39,189 +39,201 @@ from database import Base
 # AnswerVote, a join table between Answer and User (answer_id-uuid, the answer ID; user_id-uuid, the user ID; vote-int, the vote value)
 # AnswerFlag, a join table between Answer and User (answer_id-uuid, the answer ID; user_id-uuid, the user ID; flag_id-uuid, the flag ID)
 # AnswerEmbedding, a join table between Answer and Embedding (answer_id-uuid, the answer ID; embedding_id-uuid, the embedding ID)
-# 
+#
 # Currently user is registered and logged via device ID, except for admin
 
-class BaseMixin:
-  id: Mapped[uuid.UUID] = mapped_column(
-    UUID(as_uuid=True),
-    primary_key=True,
-    default=uuid.uuid4,
-  )
-  created_at: Mapped[datetime] = mapped_column(
-    default=datetime.utcnow,
-  )
-  updated_at: Mapped[datetime] = mapped_column(
-    default=datetime.utcnow,
-    onupdate=datetime.utcnow,
-  )
-  is_active: Mapped[bool] = mapped_column(
-    nullable=False,
-    default=True,
-  )
 
+class BaseMixin:
+    id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True),
+        primary_key=True,
+        default=uuid.uuid4,
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        default=datetime.utcnow,
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        default=datetime.utcnow,
+        onupdate=datetime.utcnow,
+    )
+    is_active: Mapped[bool] = mapped_column(
+        nullable=False,
+        default=True,
+    )
 
 
 class User(BaseMixin, Base):
-  __tablename__ = "users"
-  device_id: Mapped[str] = mapped_column(
-    unique=True,
-    nullable=False,
-  )
-  username: Mapped[str] = mapped_column(
-    nullable=True,
-    default=device_id,
-  )
-  email: Mapped[str] = mapped_column(
-    nullable=True,
-  )
-  # hash device_id and random salt as default password
-  password: Mapped[str] = mapped_column(
-    nullable=False,
-    default=lambda: hashlib.sha256(
-      (str(uuid.uuid4()) + str(uuid.uuid4())).encode("utf-8")
-    ).hexdigest(),
-  )
-  is_admin: Mapped[bool] = mapped_column(
-    nullable=False,
-    default=False,
-  )
+    __tablename__ = "users"
+    device_id: Mapped[str] = mapped_column(
+        unique=True,
+        nullable=False,
+    )
+    username: Mapped[str] = mapped_column(
+        nullable=False,
+        unique=True,
+    )
+    email: Mapped[str] = mapped_column(
+        nullable=True,
+        unique=True,
+    )
+    #
+    password: Mapped[str] = mapped_column(
+        nullable=False,
+    )
+    is_admin: Mapped[bool] = mapped_column(
+        nullable=False,
+        default=False,
+    )
 
-  # relationships
-  answers: Mapped[List["Answer"]] = relationship(
-    "Answer",
-    back_populates="user",
-  )
-  votes: Mapped[List["Vote"]] = relationship(
-    "Vote",
-    back_populates="user",
-  )
-  flags: Mapped[List["Flag"]] = relationship(
-    "Flag",
-    back_populates="user",
-  )
+    # relationships
+    answers: Mapped[List["Answer"]] = relationship(
+        "Answer",
+        back_populates="user",
+        lazy="selectin",
+    )
+    votes: Mapped[List["Vote"]] = relationship(
+        "Vote",
+        back_populates="user",
+        lazy="selectin",
+    )
+    flags: Mapped[List["Flag"]] = relationship(
+        "Flag",
+        back_populates="user",
+        lazy="selectin",
+    )
 
 
 class Question(BaseMixin, Base):
-  __tablename__ = "questions"
-  text: Mapped[str] = mapped_column(
-    nullable=False,
-  )
-  of_the_day: Mapped[bool] = mapped_column(
-    nullable=False,
-    default=False,
-  )
+    __tablename__ = "questions"
+    text: Mapped[str] = mapped_column(
+        nullable=False,
+    )
+    of_the_day: Mapped[bool] = mapped_column(
+        nullable=False,
+        default=False,
+    )
 
-  # relationships
-  answers: Mapped[List["Answer"]] = relationship(
-    "Answer",
-    back_populates="question",
-  )
+    # relationships
+    answers: Mapped[List["Answer"]] = relationship(
+        "Answer",
+        back_populates="question",
+        lazy="selectin",
+    )
+
 
 class Answer(BaseMixin, Base):
-  __tablename__ = "answers"
-  audio_data: Mapped[bytes] = mapped_column(
-    nullable=False,
-  )
-  user_id: Mapped[uuid.UUID] = mapped_column(
-    ForeignKey("users.id"),
-    nullable=True,  # Save user data in case of deletion by default
-  )
-  question_id: Mapped[uuid.UUID] = mapped_column(
-    ForeignKey("questions.id"),
-    nullable=False,
-  )
+    __tablename__ = "answers"
+    audio_data: Mapped[bytes] = mapped_column(
+        nullable=False,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=True,  # Save user data in case of deletion by default
+    )
+    question_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("questions.id"),
+        nullable=False,
+    )
 
-  # relationships
-  user: Mapped[User] = relationship(
-    "User",
-    back_populates="answers",
-  )
-  votes: Mapped[List["Vote"]] = relationship(
-    "Vote",
-    back_populates="answer",
-  )
-  flags: Mapped[List["Flag"]] = relationship(
-    "Flag",
-    back_populates="answer",
-  )
-  embeddings: Mapped[List["Embedding"]] = relationship(
-    "Embedding",
-    back_populates="answer",
-  )
-  question: Mapped[Question] = relationship(
-    "Question",
-    back_populates="answers",
-  )
+    # relationships
+    user: Mapped[User] = relationship(
+        "User",
+        back_populates="answers",
+        lazy="selectin",
+    )
+    votes: Mapped[List["Vote"]] = relationship(
+        "Vote",
+        back_populates="answer",
+        lazy="selectin",
+    )
+    flags: Mapped[List["Flag"]] = relationship(
+        "Flag",
+        back_populates="answer",
+        lazy="selectin",
+    )
+    embeddings: Mapped[List["Embedding"]] = relationship(
+        "Embedding",
+        back_populates="answer",
+        lazy="selectin",
+    )
+    question: Mapped[Question] = relationship(
+        "Question",
+        back_populates="answers",
+        lazy="selectin",
+    )
+
 
 class Flag(BaseMixin, Base):
-  __tablename__ = "flags"
-  reason: Mapped[str] = mapped_column(
-    nullable=True,  # No reason by default
-  )
-  user_id: Mapped[uuid.UUID] = mapped_column(
-    ForeignKey("users.id"),
-    nullable=True,  # Save user data in case of deletion by default
-  )
-  answer_id: Mapped[uuid.UUID] = mapped_column(
-    ForeignKey("answers.id"),
-    nullable=False,
-  )
+    __tablename__ = "flags"
+    reason: Mapped[str] = mapped_column(
+        nullable=True,  # No reason by default
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=True,  # Save user data in case of deletion by default
+    )
+    answer_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("answers.id"),
+        nullable=False,
+    )
 
-  # relationships
-  user: Mapped[User] = relationship(
-    "User",
-    back_populates="flags",
-  )
-  answer: Mapped[Answer] = relationship(
-    "Answer",
-    back_populates="flags",
-  )
+    # relationships
+    user: Mapped[User] = relationship(
+        "User",
+        back_populates="flags",
+        lazy="selectin",
+    )
+    answer: Mapped[Answer] = relationship(
+        "Answer",
+        back_populates="flags",
+        lazy="selectin",
+    )
 
 
 class Vote(BaseMixin, Base):
-  __tablename__ = "votes"
-  vote: Mapped[int] = mapped_column(
-    nullable=False,
-  )
-  user_id: Mapped[uuid.UUID] = mapped_column(
-    ForeignKey("users.id"),
-    nullable=True,  # Save user data in case of deletion by default
-  )
-  answer_id: Mapped[uuid.UUID] = mapped_column(
-    ForeignKey("answers.id"),
-    nullable=False,
-  )
+    __tablename__ = "votes"
+    vote: Mapped[int] = mapped_column(
+        nullable=False,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=True,  # Save user data in case of deletion by default
+    )
+    answer_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("answers.id"),
+        nullable=False,
+    )
 
-  # relationships
-  user: Mapped[User] = relationship(
-    "User",
-    back_populates="votes",
-  )
-  answer: Mapped[Answer] = relationship(
-    "Answer",
-    back_populates="votes",
-  )
+    # relationships
+    user: Mapped[User] = relationship(
+        "User",
+        back_populates="votes",
+        lazy="selectin",
+    )
+    answer: Mapped[Answer] = relationship(
+        "Answer",
+        back_populates="votes",
+        lazy="selectin",
+    )
 
 
 class Embedding(BaseMixin, Base):
-  __tablename__ = "embeddings"
-  embedding: Mapped[List[float]] = mapped_column(
-    ARRAY(Float),
-    nullable=False,
-  )
-  model: Mapped[str] = mapped_column(
-    nullable=False,
-  )
-  answer_id: Mapped[uuid.UUID] = mapped_column(
-    ForeignKey("answers.id"),
-    nullable=False,
-  )
+    __tablename__ = "embeddings"
+    embedding: Mapped[List[float]] = mapped_column(
+        ARRAY(Float),
+        nullable=False,
+    )
+    model: Mapped[str] = mapped_column(
+        nullable=False,
+    )
+    answer_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("answers.id"),
+        nullable=False,
+    )
 
-  # relationships
-  answer: Mapped[Answer] = relationship(
-    "Answer",
-    back_populates="embeddings",
-  )
-
-
+    # relationships
+    answer: Mapped[Answer] = relationship(
+        "Answer",
+        back_populates="embeddings",
+        lazy="selectin",
+    )

@@ -19,32 +19,15 @@ from datetime import datetime
 # Mixin
 
 
-# Base model, with necessary and public fields for all models
-class BaseMixin:
-    model_config = ConfigDict(from_attributes=True)
-    is_active: bool = Field(True, description="Whether the model is active")
-
-
-# Minimal model, for relations with other models
-class MinimalMixin:
-    id: UUID4 = Field(..., description="The ID of the model")
-
-
-# Full model, with all fields
-class ModelMixin:
-    id: UUID4 = Field(..., description="The ID of the model")
-    created_at: datetime = Field(..., description="The time of creation of the model")
-    updated_at: datetime = Field(
-        ..., description="The time of last update of the model"
-    )
-
-
 # User
 
 
 # Base model, with necessary and public fields for all models
 class UserBaseModel(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    is_active: bool = Field(True, description="Whether the model is active")
     device_id: str = Field(..., description="The device ID of the user")
+    email: Optional[str] = Field(None, description="The email of the user")
     username: Optional[str] = Field(None, description="The username of the user")
     password: Optional[SecretStr] = Field(None, description="The password of the user")
 
@@ -71,6 +54,7 @@ class UserModel(UserBaseModel):
 # Create model, for creating new users
 class UserCreateModel(UserBaseModel):
     # given currently users are identified by device ID, username and password are optional
+    email: Optional[str] = Field(None, description="The email of the user")
     username: Optional[str] = Field(None, description="The username of the user")
     password: Optional[SecretStr] = Field(None, description="The password of the user")
 
@@ -89,12 +73,14 @@ class UserCreateModel(UserBaseModel):
 
 # Update from user perspective, for updating user info
 class UserUpdateModel(UserBaseModel):
+    email: Optional[str] = Field(None, description="The email of the user")
     username: Optional[str] = Field(None, description="The username of the user")
     password: Optional[SecretStr] = Field(None, description="The password of the user")
 
 
 # Update from admin perspective, for updating user info
 class UserUpdateAdminModel(UserBaseModel):
+    email: Optional[str] = Field(None, description="The email of the user")
     username: Optional[str] = Field(None, description="The username of the user")
     password: Optional[SecretStr] = Field(None, description="The password of the user")
     is_admin: Optional[bool] = Field(None, description="Whether the user is an admin")
@@ -133,12 +119,12 @@ class QuestionModel(QuestionBaseModel):
 
 
 # Create model, for creating new questions
-class CreateQuestionModel(QuestionBaseModel):
+class QuestionCreateModel(QuestionBaseModel):
     pass
 
 
 # Update model, for updating question info
-class UpdateQuestionModel(QuestionBaseModel):
+class QuestionUpdateModel(QuestionBaseModel):
     text: Optional[str] = Field(None, description="The text of the question")
 
 
@@ -349,6 +335,14 @@ class FlagUpdateModel(FlagBaseModel):
 # External model, to be returned to the frontend, possibly public
 class FlagExternalModel(FlagModel):
     pass
+
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+
+class TokenData(BaseModel):
+    username: str | None = None
 
 
 # Rebuild models for relations

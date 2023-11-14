@@ -69,8 +69,11 @@ async def create_admin(
     await db.commit()
     await db.refresh(out_user)
 
+    for field in out_user.__table__.columns:
+        print(f"{field.name}: {getattr(out_user, field.name)}")
     # Convert to external model
     out_user = schemas.UserUpdateAdminModel.model_validate(out_user)
+    return out_user
 
 
 @router.post("/users", response_model=List[schemas.UserUpdateAdminModel])

@@ -13,7 +13,9 @@ from sqlalchemy.orm import declarative_base
 from config import config
 
 print(config.SQLALCHEMY_DATABASE_URI)
-engine = create_async_engine(config.SQLALCHEMY_DATABASE_URI, echo=True, future=True)
+engine = create_async_engine(config.SQLALCHEMY_DATABASE_URI,
+                            #  echo=True,
+                             future=True)
 
 Base = declarative_base()
 async_session = async_sessionmaker(engine, expire_on_commit=False)

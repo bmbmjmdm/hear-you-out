@@ -3,4 +3,5 @@
 2. docker compose up
 Congrats, you're running the backend!
 
-There miiiight be some issues with alembic migrations being run on each startup, that shouldn't be an issue as long as you don't push the repo with those migrations nor edit db models.
+# Creating first admin:
+In /api/admin/create_admin provide ADMIN_SECRET as password. Care, as only one admin can be created that way.

@@ -85,7 +85,7 @@ async def register_users(
     # Create user in database
     out_users = []
     for user in users:
-        out_user = await authentication.register_user(user)
+        out_user = await authentication.register_user(user, db)
         out_users.append(out_user)
 
     # Convert to external model

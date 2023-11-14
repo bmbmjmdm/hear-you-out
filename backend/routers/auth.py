@@ -40,7 +40,7 @@ async def register_user(
     db: AsyncSession = Depends(get_db),
 ):
     # Create user in database
-    user = await authentication.register_user(user)
+    user = await authentication.register_user(user, db)
 
     # Convert to external model
     user = schemas.UserExternalModel.model_validate(user)
@@ -101,7 +101,7 @@ async def login_username(
             detail="Incorrect username or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-
+    # Conver string
     access_token_expires = timedelta(minutes=authentication.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = await authentication.create_access_token(
         data={"sub": user.device_id}, expires_delta=access_token_expires

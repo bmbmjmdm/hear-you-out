@@ -6,7 +6,7 @@ from starlette.middleware.sessions import SessionMiddleware
 from contextlib import asynccontextmanager
 
 from database import session_manager
-from routers import core, auth
+from routers import core, auth, admin
 
 
 def init_app(init_db=True):
@@ -25,6 +25,7 @@ def init_app(init_db=True):
 
     server.include_router(core.router)
     server.include_router(auth.router)
+    server.include_router(admin.router)
     
     origins = [
     "http://localhost:8000",
@@ -34,7 +35,6 @@ def init_app(init_db=True):
     "http://127.0.0.1:5173",
     "http://localhost:3000",
     "http://localhost:5173/"
-
     ]
 
     server.add_middleware(

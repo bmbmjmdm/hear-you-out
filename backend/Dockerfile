@@ -1,21 +1,6 @@
-## running in docker
-
 FROM tiangolo/uvicorn-gunicorn-fastapi:python3.11
-
-WORKDIR /app
-
-# Install dependencies
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-# Copy application source code
-COPY . .
-
-# Expose port 8080
-EXPOSE 8080
-
+RUN pip install --upgrade pip
+COPY ./requirements.txt /app/requirements.txt
+RUN pip install -r /app/requirements.txt
 # Alembic
-
-
-# Run the application
-# CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8080"]
+RUN alembic init -t async /app/alembic

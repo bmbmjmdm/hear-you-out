@@ -17,19 +17,61 @@ from sqlalchemy.future import select
 from typing import List, Optional, Union, Annotated
 from pydantic import BaseModel
 import uuid
+import time
+import random
 
 import models, schemas
 from database import get_db
 import authentication
+from config import config
+
 
 class Message(BaseModel):
     message: str
+
 
 router = APIRouter(
     prefix="/api/admin",
     tags=["admin"],
     responses={404: {"description": "Not found"}},
 )
+
+
+# Hidden endpoint for creating the first admin user
+@router.post(
+    "/create_admin",
+    response_model=schemas.UserUpdateAdminModel,
+    include_in_schema=not config.HIDDEN_ENDPOINTS,
+)
+async def create_admin(
+    user: schemas.UserCreateModel,
+    db: AsyncSession = Depends(get_db),
+    password: str = Query(...),
+):
+    if password != config.ADMIN_SECRET:
+        time.sleep(random.randint(1, 5))
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Incorrect password",
+        )
+    # Make sure there is no admin user already
+    query = select(models.User).where(models.User.is_admin == True)
+    admin = await db.execute(query)
+    admin = admin.unique().scalars().first()
+    if admin is not None:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Admin user already exists",
+        )
+    # Create user in database
+    out_user = await authentication.register_user(user, db)
+    out_user.is_admin = True
+    await db.commit()
+    await db.refresh(out_user)
+
+    # Convert to external model
+    out_user = schemas.UserUpdateAdminModel.model_validate(out_user)
+
 
 @router.post("/users", response_model=List[schemas.UserUpdateAdminModel])
 async def register_users(
@@ -44,11 +86,9 @@ async def register_users(
         out_users.append(out_user)
 
     # Convert to external model
-    out_users = [
-        schemas.UserUpdateAdminModel.model_validate(user)
-    ]
+    out_users = [schemas.UserUpdateAdminModel.model_validate(user)]
     return out_users
-        
+
 
 @router.get("/users", response_model=List[schemas.UserUpdateAdminModel])
 async def get_users(
@@ -84,19 +124,23 @@ async def update_users(
 ):
     # Update users in database
     out_users = []
-    db_users = await db.execute(select(models.User).where(models.User.key.in_([user.key for user in users])))
+    db_users = await db.execute(
+        select(models.User).where(models.User.key.in_([user.key for user in users]))
+    )
     db_users = db_users.unique().scalars().all()
     for db_user, user in zip(db_users, users):
         for field in user.model_fields:
             setattr(db_user, field, getattr(user, field))
-        out_users.append(db_user)            
+        out_users.append(db_user)
     await db.commit()
 
     for user in out_users:
         await db.refresh(user)
 
     # Convert to external model
-    out_users = [schemas.UserUpdateAdminModel.model_validate(user) for user in out_users]
+    out_users = [
+        schemas.UserUpdateAdminModel.model_validate(user) for user in out_users
+    ]
     return out_users
 
 
@@ -146,7 +190,9 @@ async def get_questions(
         )
 
     # Convert to external model
-    questions = [schemas.QuestionUpdateModel.model_validate(question) for question in questions]
+    questions = [
+        schemas.QuestionUpdateModel.model_validate(question) for question in questions
+    ]
     return questions
 
 
@@ -158,19 +204,26 @@ async def update_questions(
 ):
     # Update questions in database
     out_questions = []
-    db_questions = await db.execute(select(models.Question).where(models.Question.key.in_([question.key for question in questions])))
+    db_questions = await db.execute(
+        select(models.Question).where(
+            models.Question.key.in_([question.key for question in questions])
+        )
+    )
     db_questions = db_questions.unique().scalars().all()
     for db_question, question in zip(db_questions, questions):
         for field in question.model_fields:
             setattr(db_question, field, getattr(question, field))
-        out_questions.append(db_question)            
+        out_questions.append(db_question)
     await db.commit()
 
     for question in out_questions:
         await db.refresh(question)
 
     # Convert to external model
-    out_questions = [schemas.QuestionUpdateModel.model_validate(question) for question in out_questions]
+    out_questions = [
+        schemas.QuestionUpdateModel.model_validate(question)
+        for question in out_questions
+    ]
     return out_questions
 
 
@@ -180,22 +233,41 @@ async def submit_answers(
     answers: List[schemas.AnswerCreateModel],
     db: AsyncSession = Depends(get_db),
 ):
-    # Create answers in database
-    db_answers = [models.Answer(**answer.model_dump()) for answer in answers]
+    db_answers = []
+    for answer in answers:
+        # Get the related objects
+        user = await db.execute(
+            select(models.User).where(models.User.id == answer.user_uuid)
+        )
+        user = user.unique().scalars().first()
+        question = await db.execute(
+            select(models.Question).where(models.Question.id == answer.question_uuid)
+        )
+        question = question.unique().scalars().first()
+        # Save the audio data to audio_files, provided as bytes
+        audio_data = answer.audio_data
+        audio_location = uuid.uuid4()
+        with open(f"{config.AUDIO_FILE_PATH}{audio_location}.wav", "wb") as f:
+            f.write(audio_data)
+        # Create the answer
+        obj_in_data = answer.model_dump()
+        db_answer = models.Answer(**obj_in_data)
+        # Set the related objects
+        db_answer.user = user
+        db_answer.question = question
+        db_answer.audio_location = audio_location
+        db_answers.append(db_answer)
     db.add_all(db_answers)
     await db.commit()
     for answer in db_answers:
         await db.refresh(answer)
-        print(f"Answer: {answer}")
-        for field in answer.__table__.columns:
-            print(f"{field.name}: {getattr(answer, field.name)}")
-
-    # Convert to external model
-    answers = [
-        schemas.AnswerUpdateModel.model_validate(answer)
-        for answer in db_answers
+    return [
+        schemas.AnswerUpdateModel.model_validate(**answer.dict(), audio_data=audio_data)
+        for answer, audio_data in zip(
+            db_answers, [answer.audio_data for answer in answers]
+        )
     ]
-    return answers
+
 
 @router.get("/answers", response_model=List[schemas.AnswerUpdateModel])
 async def get_answers(
@@ -218,8 +290,19 @@ async def get_answers(
             detail="No answers found",
         )
 
+    # Get the audio data
+    answers_audio_data = []
+    for answer in answers:
+        audio_data = None
+        with open(f"{config.AUDIO_FILE_PATH}{answer.audio_location}", "rb") as f:
+            audio_data = f.read()
+        answers_audio_data.append((answer, audio_data))
+
     # Convert to external model
-    answers = [schemas.AnswerUpdateModel.model_validate(answer) for answer in answers]
+    answers = [
+        schemas.AnswerUpdateModel.model_validate(**answer.dict(), audio_data=audio_data)
+        for answer, audio_data in answers_audio_data
+    ]
     return answers
 
 
@@ -231,20 +314,37 @@ async def update_answers(
 ):
     # Update answers in database
     out_answers = []
-    db_answers = await db.execute(select(models.Answer).where(models.Answer.key.in_([answer.key for answer in answers])))
+    db_answers = await db.execute(
+        select(models.Answer).where(
+            models.Answer.key.in_([answer.key for answer in answers])
+        )
+    )
     db_answers = db_answers.unique().scalars().all()
     for db_answer, answer in zip(db_answers, answers):
         for field in answer.model_fields:
-            setattr(db_answer, field, getattr(answer, field))
-        out_answers.append(db_answer)            
+            if field == "audio_data":
+                audio_location = uuid.uuid4()
+                with open(f"{config.AUDIO_FILE_PATH}{audio_location}.wav", "wb") as f:
+                    f.write(answer.audio_data)
+                setattr(db_answer, "audio_location", audio_location)
+            else:
+                setattr(db_answer, field, getattr(answer, field))
+        out_answers.append(db_answer)
     await db.commit()
 
+    answers_audio_data = []
     for answer in out_answers:
         await db.refresh(answer)
+        audio_data = None
+        with open(f"{config.AUDIO_FILE_PATH}{answer.audio_location}", "rb") as f:
+            audio_data = f.read()
+        answers_audio_data.append((answer, audio_data))
 
     # Convert to external model
-    out_answers = [schemas.AnswerUpdateModel.model_validate(answer) for answer in out_answers]
-    return out_answers
+    out_answers = [
+        schemas.AnswerUpdateModel.model_validate(answer_audio_data)
+        for answer_audio_data in answers_audio_data
+    ]
 
 
 @router.post("/flags", response_model=List[schemas.FlagUpdateModel])
@@ -264,11 +364,9 @@ async def submit_flags(
             print(f"{field.name}: {getattr(flag, field.name)}")
 
     # Convert to external model
-    flags = [
-        schemas.FlagUpdateModel.model_validate(flag)
-        for flag in db_flags
-    ]
+    flags = [schemas.FlagUpdateModel.model_validate(flag) for flag in db_flags]
     return flags
+
 
 @router.get("/flags", response_model=List[schemas.FlagUpdateModel])
 async def get_flags(
@@ -304,12 +402,14 @@ async def update_flags(
 ):
     # Update flags in database
     out_flags = []
-    db_flags = await db.execute(select(models.Flag).where(models.Flag.key.in_([flag.key for flag in flags])))
+    db_flags = await db.execute(
+        select(models.Flag).where(models.Flag.key.in_([flag.key for flag in flags]))
+    )
     db_flags = db_flags.unique().scalars().all()
     for db_flag, flag in zip(db_flags, flags):
         for field in flag.model_fields:
             setattr(db_flag, field, getattr(flag, field))
-        out_flags.append(db_flag)            
+        out_flags.append(db_flag)
     await db.commit()
 
     for flag in out_flags:
@@ -337,11 +437,9 @@ async def submit_votes(
             print(f"{field.name}: {getattr(vote, field.name)}")
 
     # Convert to external model
-    votes = [
-        schemas.VoteUpdateModel.model_validate(vote)
-        for vote in db_votes
-    ]
+    votes = [schemas.VoteUpdateModel.model_validate(vote) for vote in db_votes]
     return votes
+
 
 @router.get("/votes", response_model=List[schemas.VoteUpdateModel])
 async def get_votes(
@@ -377,12 +475,14 @@ async def update_votes(
 ):
     # Update votes in database
     out_votes = []
-    db_votes = await db.execute(select(models.Vote).where(models.Vote.key.in_([vote.key for vote in votes])))
+    db_votes = await db.execute(
+        select(models.Vote).where(models.Vote.key.in_([vote.key for vote in votes]))
+    )
     db_votes = db_votes.unique().scalars().all()
     for db_vote, vote in zip(db_votes, votes):
         for field in vote.model_fields:
             setattr(db_vote, field, getattr(vote, field))
-        out_votes.append(db_vote)            
+        out_votes.append(db_vote)
     await db.commit()
 
     for vote in out_votes:
@@ -400,7 +500,9 @@ async def submit_embeddings(
     db: AsyncSession = Depends(get_db),
 ):
     # Create embeddings in database
-    db_embeddings = [models.Embedding(**embedding.model_dump()) for embedding in embeddings]
+    db_embeddings = [
+        models.Embedding(**embedding.model_dump()) for embedding in embeddings
+    ]
     db.add_all(db_embeddings)
     await db.commit()
     for embedding in db_embeddings:
@@ -415,6 +517,7 @@ async def submit_embeddings(
         for embedding in db_embeddings
     ]
     return embeddings
+
 
 @router.get("/embeddings", response_model=List[schemas.EmbeddingUpdateModel])
 async def get_embeddings(
@@ -438,7 +541,10 @@ async def get_embeddings(
         )
 
     # Convert to external model
-    embeddings = [schemas.EmbeddingUpdateModel.model_validate(embedding) for embedding in embeddings]
+    embeddings = [
+        schemas.EmbeddingUpdateModel.model_validate(embedding)
+        for embedding in embeddings
+    ]
     return embeddings
 
 
@@ -450,19 +556,24 @@ async def update_embeddings(
 ):
     # Update embeddings in database
     out_embeddings = []
-    db_embeddings = await db.execute(select(models.Embedding).where(models.Embedding.key.in_([embedding.key for embedding in embeddings])))
+    db_embeddings = await db.execute(
+        select(models.Embedding).where(
+            models.Embedding.key.in_([embedding.key for embedding in embeddings])
+        )
+    )
     db_embeddings = db_embeddings.unique().scalars().all()
     for db_embedding, embedding in zip(db_embeddings, embeddings):
         for field in embedding.model_fields:
             setattr(db_embedding, field, getattr(embedding, field))
-        out_embeddings.append(db_embedding)            
+        out_embeddings.append(db_embedding)
     await db.commit()
 
     for embedding in out_embeddings:
         await db.refresh(embedding)
 
     # Convert to external model
-    out_embeddings = [schemas.EmbeddingUpdateModel.model_validate(embedding) for embedding in out_embeddings]
+    out_embeddings = [
+        schemas.EmbeddingUpdateModel.model_validate(embedding)
+        for embedding in out_embeddings
+    ]
     return out_embeddings
-
-

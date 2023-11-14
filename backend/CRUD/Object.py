@@ -1,7 +1,7 @@
 # CRUD directory is for all the database operations.
 # Universal object class for all non-User objects from which other objects inherit
 #
-from typing import Any, Dict, List, Optional, Type, TypeVar, Union
+from typing import List, Type, TypeVar, Dict, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
 
@@ -22,13 +22,17 @@ class CRUDObject:
         self.db = db
         self.model = model
 
-    async def get(self, id: uuid.UUID = None, **kwargs) -> Optional[ModelType]:
+    async def get(self, id: uuid.UUID = None, query_dict: Dict = None) -> ModelType:
         stmt = select(self.model).where(self.model.is_active == True)
 
         if id is not None:
             stmt = stmt.where(self.model.id == id)
-        if kwargs:
-            stmt = stmt.where(**kwargs)
+        if query_dict:
+            # example:
+            # question = await question_CRUD.get(query_dict={"of_the_day": True})
+            for key, value in query_dict.items():
+                stmt = stmt.where(getattr(self.model, key) == value)
+
 
         result = await self.db.execute(stmt)
         obj = result.scalars().first()

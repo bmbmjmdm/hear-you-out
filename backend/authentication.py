@@ -14,8 +14,9 @@ import os
 import models
 import schemas
 from database import get_db
+from config import config
 
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = config.ACCESS_TOKEN_EXPIRE_MINUTES
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -145,16 +146,30 @@ async def register_user(
     try:
         await db.commit()
     except Exception as e:
+        print("ERROR REPORT:",e, f"duplicate key value violates unique constraint in str(e): {'duplicate key value violates unique constraint' in str(e)}")
         if "duplicate key value violates unique constraint" in str(e):
-            if "device_id" in str(e):
+            print("SANITY CHECK:", f"username={user.username}, email={user.email}, device_id={user.device_id}")
+            print("ERROR DETAILS:", str(e), f"Key (username)=({user.username}) already exists in str(e): {'Key (username)=({user.username}) already exists' in str(e)}")
+            print("ERROR DETAILS:", str(e), f"Key (email)=({user.email}) already exists in str(e): {'Key (email)=({user.email}) already exists' in str(e)}")
+            print("ERROR DETAILS:", str(e), f"Key (device_id)=({user.device_id}) already exists in str(e): {'Key (device_id)=({user.device_id}) already exists' in str(e)}")
+            if f"Key (username)=({user.username}) already exists" in str(e):
                 raise HTTPException(
-                    status_code=400, detail="Device ID already registered"
+                    status_code=400,
+                    detail=f"Username {user.username} already exists",
                 )
-            elif "username" in str(e):
+            elif f"Key (email)=({user.email}) already exists" in str(e):
                 raise HTTPException(
-                    status_code=400, detail="Username already registered"
+                    status_code=400,
+                    detail=f"Email {user.email} already exists",
                 )
-            elif "email" in str(e):
-                raise HTTPException(status_code=400, detail="Email already registered")
+            elif f"Key (device_id)=({user.device_id}) already exists" in str(e):
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Device ID {user.device_id} already exists",
+                )
+        raise HTTPException(
+            status_code=400,
+            detail=f"Error registering user",
+        )
     await db.refresh(db_user)
     return db_user

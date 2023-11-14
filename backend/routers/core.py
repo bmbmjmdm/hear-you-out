@@ -22,7 +22,7 @@ import models, schemas
 from database import get_db
 import authentication
 from CRUD.Object import CRUDObject
-from CRUD import Flag, Vote
+from CRUD import Flag, Vote, Answer
 
 class Message(BaseModel):
     message: str
@@ -40,7 +40,7 @@ async def get_question_of_the_day(
     db: AsyncSession = Depends(get_db),
 ):
     question_CRUD = CRUDObject(db, models.Question)
-    question = await question_CRUD.get(is_of_the_day=True)
+    question = await question_CRUD.get(query_dict={"of_the_day": True})
 
     if question is None:
         raise HTTPException(
@@ -60,8 +60,11 @@ async def submit_answer(
     answer: schemas.AnswerCreateModel,
     db: AsyncSession = Depends(get_db),
 ):
-    answers_CRUD = CRUDObject(db, models.Answer)
-    answer = await answers_CRUD.create(answer)
+    answers_CRUD = Answer.CRUDAnswer(db, models.Answer)
+    # CRUD create: return answer, audio_data
+    answer, audio_data = await answers_CRUD.create(answer)
+    # Convert to external model from answer and audio_data
+    answer = schemas.AnswerExternalModel.model_validate(answer, audio_data=audio_data)
     return answer
 
 
@@ -71,16 +74,15 @@ async def get_answers(
     db: AsyncSession = Depends(get_db),
     ids: Optional[List[uuid.UUID]] = Query(None),
 ):
-    answers_CRUD = CRUDObject(db, models.Answer)
+    answers_CRUD = Answer.CRUDAnswer(db, models.Answer)
     if ids is not None:
-        answers = await answers_CRUD.get_multi(id=ids)
+        answers_audio_data = await answers_CRUD.get_multi(id=ids)
     else:
-        answers = await answers_CRUD.get_multi()
-
-    # Convert to external model
-    answers = schemas.AnswerExternalModel.model_validate(answers, many=True)
-
+        answers_audio_data = await answers_CRUD.get_multi()
+    # Convert to external models from answers and audio_data
+    answers = [schemas.AnswerExternalModel.model_validate(answer, audio_data=audio_data) for answer, audio_data in answers_audio_data]
     return answers
+
 
 # Flag answer
 @router.post("/flag", response_model=schemas.FlagExternalModel)

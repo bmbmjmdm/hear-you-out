@@ -56,7 +56,7 @@ class UserCreateModel(UserBaseModel):
     # given currently users are identified by device ID, username and password are optional
     email: Optional[str] = Field(None, description="The email of the user")
     username: Optional[str] = Field(None, description="The username of the user")
-    password: Optional[SecretStr] = Field(None, description="The password of the user")
+    password: Optional[str] = Field(None, description="The password of the user")
 
     @validator("username")
     def username_required(cls, v, values, **kwargs):
@@ -140,15 +140,15 @@ class QuestionExternalModel(QuestionModel):
 class AnswerBaseModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     is_active: bool = Field(True, description="Whether the model is active")
-    audio_data: bytes = Field(..., description="The audio data of the answer")
     question_uuid: UUID4 = Field(
         ..., description="The UUID of the question of the answer"
     )
-
+    user_uuid: UUID4 = Field(..., description="The UUID of the user of the answer")
 
 # Minimal model, for relations with other models
 class AnswerMinimalModel(AnswerBaseModel):
     id: UUID4 = Field(..., description="The ID of the model")
+    audio_location: str = Field(..., description="The location of the audio file of the answer")
 
 
 # Answer model, with all fields
@@ -157,6 +157,7 @@ class AnswerModel(AnswerBaseModel):
     updated_at: datetime = Field(
         ..., description="The time of last update of the model"
     )
+    audio_location: UUID4 = Field(..., description="The location of the audio file of the answer")
     # relation fields
     user: "UserMinimalModel" = Field(..., description="The user of the answer")
     question: "QuestionMinimalModel" = Field(
@@ -171,7 +172,8 @@ class AnswerModel(AnswerBaseModel):
 
 # Create model, for creating new answers
 class AnswerCreateModel(AnswerBaseModel):
-    pass
+    model_config = ConfigDict(from_attributes=False)
+    audio_data: bytes = Field(..., description="The audio data of the answer")
 
 
 # Update model, for updating answer info
@@ -183,10 +185,9 @@ class AnswerUpdateModel(AnswerBaseModel):
         None, description="The UUID of the question of the answer"
     )
 
-
 # External model, to be returned to the frontend, possibly public
 class AnswerExternalModel(AnswerModel):
-    pass
+    audio_data: bytes = Field(..., description="The audio data of the answer")
 
 
 # Embedding. Needs to handle admin view, user view, other user view, update embedding info

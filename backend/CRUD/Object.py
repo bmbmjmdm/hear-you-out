@@ -4,6 +4,7 @@
 from typing import List, Type, TypeVar, Dict, Tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from fastapi import HTTPException
 
 import uuid
 
@@ -16,6 +17,24 @@ CreateSchemaType = TypeVar("CreateSchemaType", schemas.QuestionCreateModel, sche
 # Type indicating QuestionUpdateModel, AnswerUpdateModel, FlagUpdateModel, VoteUpdateModel, EmbeddingUpdateModel but not UserUpdateModel
 UpdateSchemaType = TypeVar("UpdateSchemaType", schemas.QuestionUpdateModel, schemas.AnswerUpdateModel, schemas.FlagUpdateModel, schemas.VoteUpdateModel, schemas.EmbeddingUpdateModel)
 
+
+# user = await self.db.execute(select(models.User).where(models.User.id == answer_in.user_id))
+# user = user.unique().scalars().first()
+# if user is None:
+#     raise HTTPException(
+#         status_code=404,
+#         detail="User not found",
+#     )
+
+async def check_related_object(model, related_model, related_id_field, db: AsyncSession):
+    related_object = await db.execute(select(related_model).where(related_model.id == getattr(model, related_id_field)))
+    related_object = related_object.unique().scalars().first()
+    if related_object is None:
+        raise HTTPException(
+            status_code=404,
+            detail=f"{related_model.__name__} not found",
+        )
+    return related_object
 
 class CRUDObject:
     def __init__(self, db: AsyncSession, model: Type[ModelType]):

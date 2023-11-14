@@ -24,6 +24,7 @@ import models, schemas
 from database import get_db
 import authentication
 from config import config
+from CRUD.Object import check_related_object
 
 
 class Message(BaseModel):
@@ -103,7 +104,7 @@ async def get_users(
     query = select(models.User)
 
     if ids is not None:
-        query = query.where(models.User.key.in_(ids))
+        query = query.where(models.User.id.in_(ids))
 
     users = await db.execute(query)
     users = users.unique().scalars().all()
@@ -128,7 +129,7 @@ async def update_users(
     # Update users in database
     out_users = []
     db_users = await db.execute(
-        select(models.User).where(models.User.key.in_([user.key for user in users]))
+        select(models.User).where(models.User.id.in_([user.id for user in users]))
     )
     db_users = db_users.unique().scalars().all()
     for db_user, user in zip(db_users, users):
@@ -181,7 +182,7 @@ async def get_questions(
     query = select(models.Question)
 
     if ids is not None:
-        query = query.where(models.Question.key.in_(ids))
+        query = query.where(models.Question.id.in_(ids))
 
     questions = await db.execute(query)
     questions = questions.unique().scalars().all()
@@ -209,7 +210,7 @@ async def update_questions(
     out_questions = []
     db_questions = await db.execute(
         select(models.Question).where(
-            models.Question.key.in_([question.key for question in questions])
+            models.Question.id.in_([question.id for question in questions])
         )
     )
     db_questions = db_questions.unique().scalars().all()
@@ -239,14 +240,8 @@ async def submit_answers(
     db_answers = []
     for answer in answers:
         # Get the related objects
-        user = await db.execute(
-            select(models.User).where(models.User.id == answer.user_uuid)
-        )
-        user = user.unique().scalars().first()
-        question = await db.execute(
-            select(models.Question).where(models.Question.id == answer.question_uuid)
-        )
-        question = question.unique().scalars().first()
+        user = await check_related_object(answer, models.User, "user_id", db)
+        question = await check_related_object(answer, models.Question, "question_id", db)
         # Save the audio data to audio_files, provided as bytes
         audio_data = answer.audio_data
         audio_location = uuid.uuid4()
@@ -265,7 +260,7 @@ async def submit_answers(
     for answer in db_answers:
         await db.refresh(answer)
     return [
-        schemas.AnswerUpdateModel.model_validate(**answer.dict(), audio_data=audio_data)
+        schemas.AnswerUpdateModel.model_validate({**answer.__dict__, 'audio_data':audio_data})
         for answer, audio_data in zip(
             db_answers, [answer.audio_data for answer in answers]
         )
@@ -282,7 +277,7 @@ async def get_answers(
     query = select(models.Answer)
 
     if ids is not None:
-        query = query.where(models.Answer.key.in_(ids))
+        query = query.where(models.Answer.id.in_(ids))
 
     answers = await db.execute(query)
     answers = answers.unique().scalars().all()
@@ -303,7 +298,7 @@ async def get_answers(
 
     # Convert to external model
     answers = [
-        schemas.AnswerUpdateModel.model_validate(**answer.dict(), audio_data=audio_data)
+        schemas.AnswerUpdateModel.model_validate({**answer.__dict__, 'audio_data':audio_data})
         for answer, audio_data in answers_audio_data
     ]
     return answers
@@ -319,7 +314,7 @@ async def update_answers(
     out_answers = []
     db_answers = await db.execute(
         select(models.Answer).where(
-            models.Answer.key.in_([answer.key for answer in answers])
+            models.Answer.id.in_([answer.id for answer in answers])
         )
     )
     db_answers = db_answers.unique().scalars().all()
@@ -345,8 +340,7 @@ async def update_answers(
 
     # Convert to external model
     out_answers = [
-        schemas.AnswerUpdateModel.model_validate(answer_audio_data)
-        for answer_audio_data in answers_audio_data
+        schemas.AnswerUpdateModel.model_validate({**answer.__dict__, 'audio_data':audio_data}) for answer, audio_data in answers_audio_data
     ]
 
 
@@ -381,7 +375,7 @@ async def get_flags(
     query = select(models.Flag)
 
     if ids is not None:
-        query = query.where(models.Flag.key.in_(ids))
+        query = query.where(models.Flag.id.in_(ids))
 
     flags = await db.execute(query)
     flags = flags.unique().scalars().all()
@@ -406,7 +400,7 @@ async def update_flags(
     # Update flags in database
     out_flags = []
     db_flags = await db.execute(
-        select(models.Flag).where(models.Flag.key.in_([flag.key for flag in flags]))
+        select(models.Flag).where(models.Flag.id.in_([flag.id for flag in flags]))
     )
     db_flags = db_flags.unique().scalars().all()
     for db_flag, flag in zip(db_flags, flags):
@@ -454,7 +448,7 @@ async def get_votes(
     query = select(models.Vote)
 
     if ids is not None:
-        query = query.where(models.Vote.key.in_(ids))
+        query = query.where(models.Vote.id.in_(ids))
 
     votes = await db.execute(query)
     votes = votes.unique().scalars().all()
@@ -479,7 +473,7 @@ async def update_votes(
     # Update votes in database
     out_votes = []
     db_votes = await db.execute(
-        select(models.Vote).where(models.Vote.key.in_([vote.key for vote in votes]))
+        select(models.Vote).where(models.Vote.id.in_([vote.id for vote in votes]))
     )
     db_votes = db_votes.unique().scalars().all()
     for db_vote, vote in zip(db_votes, votes):
@@ -532,7 +526,7 @@ async def get_embeddings(
     query = select(models.Embedding)
 
     if ids is not None:
-        query = query.where(models.Embedding.key.in_(ids))
+        query = query.where(models.Embedding.id.in_(ids))
 
     embeddings = await db.execute(query)
     embeddings = embeddings.unique().scalars().all()
@@ -561,7 +555,7 @@ async def update_embeddings(
     out_embeddings = []
     db_embeddings = await db.execute(
         select(models.Embedding).where(
-            models.Embedding.key.in_([embedding.key for embedding in embeddings])
+            models.Embedding.id.in_([embedding.id for embedding in embeddings])
         )
     )
     db_embeddings = db_embeddings.unique().scalars().all()

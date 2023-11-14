@@ -123,7 +123,7 @@ class Question(BaseMixin, Base):
 
 class Answer(BaseMixin, Base):
     __tablename__ = "answers"
-    audio_location: Mapped[str] = mapped_column(
+    audio_location: Mapped[uuid.UUID] = mapped_column(
         nullable=False,
     )
     user_id: Mapped[uuid.UUID] = mapped_column(

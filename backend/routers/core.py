@@ -49,6 +49,7 @@ async def get_question_of_the_day(
         )
 
     # Convert to external model
+    print(f"question: {question}")
     question = schemas.QuestionExternalModel.model_validate(question)
 
     return question
@@ -62,9 +63,7 @@ async def submit_answer(
 ):
     answers_CRUD = Answer.CRUDAnswer(db, models.Answer)
     # CRUD create: return answer, audio_data
-    answer, audio_data = await answers_CRUD.create(answer)
-    # Convert to external model from answer and audio_data
-    answer = schemas.AnswerExternalModel.model_validate(answer, audio_data=audio_data)
+    answer = await answers_CRUD.create(answer, as_pydantic=True)
     return answer
 
 
@@ -76,11 +75,9 @@ async def get_answers(
 ):
     answers_CRUD = Answer.CRUDAnswer(db, models.Answer)
     if ids is not None:
-        answers_audio_data = await answers_CRUD.get_multi(id=ids)
+        answers = await answers_CRUD.get_multi(id=ids, as_pydantic=True)
     else:
-        answers_audio_data = await answers_CRUD.get_multi()
-    # Convert to external models from answers and audio_data
-    answers = [schemas.AnswerExternalModel.model_validate(answer, audio_data=audio_data) for answer, audio_data in answers_audio_data]
+        answers = await answers_CRUD.get_multi(as_pydantic=True)
     return answers
 
 

@@ -38,7 +38,7 @@ class UserMinimalModel(UserBaseModel):
 
 
 # User model, with all fields
-class UserModel(UserBaseModel):
+class UserModel(UserMinimalModel):
     created_at: datetime = Field(..., description="The time of creation of the model")
     updated_at: datetime = Field(
         ..., description="The time of last update of the model"
@@ -72,14 +72,14 @@ class UserCreateModel(UserBaseModel):
 
 
 # Update from user perspective, for updating user info
-class UserUpdateModel(UserBaseModel):
+class UserUpdateModel(UserMinimalModel):
     email: Optional[str] = Field(None, description="The email of the user")
     username: Optional[str] = Field(None, description="The username of the user")
     password: Optional[SecretStr] = Field(None, description="The password of the user")
 
 
 # Update from admin perspective, for updating user info
-class UserUpdateAdminModel(UserBaseModel):
+class UserUpdateAdminModel(UserMinimalModel):
     email: Optional[str] = Field(None, description="The email of the user")
     username: Optional[str] = Field(None, description="The username of the user")
     password: Optional[SecretStr] = Field(None, description="The password of the user")
@@ -107,7 +107,8 @@ class QuestionMinimalModel(QuestionBaseModel):
 
 
 # Question model, with all fields
-class QuestionModel(QuestionBaseModel):
+class QuestionModel(QuestionMinimalModel):
+    of_the_day: bool = Field(..., description="Whether the question is of the day")
     created_at: datetime = Field(..., description="The time of creation of the model")
     updated_at: datetime = Field(
         ..., description="The time of last update of the model"
@@ -124,8 +125,10 @@ class QuestionCreateModel(QuestionBaseModel):
 
 
 # Update model, for updating question info
-class QuestionUpdateModel(QuestionBaseModel):
+class QuestionUpdateModel(QuestionMinimalModel):
+    id: Optional[UUID4] = Field(None, description="The ID of the model")
     text: Optional[str] = Field(None, description="The text of the question")
+    of_the_day: Optional[bool] = Field(None, description="Whether the question is of the day")
 
 
 # External model, to be returned to the frontend, possibly public
@@ -140,19 +143,19 @@ class QuestionExternalModel(QuestionModel):
 class AnswerBaseModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     is_active: bool = Field(True, description="Whether the model is active")
-    question_uuid: UUID4 = Field(
+    question_id: UUID4 = Field(
         ..., description="The UUID of the question of the answer"
     )
-    user_uuid: UUID4 = Field(..., description="The UUID of the user of the answer")
+    user_id: UUID4 = Field(..., description="The UUID of the user of the answer")
 
 # Minimal model, for relations with other models
 class AnswerMinimalModel(AnswerBaseModel):
     id: UUID4 = Field(..., description="The ID of the model")
-    audio_location: str = Field(..., description="The location of the audio file of the answer")
+    audio_location: UUID4 = Field(..., description="The location of the audio file of the answer")
 
 
 # Answer model, with all fields
-class AnswerModel(AnswerBaseModel):
+class AnswerModel(AnswerMinimalModel):
     created_at: datetime = Field(..., description="The time of creation of the model")
     updated_at: datetime = Field(
         ..., description="The time of last update of the model"
@@ -177,11 +180,11 @@ class AnswerCreateModel(AnswerBaseModel):
 
 
 # Update model, for updating answer info
-class AnswerUpdateModel(AnswerBaseModel):
+class AnswerUpdateModel(AnswerMinimalModel):
     audio_data: Optional[bytes] = Field(
         None, description="The audio data of the answer"
     )
-    question_uuid: Optional[UUID4] = Field(
+    question_id: Optional[UUID4] = Field(
         None, description="The UUID of the question of the answer"
     )
 
@@ -199,7 +202,7 @@ class EmbeddingBaseModel(BaseModel):
     is_active: bool = Field(True, description="Whether the model is active")
     embedding: List[float] = Field(..., description="The embedding of the answer")
     model: str = Field(..., description="The model used for the embedding")
-    answer_uuid: UUID4 = Field(
+    answer_id: UUID4 = Field(
         ..., description="The UUID of the answer of the embedding"
     )
 
@@ -210,7 +213,7 @@ class EmbeddingMinimalModel(EmbeddingBaseModel):
 
 
 # Embedding model, with all fields
-class EmbeddingModel(EmbeddingBaseModel):
+class EmbeddingModel(EmbeddingMinimalModel):
     created_at: datetime = Field(..., description="The time of creation of the model")
     updated_at: datetime = Field(
         ..., description="The time of last update of the model"
@@ -225,12 +228,12 @@ class EmbeddingCreateModel(EmbeddingBaseModel):
 
 
 # Update model, for updating embedding info
-class EmbeddingUpdateModel(EmbeddingBaseModel):
+class EmbeddingUpdateModel(EmbeddingMinimalModel):
     embedding: Optional[List[float]] = Field(
         None, description="The embedding of the answer"
     )
     model: Optional[str] = Field(None, description="The model used for the embedding")
-    answer_uuid: Optional[UUID4] = Field(
+    answer_id: Optional[UUID4] = Field(
         None, description="The UUID of the answer of the embedding"
     )
 
@@ -248,8 +251,8 @@ class VoteBaseModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     is_active: bool = Field(True, description="Whether the model is active")
     vote: int = Field(..., description="The vote of the user")
-    user_uuid: UUID4 = Field(..., description="The UUID of the user of the vote")
-    answer_uuid: UUID4 = Field(..., description="The UUID of the answer of the vote")
+    user_id: UUID4 = Field(..., description="The UUID of the user of the vote")
+    answer_id: UUID4 = Field(..., description="The UUID of the answer of the vote")
 
 
 # Minimal model, for relations with other models
@@ -258,7 +261,7 @@ class VoteMinimalModel(VoteBaseModel):
 
 
 # Vote model, with all fields
-class VoteModel(VoteBaseModel):
+class VoteModel(VoteMinimalModel):
     created_at: datetime = Field(..., description="The time of creation of the model")
     updated_at: datetime = Field(
         ..., description="The time of last update of the model"
@@ -274,12 +277,12 @@ class VoteCreateModel(VoteBaseModel):
 
 
 # Update model, for updating vote info
-class VoteUpdateModel(VoteBaseModel):
+class VoteUpdateModel(VoteMinimalModel):
     vote: Optional[int] = Field(None, description="The vote of the user")
-    user_uuid: Optional[UUID4] = Field(
+    user_id: Optional[UUID4] = Field(
         None, description="The UUID of the user of the vote"
     )
-    answer_uuid: Optional[UUID4] = Field(
+    answer_id: Optional[UUID4] = Field(
         None, description="The UUID of the answer of the vote"
     )
 
@@ -297,8 +300,8 @@ class FlagBaseModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     is_active: bool = Field(True, description="Whether the model is active")
     reason: str = Field(..., description="The reason of the flag")
-    user_uuid: UUID4 = Field(..., description="The UUID of the user of the flag")
-    answer_uuid: UUID4 = Field(..., description="The UUID of the answer of the flag")
+    user_id: UUID4 = Field(..., description="The UUID of the user of the flag")
+    answer_id: UUID4 = Field(..., description="The UUID of the answer of the flag")
 
 
 # Minimal model, for relations with other models
@@ -307,7 +310,7 @@ class FlagMinimalModel(FlagBaseModel):
 
 
 # Flag model, with all fields
-class FlagModel(FlagBaseModel):
+class FlagModel(FlagMinimalModel):
     created_at: datetime = Field(..., description="The time of creation of the model")
     updated_at: datetime = Field(
         ..., description="The time of last update of the model"
@@ -323,12 +326,12 @@ class FlagCreateModel(FlagBaseModel):
 
 
 # Update model, for updating flag info
-class FlagUpdateModel(FlagBaseModel):
+class FlagUpdateModel(FlagMinimalModel):
     reason: Optional[str] = Field(None, description="The reason of the flag")
-    user_uuid: Optional[UUID4] = Field(
+    user_id: Optional[UUID4] = Field(
         None, description="The UUID of the user of the flag"
     )
-    answer_uuid: Optional[UUID4] = Field(
+    answer_id: Optional[UUID4] = Field(
         None, description="The UUID of the answer of the flag"
     )
 

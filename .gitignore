@@ -323,3 +323,6 @@ cython_debug/
 
 # PostgreSQL
 postgres-data/
+
+# Alembic
+alembic/versions/*.pyc

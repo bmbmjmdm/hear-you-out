@@ -37,8 +37,10 @@ async def get_user(
     db: AsyncSession, username: str
 ) -> models.User:  # This could be in CRUD
     stmt = select(models.User).where(models.User.username == username)
+    print(f"stmt: {stmt}")
     result = await db.execute(stmt)
     user = result.scalars().first()
+    print(f"user: {user}")
     return user
 
 
@@ -78,14 +80,19 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
+        print("SANITY CHECK:", token)
         payload = jwt.decode(
             token,
             os.environ.get("SECRET_KEY"),
             algorithms=[os.environ.get("ALGORITHM")],
         )
+        print("payload:", payload)
         username: str = payload.get("sub")
+        print("username:", username)
+        print(f"username is None: {username is None}")
         if username is None:
             raise credentials_exception
+        print(f"schemas.TokenData(username=username): {schemas.TokenData(username=username)}")
         token_data = schemas.TokenData(username=username)
     except JWTError:
         raise credentials_exception

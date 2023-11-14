@@ -147,6 +147,7 @@ class AnswerBaseModel(BaseModel):
         ..., description="The UUID of the question of the answer"
     )
     user_id: UUID4 = Field(..., description="The UUID of the user of the answer")
+    views: int = Field(0, description="The number of views of the answer")
 
 # Minimal model, for relations with other models
 class AnswerMinimalModel(AnswerBaseModel):

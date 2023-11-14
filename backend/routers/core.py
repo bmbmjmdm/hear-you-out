@@ -67,6 +67,26 @@ async def submit_answer(
     return answer
 
 
+@router.post("/answer/view", response_model=schemas.AnswerExternalModel)
+async def submit_answer_view(
+    user: Annotated[models.User, Depends(authentication.get_current_active_user)],
+    answer_id: uuid.UUID,
+    db: AsyncSession = Depends(get_db),
+):
+    answers_CRUD = Answer.CRUDAnswer(db, models.Answer)
+    # Get the answer
+    answer = await answers_CRUD.get(id=answer_id)
+    if answer is None:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Answer not found",
+        )
+    # Increment the view count
+    answer = await answers_CRUD.view(answer, as_pydantic=True)
+    print(f"answer: {answer}")
+    return answer
+
+
 @router.get("/answers", response_model=List[schemas.AnswerExternalModel])
 async def get_answers(
     user: Annotated[models.User, Depends(authentication.get_current_active_user)],

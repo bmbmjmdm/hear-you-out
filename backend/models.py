@@ -134,7 +134,10 @@ class Answer(BaseMixin, Base):
         ForeignKey("questions.id"),
         nullable=False,
     )
-
+    views: Mapped[int] = mapped_column(
+        nullable=False,
+        default=0,
+    )
     # relationships
     user: Mapped[User] = relationship(
         "User",

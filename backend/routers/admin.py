@@ -241,7 +241,9 @@ async def submit_answers(
     for answer in answers:
         # Get the related objects
         user = await check_related_object(answer, models.User, "user_id", db)
-        question = await check_related_object(answer, models.Question, "question_id", db)
+        question = await check_related_object(
+            answer, models.Question, "question_id", db
+        )
         # Save the audio data to audio_files, provided as bytes
         audio_data = answer.audio_data
         audio_location = uuid.uuid4()
@@ -260,7 +262,9 @@ async def submit_answers(
     for answer in db_answers:
         await db.refresh(answer)
     return [
-        schemas.AnswerUpdateModel.model_validate({**answer.__dict__, 'audio_data':audio_data})
+        schemas.AnswerUpdateModel.model_validate(
+            {**answer.__dict__, "audio_data": audio_data}
+        )
         for answer, audio_data in zip(
             db_answers, [answer.audio_data for answer in answers]
         )
@@ -298,7 +302,9 @@ async def get_answers(
 
     # Convert to external model
     answers = [
-        schemas.AnswerUpdateModel.model_validate({**answer.__dict__, 'audio_data':audio_data})
+        schemas.AnswerUpdateModel.model_validate(
+            {**answer.__dict__, "audio_data": audio_data}
+        )
         for answer, audio_data in answers_audio_data
     ]
     return answers
@@ -340,7 +346,10 @@ async def update_answers(
 
     # Convert to external model
     out_answers = [
-        schemas.AnswerUpdateModel.model_validate({**answer.__dict__, 'audio_data':audio_data}) for answer, audio_data in answers_audio_data
+        schemas.AnswerUpdateModel.model_validate(
+            {**answer.__dict__, "audio_data": audio_data}
+        )
+        for answer, audio_data in answers_audio_data
     ]
 
 

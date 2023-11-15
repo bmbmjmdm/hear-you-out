@@ -58,7 +58,7 @@ export const BottomButton = ({name, theme, onPress, submitting = false, extraDar
     setPressed(true)
     animationInterval.current = setInterval(() => animateCircle(name, setCircles, screenSize), 10)
   }
-setCircles
+
   const onPressOut = () => {
     setTimeout(() => {
       clearInterval(animationInterval.current)

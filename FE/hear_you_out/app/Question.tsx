@@ -24,6 +24,7 @@ import FadeInElement from './FadeInElement'
 import ModalContents from './ModalContents'
 import Pause from './Pause.png';
 import { PointerArrow } from "./PointerArrow"
+import * as amplitude from '@amplitude/analytics-react-native';
 
 // https://github.com/hyochan/react-native-audio-recorder-player/blob/master/index.ts
 const audioSet = {
@@ -100,6 +101,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
 
   // run this effect ONCE when this component mounts
   React.useEffect(() => {
+    amplitude.track('Arrived on question screen');
     const asyncFun = async () => {
       // our timer is constantly running, we just turn it off and on based on recording
       intervalRecord.current = setInterval(() => {
@@ -133,6 +135,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
         await RNFS.writeFile(fileList, listContent, 'utf8')
         setReady(true)
       } catch (e) {
+        amplitude.track('ERROR: Cannot write file in initial question setup', {error: e.message});
         console.log(e)
         // if we can't even write our filelist, something's seriously wrong. 
         Alert.alert("Cannot write files. Please contact support if this keeps happening.")
@@ -150,6 +153,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
           await deleteCurrentFile()
         }
         catch (e) {
+          amplitude.track('ERROR: Failed to stop/unlink question on unmount', {error: e.message});
           console.log("failed to stop/unlink question on unmount")
           console.log(e)
           // we're unmounting, don't bother handling error
@@ -180,6 +184,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
       setModalConfirm(null)
       return
     }
+    amplitude.track('Started/continued question recording');
     lock.current = true
     try {
       // stop playing
@@ -209,6 +214,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
       }
     }
     catch (e) {
+      amplitude.track('ERROR: Recording failed in recordStartContinue', {error: e.message});
       // Writing files or accessing the recorder must have failed, but I don't know why. Reset everything
       Alert.alert("Recording failed. Please contact support if this keeps happening.")
       console.log(e)
@@ -220,6 +226,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
   // we use force when we can't rely on `recording` due to the setInterval timer not having updated variables
   const recordPaused = async (force:boolean = false, retry:boolean = false) => {
     if (lock.current) return
+    amplitude.track('Paused question recording', { seconds: recordTime });
     lock.current = true
     try { 
       if (recording || force) {
@@ -234,6 +241,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
     catch (e) {
       // Pausing failed. Re-attempt without forcing. If we wind up here again, error out.
       if (retry) {
+        amplitude.track('ERROR: Pausing failed in recordPaused', {error: e.message});
         Alert.alert("Pausing failed. Please contact support if this keeps happening.")
         console.log(e)
         onError()
@@ -273,6 +281,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
 
   const restartRecordingConfirmed = async () => {
     if (lock.current || recording) return
+    amplitude.track('Restarting question recording', { seconds: recordTime });
     lock.current = true
     try {
       if (playing) {
@@ -286,6 +295,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
       setModalVisible(false)
     }
     catch (e) {
+      amplitude.track('ERROR: Restarting failed in restartRecordingConfirmed', {error: e.message});
       // Similar to recording failed, we dont know what went wrong but it's pretty serious and un-recoverable
       Alert.alert("Restarting failed. Please contact support if this keeps happening.")
       console.log(e)
@@ -307,6 +317,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
         setShookChecklist(true)
       }
       else {
+        amplitude.track('Tried to submit question recording without completing checklist');
         setModalText("Please address all points in the checklist (scroll if you have to)")
         setModalConfirm(null)
         setModalVisible(true)
@@ -315,6 +326,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
       return
     }
     if (recordTime < 15) {
+      amplitude.track('Tried to submit question recording that was too short', { seconds: recordTime });
       setModalText("Please thoroughly answer the prompt (your answer was too short).")
       setModalConfirm(null)
       setModalVisible(true)
@@ -341,6 +353,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
       // we dont even care about cleaning up the states because we're gonna move on from this screen
     }
     catch (e) {
+      amplitude.track('ERROR: Submitting failed in submitRecordingConfirmed', {error: e.message});
       // they'll be able to re-answer the question since this wasn't a network error
       Alert.alert("Error during submission. Please contact support if this keeps happening.")
       console.log(e)
@@ -354,6 +367,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
       recorderShaker?.current?.shake()
       return;
     }
+    amplitude.track('Playing back question recording', { seconds: recordTime });
     lock.current = true
     try {
       if (playing) {
@@ -376,6 +390,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
       }
     }
     catch (e) {
+      amplitude.track('ERROR: Playback failed in hearRecording', {error: e.message});
       // Don't throw the user out for this. They can still record, restart, and submit possibly
       Alert.alert("Error during playback. Please contact support if this keeps happening.")
       console.log(e)
@@ -418,6 +433,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
     // dumb way of progressing through tutorial, but a good place to start
     // TODO make more interactive
     if (!completedTutorial) {
+      amplitude.track('Began question tutorial');
       let waitTime = 1000
       setTimeout(() => setCurrentTutorialElement('question'), waitTime) // 1 second to load screen
       waitTime += 3500
@@ -428,6 +444,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
       setTimeout(() => setCurrentTutorialElement('bottom'), waitTime) // 16 seconds to press button and answer
       waitTime += 750
       setTimeout(onCompleteTutorial, waitTime) // make sure bottom buttons are fully faded in before marking tutorial complete
+      setTimeout(() => amplitude.track('Finished question tutorial'), waitTime)
     }
   }, [])
 

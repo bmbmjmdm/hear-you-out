@@ -1,17 +1,7 @@
-## running locally in WSL2
+# Instructions to run the backend
+1. Move up to main directory
+2. docker compose up
+Congrats, you're running the backend!
 
-`ifconfig`
-source .venv/bin/activate
-hear-you-out/backend$ `uvicorn --host <ip> main:app`
-web browse to <ip>:8000/docs
-
-### running tests
-
-hear-you-out/backend$ `pytest`
-
-### install
-
-python -m venv .venv
-source .venv/bin/activate
-python -m pip install -r requirements.txt -r local_requirements.txt
-
+# Creating first admin:
+In /api/admin/create_admin provide ADMIN_SECRET as password. Care, as only one admin can be created that way.

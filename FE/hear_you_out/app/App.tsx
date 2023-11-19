@@ -16,7 +16,7 @@ import Question from './Question'
 import Answer from './Answer'
 import PermissionsAndroid from 'react-native-permissions';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { APIQuestion, getAnswer, getQuestion, rateAnswer, submitAnswer, reportAnswer, clearTempAnswerList, getAnswerStats, APIAnswerStats } from './Network'
+import { APIQuestion, getAnswer, getQuestion, rateAnswer, submitAnswer, reportAnswer, clearTempAnswerList, getAnswerStats, APIAnswerStats, login } from './Network'
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NoAnswers from './NoAnswers'
 import { ScreenSize, SizeContext } from './helpers'
@@ -90,6 +90,16 @@ const App = () => {
 
   React.useEffect(() => {
     const asyncFun = async () => {
+      // login so we can authenticate all future calls
+      try {
+        await login();
+      }
+      catch (e) {
+        amplitude.track('ERROR: Failed to login', {error: e.message});
+        Alert.alert("Failed to login. Please restart the app and check your internet connection.")
+        return;
+      }
+
       // check if theyve gone through the tutorials or not. do this async since we have to load the stacks anyway
       let checkQT = () => AsyncStorage.getItem("completedQuestionTutorial").then((val) => setCompletedQuestionTutorial(JSON.parse(val) || false))
       // double check each of them, to avoid blips
@@ -272,7 +282,7 @@ const App = () => {
       }], {
         cancelable: false
       })
-      throw new Error("Cannnot load single, reloading all")
+      throw new Error("Cannot load single, reloading all")
     }
   }
 

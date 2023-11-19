@@ -63,7 +63,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
   // modal
   const [modalVisible, setModalVisible] = React.useState(false)
   const [modalText, setModalText] = React.useState("")
-  const [modalConfirm, setModalConfirm] = React.useState(null)
+  const [modalConfirm, setModalConfirm] = React.useState<Function | null>(null)
   const [shookChecklist, setShookChecklist] = React.useState(false)
   const [shookRecorder, setShookRecorder] = React.useState(false)
 
@@ -275,7 +275,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
     }
     // user pressed first button, now they need to confirm
     setModalText("Delete recording and restart?")
-    setModalConfirm(() => restartRecordingConfirmed)
+    setModalConfirm(restartRecordingConfirmed)
     setModalVisible(true)
   }
 
@@ -334,7 +334,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
     }
     // user pressed first button, now they need to confirm
     setModalText("Submit your answer?")
-    setModalConfirm(() => submitRecordingConfirmed)
+    setModalConfirm(submitRecordingConfirmed)
     setModalVisible(true)
   }
 

@@ -25,7 +25,7 @@ from database import Base
 # Question of the day is selected from the database and sent to the frontend
 # User can 1) submit an answer, 2) listen to answers and possibly vote (only 'convinced' or nothing) on them (also flag them)
 # User can submit an answer by recording audio and submitting it
-# Answers are currently stored in the database, but scaling needs to be considered
+# Answers are currently stored on the drive
 # Answers's embeddings are stored separately to manage information about models used
 #
 # Given the above, the database should have the following models:

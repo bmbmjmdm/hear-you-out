@@ -18,6 +18,8 @@ from config import config
 
 # 
 ACCESS_TOKEN_EXPIRE_MINUTES = int(config.ACCESS_TOKEN_EXPIRE_MINUTES)
+SECRET_KEY = os.environ.get("SECRET_KEY")
+ALGORITHM = os.environ.get("ALGORITHM")
 
 
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -65,7 +67,7 @@ async def create_access_token(
         expire = datetime.utcnow() + timedelta(minutes=15)
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(
-        to_encode, os.environ.get("SECRET_KEY"), os.environ.get("ALGORITHM")
+        to_encode, key=SECRET_KEY, algorithm=ALGORITHM
     )
     return encoded_jwt
 
@@ -80,19 +82,14 @@ async def get_current_user(
         headers={"WWW-Authenticate": "Bearer"},
     )
     try:
-        print("SANITY CHECK:", token)
         payload = jwt.decode(
             token,
-            os.environ.get("SECRET_KEY"),
-            algorithms=[os.environ.get("ALGORITHM")],
+            key=SECRET_KEY,
+            algorithms=[ALGORITHM],
         )
-        print("payload:", payload)
         username: str = payload.get("sub")
-        print("username:", username)
-        print(f"username is None: {username is None}")
         if username is None:
             raise credentials_exception
-        print(f"schemas.TokenData(username=username): {schemas.TokenData(username=username)}")
         token_data = schemas.TokenData(username=username)
     except JWTError:
         raise credentials_exception
@@ -154,12 +151,7 @@ async def register_user(
     try:
         await db.commit()
     except Exception as e:
-        print("ERROR REPORT:",e, f"duplicate key value violates unique constraint in str(e): {'duplicate key value violates unique constraint' in str(e)}")
         if "duplicate key value violates unique constraint" in str(e):
-            print("SANITY CHECK:", f"username={user.username}, email={user.email}, device_id={user.device_id}")
-            print("ERROR DETAILS:", str(e), f"Key (username)=({user.username}) already exists in str(e): {'Key (username)=({user.username}) already exists' in str(e)}")
-            print("ERROR DETAILS:", str(e), f"Key (email)=({user.email}) already exists in str(e): {'Key (email)=({user.email}) already exists' in str(e)}")
-            print("ERROR DETAILS:", str(e), f"Key (device_id)=({user.device_id}) already exists in str(e): {'Key (device_id)=({user.device_id}) already exists' in str(e)}")
             if f"Key (username)=({user.username}) already exists" in str(e):
                 raise HTTPException(
                     status_code=400,

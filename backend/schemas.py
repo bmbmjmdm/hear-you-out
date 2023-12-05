@@ -193,6 +193,12 @@ class AnswerUpdateModel(AnswerMinimalModel):
 class AnswerExternalModel(AnswerModel):
     audio_data: bytes = Field(..., description="The audio data of the answer")
 
+# Only ID and views
+class AnswerExternalViewsModel(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID4 = Field(..., description="The ID of the model")
+    views: int = Field(0, description="The number of views of the answer")
+
 
 # Embedding. Needs to handle admin view, user view, other user view, update embedding info
 

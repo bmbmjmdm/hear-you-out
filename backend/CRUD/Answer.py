@@ -3,7 +3,7 @@ import uuid
 from typing import Dict, List, Tuple
 from fastapi import HTTPException
 
-from schemas import AnswerCreateModel, AnswerExternalModel, AnswerUpdateModel
+from schemas import AnswerCreateModel, AnswerExternalModel, AnswerUpdateModel, AnswerExternalViewsModel
 import models
 from config import config
 
@@ -145,3 +145,16 @@ class CRUDAnswer(CRUDObject):
             ),
             as_pydantic=as_pydantic,
         )
+
+    async def get_views_multi(
+        self, skip: int = 0, limit: int = 100, as_pydantic=True, **kwargs
+    ) -> List[models.Answer] | List[AnswerExternalViewsModel]:
+        answers = await super().get_multi(skip, limit, **kwargs)
+        if as_pydantic:
+            return [
+                AnswerExternalViewsModel.model_validate(
+                    {**answer.__dict__, "audio_data": None}
+                )
+                for answer in answers
+            ]
+        return answers

@@ -24,6 +24,7 @@ import authentication
 from CRUD.Object import CRUDObject
 from CRUD import Flag, Vote, Answer
 
+
 class Message(BaseModel):
     message: str
 
@@ -33,6 +34,7 @@ router = APIRouter(
     tags=["api"],
     responses={404: {"description": "Not found"}},
 )
+
 
 # Always only question of the day
 @router.get("/question", response_model=schemas.QuestionExternalModel)
@@ -101,6 +103,16 @@ async def get_answers(
     return answers
 
 
+@router.get("/answers/views", response_model=List[schemas.AnswerExternalViewsModel])
+async def get_answers_views(
+    user: Annotated[models.User, Depends(authentication.get_current_active_user)],
+    db: AsyncSession = Depends(get_db),
+    ids: List[uuid.UUID] = Query(None),
+):
+    answers_CRUD = Answer.CRUDAnswer(db, models.Answer)
+    answers = await answers_CRUD.get_views_multi(id=ids, as_pydantic=True)
+    return answers
+
 # Flag answer
 @router.post("/flag", response_model=schemas.FlagExternalModel)
 async def submit_flag(
@@ -112,6 +124,7 @@ async def submit_flag(
     flag = await flags_CRUD.create(flag)
     flag = schemas.FlagExternalModel.model_validate(flag)
     return flag
+
 
 # Vote answer
 @router.post("/vote", response_model=schemas.VoteExternalModel)

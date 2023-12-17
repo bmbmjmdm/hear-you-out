@@ -76,7 +76,7 @@ class CRUDAnswer(CRUDObject):
         # Set the related objects
         print(f"answer: {answer}")
         answer.audio_location = audio_location
-        answer.user = user
+        answer.author = user
         answer.question = question
         self.db.add(answer)
         await self.db.commit()
@@ -112,7 +112,7 @@ class CRUDAnswer(CRUDObject):
         for key in answer_in.model_dump():
             setattr(answer, key, getattr(answer_in, key))
         # Set the related objects
-        answer.user = user
+        answer.author = user
         answer.question = question
         answer.audio_location = audio_location
         

@@ -44,7 +44,10 @@ class UserModel(UserMinimalModel):
         ..., description="The time of last update of the model"
     )
     # relation fields
-    answers: List["AnswerMinimalModel"] = Field(
+    authored_answers: List["AnswerMinimalModel"] = Field(
+        ..., description="The answers of the user"
+    )
+    viewed_answers: List["AnswerMinimalModel"] = Field(
         ..., description="The answers of the user"
     )
     votes: List["VoteMinimalModel"] = Field(..., description="The votes of the user")
@@ -163,7 +166,10 @@ class AnswerModel(AnswerMinimalModel):
     )
     audio_location: UUID4 = Field(..., description="The location of the audio file of the answer")
     # relation fields
-    user: "UserMinimalModel" = Field(..., description="The user of the answer")
+    author: "UserMinimalModel" = Field(..., description="The author of the answer")
+    viewed_by: List["UserMinimalModel"] = Field(
+        ..., description="The users who viewed the answer"
+    )
     question: "QuestionMinimalModel" = Field(
         ..., description="The question of the answer"
     )

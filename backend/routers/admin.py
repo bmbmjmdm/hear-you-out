@@ -253,7 +253,7 @@ async def submit_answers(
         obj_in_data = answer.model_dump()
         db_answer = models.Answer(**obj_in_data)
         # Set the related objects
-        db_answer.user = user
+        db_answer.author = user
         db_answer.question = question
         db_answer.audio_location = audio_location
         db_answers.append(db_answer)

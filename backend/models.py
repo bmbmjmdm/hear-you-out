@@ -43,6 +43,23 @@ from database import Base
 # Currently user is registered and logged via device ID, except for admin
 
 
+user_answer_views = Table(
+    "user_answer_views",
+    Base.metadata,
+    Column(
+        "user_id",
+        UUID(as_uuid=True),
+        ForeignKey("users.id"),
+        primary_key=True,
+    ),
+    Column(
+        "answer_id",
+        UUID(as_uuid=True),
+        ForeignKey("answers.id"),
+        primary_key=True,
+    ),
+)
+
 class BaseMixin:
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -86,9 +103,15 @@ class User(BaseMixin, Base):
     )
 
     # relationships
-    answers: Mapped[List["Answer"]] = relationship(
+    answers_authored: Mapped[List["Answer"]] = relationship(
         "Answer",
-        back_populates="user",
+        back_populates="author",
+        lazy="selectin",
+    )
+    answers_viewed: Mapped[List["Answer"]] = relationship(
+        "Answer",
+        secondary="user_answer_views",
+        back_populates="viewed_by",
         lazy="selectin",
     )
     votes: Mapped[List["Vote"]] = relationship(
@@ -139,9 +162,15 @@ class Answer(BaseMixin, Base):
         default=0,
     )
     # relationships
-    user: Mapped[User] = relationship(
+    author: Mapped[User] = relationship(
         "User",
-        back_populates="answers",
+        back_populates="answers_authored",
+        lazy="selectin",
+    )
+    viewed_by: Mapped[List[User]] = relationship(
+        "User",
+        secondary="user_answer_views",
+        back_populates="answers_viewed",
         lazy="selectin",
     )
     votes: Mapped[List["Vote"]] = relationship(

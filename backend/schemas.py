@@ -44,10 +44,10 @@ class UserModel(UserMinimalModel):
         ..., description="The time of last update of the model"
     )
     # relation fields
-    authored_answers: List["AnswerMinimalModel"] = Field(
+    answers_authored: List["AnswerMinimalModel"] = Field(
         ..., description="The answers of the user"
     )
-    viewed_answers: List["AnswerMinimalModel"] = Field(
+    answers_viewed: List["AnswerMinimalModel"] = Field(
         ..., description="The answers of the user"
     )
     votes: List["VoteMinimalModel"] = Field(..., description="The votes of the user")

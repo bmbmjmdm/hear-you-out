@@ -15,6 +15,7 @@ from fastapi.security import OAuth2PasswordRequestForm
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 
 from typing import List, Optional, Union, Annotated
 from pydantic import BaseModel
@@ -63,7 +64,10 @@ async def login_device(
 ):
     # Get user from database
     user = await db.execute(
-        select(models.User).where(models.User.device_id == device_id)
+        select(models.User).where(models.User.device_id == device_id).options(
+            selectinload(models.User.answers_authored),
+            selectinload(models.User.answers_viewed),
+        )
     )
     user = user.unique().scalars().first()
 

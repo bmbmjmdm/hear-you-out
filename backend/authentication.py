@@ -3,6 +3,7 @@ from jose import JWTError, jwt
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.future import select
+from sqlalchemy.orm import selectinload
 
 from fastapi import Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
@@ -38,7 +39,10 @@ async def verify_password(plain_password: str, hashed_password: str) -> bool:
 async def get_user(
     db: AsyncSession, username: str
 ) -> models.User:  # This could be in CRUD
-    stmt = select(models.User).where(models.User.username == username)
+    stmt = select(models.User).where(models.User.username == username).options(
+        selectinload(models.User.answers_viewed),
+        selectinload(models.User.answers_authored),
+    )
     print(f"stmt: {stmt}")
     result = await db.execute(stmt)
     user = result.scalars().first()

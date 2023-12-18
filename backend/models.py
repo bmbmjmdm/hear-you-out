@@ -60,6 +60,7 @@ user_answer_views = Table(
     ),
 )
 
+
 class BaseMixin:
     id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True),
@@ -135,6 +136,8 @@ class Question(BaseMixin, Base):
         nullable=False,
         default=False,
     )
+    # List of strings, default is empty list
+    checklist = Column(ARRAY(String), nullable=False, default=[])
 
     # relationships
     answers: Mapped[List["Answer"]] = relationship(

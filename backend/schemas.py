@@ -139,6 +139,12 @@ class QuestionExternalModel(QuestionModel):
     pass
 
 
+# External limited model, with no answers
+class QuestionExternalLimitedModel(QuestionMinimalModel):
+    pass
+
+
+
 # Answer. Needs to handle admin view, user view, other user view, update answer info
 
 

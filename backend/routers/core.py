@@ -37,7 +37,7 @@ router = APIRouter(
 
 
 # Always only question of the day
-@router.get("/question", response_model=schemas.QuestionExternalModel)
+@router.get("/question", response_model=schemas.QuestionExternalLimitedModel)
 async def get_question_of_the_day(
     db: AsyncSession = Depends(get_db),
 ):
@@ -52,7 +52,7 @@ async def get_question_of_the_day(
 
     # Convert to external model
     print(f"question: {question}")
-    question = schemas.QuestionExternalModel.model_validate(question)
+    question = schemas.QuestionExternalLimitedModel.model_validate(question)
 
     return question
 

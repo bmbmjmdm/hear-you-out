@@ -5,3 +5,7 @@ Congrats, you're running the backend!
 
 # Creating first admin:
 In /api/admin/create_admin provide ADMIN_SECRET as password. Care, as only one admin can be created that way.
+
+# Autopopulating database
+0. (?) Nuke your current database - required if you lost admin access
+1. From /backend run: "python -m db_mockup.autopopulate"

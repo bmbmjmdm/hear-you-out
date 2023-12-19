@@ -176,7 +176,7 @@ async def submit_questions(
 async def get_questions(
     admin: Annotated[models.User, Depends(authentication.get_current_active_admin)],
     db: AsyncSession = Depends(get_db),
-    ids: Optional[List[uuid.UUID]] = Query(None),
+    ids: List[uuid.UUID] = Query(None),
 ):
     # Get questions from database
     query = select(models.Question)

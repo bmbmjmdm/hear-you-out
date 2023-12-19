@@ -93,7 +93,7 @@ async def submit_answer_view(
 async def get_answers(
     user: Annotated[models.User, Depends(authentication.get_current_active_user)],
     db: AsyncSession = Depends(get_db),
-    ids: Optional[List[uuid.UUID]] = Query(None),
+    ids: List[uuid.UUID] = Query(None),
 ):
     answers_CRUD = Answer.CRUDAnswer(db, models.Answer)
     if ids is not None:

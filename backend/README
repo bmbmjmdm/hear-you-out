@@ -8,4 +8,5 @@ In /api/admin/create_admin provide ADMIN_SECRET as password. Care, as only one a
 
 # Autopopulating database
 0. (?) Nuke your current database - required if you lost admin access
-1. From /backend run: "python -m db_mockup.autopopulate"
+1. Start the server. Script assumes it runs on http://127.0.0.1:8080
+2. From /backend run: "python -m db_mockup.autopopulate"

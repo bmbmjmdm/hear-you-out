@@ -325,6 +325,3 @@ cython_debug/
 
 # PostgreSQL
 postgres-data/
-
-# Audio files
-backend/audio_files/

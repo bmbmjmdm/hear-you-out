@@ -1,6 +1,3 @@
-list of questions
-cli.sh
-
 .venv/
 .env
 .deta/
@@ -11,4 +8,4 @@ __pycache__/
 
 .projectile
 
-audio_files/
+db_mockup/output/*

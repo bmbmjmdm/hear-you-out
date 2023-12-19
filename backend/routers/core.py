@@ -84,7 +84,7 @@ async def submit_answer_view(
             detail="Answer not found",
         )
     # Increment the view count
-    answer = await answers_CRUD.view(answer, as_pydantic=True)
+    answer = await answers_CRUD.view(answer, user, as_pydantic=True)
     print(f"answer: {answer}")
     return answer
 

@@ -209,7 +209,11 @@ class AnswerUpdateModel(AnswerMinimalModel):
     question_id: Optional[UUID4] = Field(
         None, description="The UUID of the question of the answer"
     )
-
+    views: Optional[int] = Field(None, description="The number of views of the answer")
+    # relation fields
+    viewed_by: Optional[List["UserMinimalModel"]] = Field(
+        None, description="The users who viewed the answer"
+    )
 
 # External model, to be returned to the frontend, possibly public
 class AnswerExternalModel(AnswerModel):

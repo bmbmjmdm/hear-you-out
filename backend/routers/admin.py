@@ -176,7 +176,7 @@ async def submit_questions(
 async def get_questions(
     admin: Annotated[models.User, Depends(authentication.get_current_active_admin)],
     db: AsyncSession = Depends(get_db),
-    ids: Optional[List[uuid.UUID]] = Query(None),
+    ids: List[uuid.UUID] = Query(None),
 ):
     # Get questions from database
     query = select(models.Question)
@@ -253,7 +253,7 @@ async def submit_answers(
         obj_in_data = answer.model_dump()
         db_answer = models.Answer(**obj_in_data)
         # Set the related objects
-        db_answer.user = user
+        db_answer.author = user
         db_answer.question = question
         db_answer.audio_location = audio_location
         db_answers.append(db_answer)

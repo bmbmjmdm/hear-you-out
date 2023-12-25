@@ -44,7 +44,10 @@ class UserModel(UserMinimalModel):
         ..., description="The time of last update of the model"
     )
     # relation fields
-    answers: List["AnswerMinimalModel"] = Field(
+    answers_authored: List["AnswerMinimalModel"] = Field(
+        ..., description="The answers of the user"
+    )
+    answers_viewed: List["AnswerMinimalModel"] = Field(
         ..., description="The answers of the user"
     )
     votes: List["VoteMinimalModel"] = Field(..., description="The votes of the user")
@@ -99,6 +102,9 @@ class QuestionBaseModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     is_active: bool = Field(True, description="Whether the model is active")
     text: str = Field(..., description="The text of the question")
+    checklist: List[str] = Field(
+        ..., description="The checklist of the question, in markdown"
+    )
 
 
 # Minimal model, for relations with other models
@@ -128,11 +134,18 @@ class QuestionCreateModel(QuestionBaseModel):
 class QuestionUpdateModel(QuestionMinimalModel):
     id: Optional[UUID4] = Field(None, description="The ID of the model")
     text: Optional[str] = Field(None, description="The text of the question")
-    of_the_day: Optional[bool] = Field(None, description="Whether the question is of the day")
+    of_the_day: Optional[bool] = Field(
+        None, description="Whether the question is of the day"
+    )
 
 
 # External model, to be returned to the frontend, possibly public
 class QuestionExternalModel(QuestionModel):
+    pass
+
+
+# External limited model, with no answers
+class QuestionExternalLimitedModel(QuestionMinimalModel):
     pass
 
 
@@ -149,10 +162,13 @@ class AnswerBaseModel(BaseModel):
     user_id: UUID4 = Field(..., description="The UUID of the user of the answer")
     views: int = Field(0, description="The number of views of the answer")
 
+
 # Minimal model, for relations with other models
 class AnswerMinimalModel(AnswerBaseModel):
     id: UUID4 = Field(..., description="The ID of the model")
-    audio_location: UUID4 = Field(..., description="The location of the audio file of the answer")
+    audio_location: UUID4 = Field(
+        ..., description="The location of the audio file of the answer"
+    )
 
 
 # Answer model, with all fields
@@ -161,9 +177,14 @@ class AnswerModel(AnswerMinimalModel):
     updated_at: datetime = Field(
         ..., description="The time of last update of the model"
     )
-    audio_location: UUID4 = Field(..., description="The location of the audio file of the answer")
+    audio_location: UUID4 = Field(
+        ..., description="The location of the audio file of the answer"
+    )
     # relation fields
-    user: "UserMinimalModel" = Field(..., description="The user of the answer")
+    author: "UserMinimalModel" = Field(..., description="The author of the answer")
+    viewed_by: List["UserMinimalModel"] = Field(
+        ..., description="The users who viewed the answer"
+    )
     question: "QuestionMinimalModel" = Field(
         ..., description="The question of the answer"
     )
@@ -188,10 +209,22 @@ class AnswerUpdateModel(AnswerMinimalModel):
     question_id: Optional[UUID4] = Field(
         None, description="The UUID of the question of the answer"
     )
+    views: Optional[int] = Field(None, description="The number of views of the answer")
+    # relation fields
+    viewed_by: Optional[List["UserMinimalModel"]] = Field(
+        None, description="The users who viewed the answer"
+    )
 
 # External model, to be returned to the frontend, possibly public
 class AnswerExternalModel(AnswerModel):
     audio_data: bytes = Field(..., description="The audio data of the answer")
+
+
+# Only ID and views
+class AnswerExternalViewsModel(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID4 = Field(..., description="The ID of the model")
+    views: int = Field(0, description="The number of views of the answer")
 
 
 # Embedding. Needs to handle admin view, user view, other user view, update embedding info
@@ -203,9 +236,7 @@ class EmbeddingBaseModel(BaseModel):
     is_active: bool = Field(True, description="Whether the model is active")
     embedding: List[float] = Field(..., description="The embedding of the answer")
     model: str = Field(..., description="The model used for the embedding")
-    answer_id: UUID4 = Field(
-        ..., description="The UUID of the answer of the embedding"
-    )
+    answer_id: UUID4 = Field(..., description="The UUID of the answer of the embedding")
 
 
 # Minimal model, for relations with other models
@@ -340,6 +371,7 @@ class FlagUpdateModel(FlagMinimalModel):
 # External model, to be returned to the frontend, possibly public
 class FlagExternalModel(FlagModel):
     pass
+
 
 class Token(BaseModel):
     access_token: str

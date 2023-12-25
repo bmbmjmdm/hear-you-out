@@ -1,0 +1,44 @@
+{
+  "admin": {
+    "username": "admin",
+    "password": "admin",
+    "email": "admin@localhost",
+    "device_id": "admin"
+  },
+  "questions": [
+    {
+      "is_active": true,
+      "of_the_day": true,
+      "text": "What is love?",
+      "checklist": [
+        "baby don't hurt me",
+        "don't hurt me",
+        "no more"
+      ]
+    },
+    {
+      "is_active": true,
+      "of_the_day": false,
+      "text": "What is the meaning of life?",
+      "checklist": [
+        "42"
+      ]
+    },
+    {
+      "is_active": true,
+      "of_the_day": false,
+      "text": "What is the airspeed velocity of an unladen swallow?",
+      "checklist": [
+        "African or European?"
+      ]
+    }
+  ],
+  "users":[
+    {
+      "device_id": "user"},
+    {
+      "device_id": "user2"},
+    {
+      "device_id": "user3"}
+  ]
+}

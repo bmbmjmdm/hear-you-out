@@ -1,0 +1,7 @@
+# Autopopulating database
+0. (?) Nuke your current database - required if you lost admin access
+1. Start the server. Script assumes it runs on http://127.0.0.1:8080
+2. Setup venv: 'python3 -m venv venv' (or 'python -m venv venv' if appropriate)
+3. Activate venv: Windows: '.\venv\Scripts\activate', Unix/MacOS: 'source venv/bin/activate'
+4. (From venv) Install requirements: 'pip install -r requirements.txt'
+5. (From venv) Run script: "python autopopulate.py"

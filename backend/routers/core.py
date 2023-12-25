@@ -24,8 +24,17 @@ import authentication
 from CRUD.Object import CRUDObject
 from CRUD import Flag, Vote, Answer
 
+
 class Message(BaseModel):
     message: str
+
+
+def check_list_length(list: List):
+    if len(list) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_204_NO_CONTENT,
+            detail="No content",
+        )
 
 
 router = APIRouter(
@@ -34,8 +43,9 @@ router = APIRouter(
     responses={404: {"description": "Not found"}},
 )
 
+
 # Always only question of the day
-@router.get("/question", response_model=schemas.QuestionExternalModel)
+@router.get("/question", response_model=schemas.QuestionExternalLimitedModel)
 async def get_question_of_the_day(
     db: AsyncSession = Depends(get_db),
 ):
@@ -50,7 +60,8 @@ async def get_question_of_the_day(
 
     # Convert to external model
     print(f"question: {question}")
-    question = schemas.QuestionExternalModel.model_validate(question)
+    question = schemas.QuestionExternalLimitedModel.model_validate(question)
+    check_list_length(question["answers"])
 
     return question
 
@@ -82,7 +93,7 @@ async def submit_answer_view(
             detail="Answer not found",
         )
     # Increment the view count
-    answer = await answers_CRUD.view(answer, as_pydantic=True)
+    answer = await answers_CRUD.view(answer, user, as_pydantic=True)
     print(f"answer: {answer}")
     return answer
 
@@ -91,13 +102,29 @@ async def submit_answer_view(
 async def get_answers(
     user: Annotated[models.User, Depends(authentication.get_current_active_user)],
     db: AsyncSession = Depends(get_db),
-    ids: Optional[List[uuid.UUID]] = Query(None),
+    ids: List[uuid.UUID] = Query(None),
+    questions_ids: List[uuid.UUID] = Query(None),
 ):
     answers_CRUD = Answer.CRUDAnswer(db, models.Answer)
+    kwargs = {}
+    if questions_ids is not None:
+        kwargs["question_id"] = questions_ids
     if ids is not None:
-        answers = await answers_CRUD.get_multi(id=ids, as_pydantic=True)
-    else:
-        answers = await answers_CRUD.get_multi(as_pydantic=True)
+        kwargs["id"] = ids
+    answers = await answers_CRUD.get_multi(as_pydantic=True, **kwargs)
+    check_list_length(answers)
+    return answers
+
+
+@router.get("/answers/views", response_model=List[schemas.AnswerExternalViewsModel])
+async def get_answers_views(
+    user: Annotated[models.User, Depends(authentication.get_current_active_user)],
+    db: AsyncSession = Depends(get_db),
+    ids: List[uuid.UUID] = Query(None),
+):
+    answers_CRUD = Answer.CRUDAnswer(db, models.Answer)
+    answers = await answers_CRUD.get_views_multi(id=ids, as_pydantic=True)
+    check_list_length(answers)
     return answers
 
 
@@ -112,6 +139,7 @@ async def submit_flag(
     flag = await flags_CRUD.create(flag)
     flag = schemas.FlagExternalModel.model_validate(flag)
     return flag
+
 
 # Vote answer
 @router.post("/vote", response_model=schemas.VoteExternalModel)

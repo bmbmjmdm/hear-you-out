@@ -3,7 +3,12 @@ import uuid
 from typing import Dict, List, Tuple
 from fastapi import HTTPException
 
-from schemas import AnswerCreateModel, AnswerExternalModel, AnswerUpdateModel
+from schemas import (
+    AnswerCreateModel,
+    AnswerExternalModel,
+    AnswerUpdateModel,
+    AnswerExternalViewsModel,
+)
 import models
 from config import config
 
@@ -76,7 +81,7 @@ class CRUDAnswer(CRUDObject):
         # Set the related objects
         print(f"answer: {answer}")
         answer.audio_location = audio_location
-        answer.user = user
+        answer.author = user
         answer.question = question
         self.db.add(answer)
         await self.db.commit()
@@ -112,10 +117,10 @@ class CRUDAnswer(CRUDObject):
         for key in answer_in.model_dump():
             setattr(answer, key, getattr(answer_in, key))
         # Set the related objects
-        answer.user = user
+        answer.author = user
         answer.question = question
         answer.audio_location = audio_location
-        
+
         await self.db.commit()
         await self.db.refresh(answer)
         # retrieve the audio data
@@ -130,18 +135,38 @@ class CRUDAnswer(CRUDObject):
         return answer, audio_data
 
     async def view(
-        self, answer: AnswerUpdateModel, as_pydantic=True
+        self, answer: AnswerUpdateModel, user: models.User, as_pydantic=True
     ) -> Tuple[models.Answer, bytes] | AnswerExternalModel:
         # Update the answer with one view more
-        print(f"answer.model_dump(): {answer.model_dump()}")
         answer_model = await self.db.execute(
             select(models.Answer).where(models.Answer.id == answer.id)
         )
         answer_model = answer_model.unique().scalars().first()
-        return await self.update(
-            answer=answer_model,
-            answer_in=AnswerUpdateModel.model_validate(
-                {**answer.model_dump(), "views": answer_model.views + 1}
-            ),
-            as_pydantic=as_pydantic,
-        )
+        # Update .views with +1 and viewed_by relationship with user
+        answer_model.views += 1
+        answer_model.viewed_by.append(user)
+        await self.db.commit()
+        await self.db.refresh(answer_model)
+        # retrieve the audio data
+        audio_data = None
+        with open(f"{config.AUDIO_FILE_PATH}{answer_model.audio_location}", "rb") as f:
+            audio_data = f.read()
+        if as_pydantic:
+            # Build external model from answer and audio_data
+            return AnswerExternalModel.model_validate(
+                {**answer_model.__dict__, "audio_data": audio_data}
+            )
+        return answer_model, audio_data
+
+    async def get_views_multi(
+        self, skip: int = 0, limit: int = 100, as_pydantic=True, **kwargs
+    ) -> List[models.Answer] | List[AnswerExternalViewsModel]:
+        answers = await super().get_multi(skip, limit, **kwargs)
+        if as_pydantic:
+            return [
+                AnswerExternalViewsModel.model_validate(
+                    {**answer.__dict__, "audio_data": None}
+                )
+                for answer in answers
+            ]
+        return answers

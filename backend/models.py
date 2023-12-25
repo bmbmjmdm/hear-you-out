@@ -25,7 +25,7 @@ from database import Base
 # Question of the day is selected from the database and sent to the frontend
 # User can 1) submit an answer, 2) listen to answers and possibly vote (only 'convinced' or nothing) on them (also flag them)
 # User can submit an answer by recording audio and submitting it
-# Answers are currently stored in the database, but scaling needs to be considered
+# Answers are currently stored on the drive
 # Answers's embeddings are stored separately to manage information about models used
 #
 # Given the above, the database should have the following models:
@@ -41,6 +41,24 @@ from database import Base
 # AnswerEmbedding, a join table between Answer and Embedding (answer_id-uuid, the answer ID; embedding_id-uuid, the embedding ID)
 #
 # Currently user is registered and logged via device ID, except for admin
+
+
+user_answer_views = Table(
+    "user_answer_views",
+    Base.metadata,
+    Column(
+        "user_id",
+        UUID(as_uuid=True),
+        ForeignKey("users.id"),
+        primary_key=True,
+    ),
+    Column(
+        "answer_id",
+        UUID(as_uuid=True),
+        ForeignKey("answers.id"),
+        primary_key=True,
+    ),
+)
 
 
 class BaseMixin:
@@ -86,9 +104,15 @@ class User(BaseMixin, Base):
     )
 
     # relationships
-    answers: Mapped[List["Answer"]] = relationship(
+    answers_authored: Mapped[List["Answer"]] = relationship(
         "Answer",
-        back_populates="user",
+        back_populates="author",
+        lazy="selectin",
+    )
+    answers_viewed: Mapped[List["Answer"]] = relationship(
+        "Answer",
+        secondary="user_answer_views",
+        back_populates="viewed_by",
         lazy="selectin",
     )
     votes: Mapped[List["Vote"]] = relationship(
@@ -112,6 +136,8 @@ class Question(BaseMixin, Base):
         nullable=False,
         default=False,
     )
+    # List of strings, default is empty list
+    checklist = Column(ARRAY(String), nullable=False, default=[])
 
     # relationships
     answers: Mapped[List["Answer"]] = relationship(
@@ -139,9 +165,15 @@ class Answer(BaseMixin, Base):
         default=0,
     )
     # relationships
-    user: Mapped[User] = relationship(
+    author: Mapped[User] = relationship(
         "User",
-        back_populates="answers",
+        back_populates="answers_authored",
+        lazy="selectin",
+    )
+    viewed_by: Mapped[List[User]] = relationship(
+        "User",
+        secondary="user_answer_views",
+        back_populates="answers_viewed",
         lazy="selectin",
     )
     votes: Mapped[List["Vote"]] = relationship(

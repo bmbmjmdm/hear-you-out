@@ -1,0 +1,31 @@
+[
+    {
+        "is_active": true,
+        "text": "What is love?",
+        "checklist": [
+            "baby don't hurt me",
+            "don't hurt me",
+            "no more"
+        ],
+        "id": "6b4fb850-db20-488b-ac5d-5a53b95bfdfe",
+        "of_the_day": true
+    },
+    {
+        "is_active": true,
+        "text": "What is the meaning of life?",
+        "checklist": [
+            "42"
+        ],
+        "id": "44a08bf5-e7ca-40fe-8487-2929225dbf50",
+        "of_the_day": false
+    },
+    {
+        "is_active": true,
+        "text": "What is the airspeed velocity of an unladen swallow?",
+        "checklist": [
+            "African or European?"
+        ],
+        "id": "335d5aed-c864-437b-82b5-7e388931bf69",
+        "of_the_day": false
+    }
+]

@@ -29,6 +29,14 @@ class Message(BaseModel):
     message: str
 
 
+def check_list_length(list: List):
+    if len(list) == 0:
+        raise HTTPException(
+            status_code=status.HTTP_204_NO_CONTENT,
+            detail="No content",
+        )
+
+
 router = APIRouter(
     prefix="/api",
     tags=["api"],
@@ -53,6 +61,7 @@ async def get_question_of_the_day(
     # Convert to external model
     print(f"question: {question}")
     question = schemas.QuestionExternalLimitedModel.model_validate(question)
+    check_list_length(question["answers"])
 
     return question
 
@@ -94,12 +103,16 @@ async def get_answers(
     user: Annotated[models.User, Depends(authentication.get_current_active_user)],
     db: AsyncSession = Depends(get_db),
     ids: List[uuid.UUID] = Query(None),
+    questions_ids: List[uuid.UUID] = Query(None),
 ):
     answers_CRUD = Answer.CRUDAnswer(db, models.Answer)
+    kwargs = {}
+    if questions_ids is not None:
+        kwargs["question_id"] = questions_ids
     if ids is not None:
-        answers = await answers_CRUD.get_multi(id=ids, as_pydantic=True)
-    else:
-        answers = await answers_CRUD.get_multi(as_pydantic=True)
+        kwargs["id"] = ids
+    answers = await answers_CRUD.get_multi(as_pydantic=True, **kwargs)
+    check_list_length(answers)
     return answers
 
 
@@ -111,7 +124,9 @@ async def get_answers_views(
 ):
     answers_CRUD = Answer.CRUDAnswer(db, models.Answer)
     answers = await answers_CRUD.get_views_multi(id=ids, as_pydantic=True)
+    check_list_length(answers)
     return answers
+
 
 # Flag answer
 @router.post("/flag", response_model=schemas.FlagExternalModel)

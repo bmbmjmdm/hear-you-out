@@ -59,9 +59,8 @@ async def get_question_of_the_day(
         )
 
     # Convert to external model
-    print(f"question: {question}")
     question = schemas.QuestionExternalLimitedModel.model_validate(question)
-    check_list_length(question["answers"])
+    check_list_length([question])
 
     return question
 

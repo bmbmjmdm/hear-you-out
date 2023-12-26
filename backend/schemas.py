@@ -376,6 +376,7 @@ class FlagExternalModel(FlagModel):
 class Token(BaseModel):
     access_token: str
     token_type: str
+    user_id: UUID4
 
 
 class TokenData(BaseModel):

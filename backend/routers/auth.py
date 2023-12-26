@@ -87,7 +87,7 @@ async def login_device(
     access_token = await authentication.create_access_token(
         data={"sub": user.device_id}, expires_delta=access_token_expires
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token, "token_type": "bearer", "user_id": user.id}
 
 @router.post("/login/username", response_model=schemas.Token)
 async def login_username(
@@ -110,4 +110,4 @@ async def login_username(
     access_token = await authentication.create_access_token(
         data={"sub": user.device_id}, expires_delta=access_token_expires
     )
-    return {"access_token": access_token, "token_type": "bearer"}
+    return {"access_token": access_token, "token_type": "bearer", "user_id": user.id}

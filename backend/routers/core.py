@@ -103,7 +103,10 @@ async def get_answers(
         ]
 
     for answer in answers:
-        await answers_CRUD.view(answer, user, as_pydantic=True)
+        try:
+            await answers_CRUD.view(answer, user, as_pydantic=True)
+        except Exception as e:
+            print(e)
 
     # Pick only limit'th answers from the front
     answers = answers[:limit]

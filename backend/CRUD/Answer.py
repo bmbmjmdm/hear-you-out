@@ -144,7 +144,8 @@ class CRUDAnswer(CRUDObject):
         answer_model = answer_model.unique().scalars().first()
         # Update .views with +1 and viewed_by relationship with user
         answer_model.views += 1
-        answer_model.viewed_by.append(user)
+        if user not in answer_model.viewed_by:
+            answer_model.viewed_by.append(user)
         await self.db.commit()
         await self.db.refresh(answer_model)
         # retrieve the audio data

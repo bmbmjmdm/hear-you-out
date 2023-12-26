@@ -8,4 +8,4 @@ __pycache__/
 
 .projectile
 
-db_mockup/output/*
+output/

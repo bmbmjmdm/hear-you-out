@@ -101,15 +101,14 @@ async def get_answers(
             for answer in answers
             if answer.id not in seen_answers_ids
         ]
-
+    
+    response_answers = []
     for answer in answers:
-        try:
-            await answers_CRUD.view(answer, user, as_pydantic=True)
-        except Exception as e:
-            print(e)
+        response_answer = await answers_CRUD.view(answer, user, as_pydantic=True)
+        response_answers.append(response_answer)
 
     # Pick only limit'th answers from the front
-    answers = answers[:limit]
+    answers = response_answers[:limit]
 
     check_list_length(answers)
     return answers

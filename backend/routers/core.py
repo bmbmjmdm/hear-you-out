@@ -100,11 +100,15 @@ async def get_answers(
         answers = [
             answer
             for answer in answers
-            if answer["id"] not in [str(id) for id in seen_answers_ids]
+            if answer.id not in seen_answers_ids
         ]
-    
+
     for answer in answers:
         await answers_CRUD.view(answer, user, as_pydantic=True)
+
+    # Pick only limit'th answers from the front
+    answers = answers[:limit]
+
     check_list_length(answers)
     return answers
 

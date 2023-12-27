@@ -40,6 +40,7 @@ class CRUDAnswer(CRUDObject):
         # retrieve the audio data
         answers_audio_data = []
         for answer in answers:
+            print(f"answer: {answer}")
             audio_data = None
             with open(f"{config.AUDIO_FILE_PATH}{answer.audio_location}", "rb") as f:
                 audio_data = f.read()
@@ -138,20 +139,16 @@ class CRUDAnswer(CRUDObject):
         self, answer: AnswerUpdateModel, user: models.User, as_pydantic=True
     ) -> Tuple[models.Answer, bytes] | AnswerExternalModel:
         # Update the answer with one view more
-        answer_model = await self.db.execute(
-            select(models.Answer).where(models.Answer.id == answer.id)
-        )
-        answer_model = answer_model.unique().scalars().first()
+        answer_model = await self.get(id=answer.id, as_pydantic=False)
+        answer_model = answer_model[0]
+        # answer_model = answer_model.unique().scalars().first()
         # Update .views with +1 and viewed_by relationship with user
         answer_model.views += 1
         if user not in answer_model.viewed_by:
             answer_model.viewed_by.append(user)
         await self.db.commit()
         await self.db.refresh(answer_model)
-        # retrieve the audio data
-        audio_data = None
-        with open(f"{config.AUDIO_FILE_PATH}{answer_model.audio_location}", "rb") as f:
-            audio_data = f.read()
+        answer, audio_data = await self.get(id=answer.id, as_pydantic=False)
         if as_pydantic:
             # Build external model from answer and audio_data
             return AnswerExternalModel.model_validate(

@@ -214,10 +214,22 @@ class AnswerUpdateModel(AnswerMinimalModel):
     viewed_by: Optional[List["UserMinimalModel"]] = Field(
         None, description="The users who viewed the answer"
     )
+    author: Optional["UserMinimalModel"] = Field(
+        None, description="The author of the answer"
+    )
+
 
 # External model, to be returned to the frontend, possibly public
 class AnswerExternalModel(AnswerModel):
     audio_data: bytes = Field(..., description="The audio data of the answer")
+
+
+# Slightly limited external model for standards users
+class AnswerExternalUserModel(AnswerMinimalModel):
+    audio_data: bytes = Field(..., description="The audio data of the answer")
+    question: "QuestionMinimalModel" = Field(
+        ..., description="The question of the answer"
+    )
 
 
 # Only ID and views

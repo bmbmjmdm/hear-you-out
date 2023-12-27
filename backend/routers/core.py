@@ -65,7 +65,7 @@ async def get_question_of_the_day(
     return question
 
 
-@router.get("/answers", response_model=List[schemas.AnswerExternalModel])
+@router.get("/answers", response_model=List[schemas.AnswerExternalUserModel])
 async def get_answers(
     user: Annotated[models.User, Depends(authentication.get_current_active_user)],
     db: AsyncSession = Depends(get_db),
@@ -109,6 +109,11 @@ async def get_answers(
 
     # Pick only limit'th answers from the front
     answers = response_answers[:limit]
+
+    # Convert to AnswerExternalUserModel
+    for answer in answers:
+        answer = schemas.AnswerExternalUserModel.model_validate(answer)
+        
 
     check_list_length(answers)
     return answers

@@ -58,7 +58,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
   const [currentTutorialElement, setCurrentTutorialElement] = React.useState("")
   // TODO set disabled styles on everything when submitting?
   const [submitting, setSubmitting] = React.useState(false)
-  const hasStats = stats?.num_serves
+  const hasStats = stats?.views
 
   // modal
   const [modalVisible, setModalVisible] = React.useState(false)
@@ -167,7 +167,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
   React.useEffect(() => {
     if (hasStats && isShown) {
       setModalVisible(true)
-      setModalText(stats.num_serves + " people heard your last answer!")
+      setModalText(stats.views + " people heard your last answer!")
     }
   }, [hasStats, isShown])
 

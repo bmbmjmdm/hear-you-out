@@ -243,6 +243,8 @@ const App = () => {
       const newQ = await getQuestion()
       const curQuestion = previousQuestionForced || question
       if (curQuestion.key !== newQ.key && loadedQuestion?.key !== newQ.key) {
+        // we dont need to remember old 
+        clearTempAnswerList()
         const oldAnswerStats = await getAnswerStats()
         setStats(oldAnswerStats)
         setQuestion(newQ)
@@ -275,6 +277,7 @@ const App = () => {
     }
     catch (e) {
       amplitude.track('ERROR: Failed to finish loadStack', {error: e.message});
+      console.log(e)
       // loading is critical. if it fails, do a hard reload
       Alert.alert("Failed to load card. Please check your internet connection or contact support", undefined, [{
         text: "Reload",

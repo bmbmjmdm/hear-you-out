@@ -30,7 +30,7 @@ import ModalContents from './ModalContents'
 import { RNFFmpeg } from 'react-native-ffmpeg';
 import { Buffer } from "buffer";
 import { PointerArrow } from "./PointerArrow"
-import * as amplitude from '@amplitude/analytics-react-native';
+import analytics from '@react-native-firebase/analytics';
 
 type AnswerProps = {
   setDisableSwipes: (val: boolean) => void,
@@ -141,7 +141,7 @@ const Answer = ({
 
   // run this effect ONCE when this component mounts to load the audio file and prep the player
   React.useEffect(() => {
-    amplitude.track('Arrived on answer screen');
+    analytics().logEvent('answer_screen');
     const asyncFun = async () => {
       try {
         await RNFS.writeFile(filepath, answerAudioData, 'base64')
@@ -171,7 +171,7 @@ const Answer = ({
         setMeterData(pcmData)
       }
       catch (e) {
-        amplitude.track('ERROR: Cannot write file in initial answer setup', {error: e.message});
+        analytics().logEvent('ERROR_answer_mount', {details: 'Cannot write file in initial answer setup', error: e.message});
         console.log(e)
         // cannot create our audio file, nothing we can do
         Alert.alert("Cannot write answer to file. Please contact support if this keeps happening.")
@@ -189,7 +189,7 @@ const Answer = ({
           await RNFS.unlink(pcmPath)
         }
         catch (e) {
-          amplitude.track('ERROR: Failed to stop/unlink answer on unmount', {error: e.message});
+          analytics().logEvent('ERROR_answer_unmount', {details: 'Failed to stop/unlink answer on unmount', error: e.message});
           console.log("failed to stop/unlink answer on unmount")
           console.log(e)
           // we're already unmounted, so don't worry about it
@@ -251,7 +251,7 @@ const Answer = ({
         await player.pausePlayer()
       }
       catch (e) {
-        amplitude.track('ERROR: Start then pause failed when trying to restart answer in onSlidingComplete', {error: e.message});
+        analytics().logEvent('ERROR_onSlidingComplete_startPause', {details: 'Start then pause failed when trying to restart answer', error: e.message});
         console.log("start then pause failed")
         console.log(e)
         // let restart fail silently, its not worth reloading the app over and for MVP the user can recover manually
@@ -261,7 +261,7 @@ const Answer = ({
       await player.seekToPlayer(val)
     }
     catch (e) {
-      amplitude.track('ERROR: Seeking in answer in onSlidingComplete', {error: e.message});
+      analytics().logEvent('ERROR_onSlidingComplete_seek', {details: 'Seeking in answer failed', error: e.message});
       console.log(e)
       // same as above catch
       Alert.alert("Failed to seek. Please contact support if this keeps happening.")
@@ -272,19 +272,19 @@ const Answer = ({
   const playPressed = async () => {
     // we're already playing, pause
     if (playing) {
-      amplitude.track('Paused answer', { slider: sliderValue, length: length });
+      analytics().logEvent('answer_paused', { slider: sliderValue, length: length });
       try {
         await player.pausePlayer()
       }
       catch (e) {
-        amplitude.track('ERROR: Pausing answer failed in playPressed', {error: e.message});
+        analytics().logEvent('ERROR_playPressed_pausing', {details: 'Pausing answer failed', error: e.message});
         console.log(e)
         Alert.alert("Failed to pause. Please contact support if this keeps happening.")
       }
     }
     // we're not playing but we already started, resume
     else if (started.current) {
-      amplitude.track('Resumed answer', { slider: sliderValue, length: length });
+      analytics().logEvent('answer_resumed', { slider: sliderValue, length: length });
       setDisableSwipes(false)
       try {
         await player.resumePlayer()
@@ -292,13 +292,13 @@ const Answer = ({
       catch (e) {
         // if we cant resume the player, try to restart
         try {
-          amplitude.track('ERROR: Resuming answer failed in playPressed', {error: e.message});
+          analytics().logEvent('ERROR_playPressed_resuming', {details: 'Resuming answer failed', error: e.message});
           console.log("failed to resume player, restarting")
           console.log(e)
           await player.startPlayer(filepath)
         }
         catch (e2) {
-          amplitude.track('ERROR: Restarting answer failed in playPressed', {error: e.message});
+          analytics().logEvent('ERROR_playPressed_restarting', {details: 'Restarting answer failed', error: e.message});
           console.log(e2)
           // if we cant start the player, this is a serious problem
           Alert.alert("Cannot play answer. Please contact support if this keeps happening.")
@@ -308,7 +308,7 @@ const Answer = ({
     }
     // we're not playing and didnt start yet, so start
     else {
-      amplitude.track('Started listening to answer', { slider: sliderValue, length: length });
+      analytics().logEvent('answer_started', { slider: sliderValue, length: length });
       started.current = true
       startedPerm.current = true
       setDisableSwipes(false)
@@ -316,7 +316,7 @@ const Answer = ({
         await player.startPlayer(filepath)
       }
       catch (e) {
-        amplitude.track('ERROR: Playing answer failed in playPressed', {error: e.message});
+        analytics().logEvent('ERROR_playPressed_starting', {details: 'Playing answer failed', error: e.message});
         console.log(e)
         // if we cant start the player, this is a serious problem
         Alert.alert("Cannot play answer. Please contact support if this keeps happening.")
@@ -342,11 +342,11 @@ const Answer = ({
 
   const shareAnswer = async () => {
     if (!startedPerm.current) {
-      amplitude.track('Tried to share without listening');
+      analytics().logEvent('tried_sharing_without_listening');
       informBeginPlaying();
       return;
     }
-    amplitude.track('Shared answer maybe');
+    analytics().logEvent('shared_answer_maybe');
     try {
       // note this method does not work with base64 files. we will have to convert the file to a normal mp3 or w.e and share it like that
       const options = {
@@ -356,19 +356,19 @@ const Answer = ({
     }
     catch (e) {
       if (e.message !== "User did not share") {
-        amplitude.track('ERROR: Sharing answer failed in shareAnswer', {error: e.message});
+        analytics().logEvent('ERROR_shareAnswer', {details: 'Sharing answer failed', error: e.message});
         console.log(e)
         Alert.alert("Failed to share. Please contact support if this keeps happening.")
       }
       else {
-        amplitude.track('User chose not to share answer');
+        analytics().logEvent('shared_answer_chose_not_to');
       }
     }
   }
 
   const reportAnswer = () => {
     if (!startedPerm.current) {
-      amplitude.track('Tried to report without listening');
+      analytics().logEvent('tried_reporting_without_listening');
       informBeginPlaying();
       return;
     }
@@ -379,14 +379,14 @@ const Answer = ({
   }
 
   const confirmReportAnswer = () => {
-    amplitude.track('Reported answer');
+    // we log this event in our parent, so dont do it here
     setModalVisible(false)
     onReport()
   }
 
   const tryApproveAnswer = () => {
     if (!startedPerm.current) {
-      amplitude.track('Tried to approve without listening');
+      analytics().logEvent('tried_approving_without_listening');
       informBeginPlaying();
       return;
     }
@@ -400,7 +400,7 @@ const Answer = ({
 
   const tryDisapproveAnswer = () => {
     if (!startedPerm.current) {
-      amplitude.track('Tried to disapprove without listening');
+      analytics().logEvent('tried_disapproving_without_listening');
       informBeginPlaying();
       return;
     }
@@ -428,7 +428,7 @@ const Answer = ({
     // dumb way of progressing through tutorial, but a good place to start
     // TODO make more interactive
     if (!completedTutorial && isShown) {
-      amplitude.track('Began answer tutorial');
+      analytics().logEvent('answer_tutorial_began');
       let waitTime = 500
       setTimeout(() => setCurrentTutorialElement('question'), waitTime) // let past card finish animating out before fading in question
       waitTime += 2500
@@ -439,7 +439,7 @@ const Answer = ({
       setTimeout(() => setCurrentTutorialElement('bottom'), waitTime) // 2 seconds to see misc buttons
       waitTime += 750
       setTimeout(onCompleteTutorial, waitTime) // make sure bottom buttons are fully faded in before marking tutorial complete
-      setTimeout(() => amplitude.track('Began answer tutorial'), waitTime)
+      setTimeout(() => analytics().logEvent('answer_tutorial_completed'), waitTime)
     }
   }, [isShown])
 

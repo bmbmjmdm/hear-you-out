@@ -8,6 +8,7 @@ import {
   AppState,
   Alert,
   useWindowDimensions,
+  PermissionsAndroid as PA
 } from 'react-native';
 
 // https://www.npmjs.com/package/react-native-deck-swiper
@@ -20,7 +21,13 @@ import { APIQuestion, getAnswer, getQuestion, rateAnswer, submitAnswer, reportAn
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NoAnswers from './NoAnswers'
 import { ScreenSize, SizeContext } from './helpers'
-import * as amplitude from '@amplitude/analytics-react-native';
+import analytics from '@react-native-firebase/analytics';
+
+const WRITE_PERMISSION = PermissionsAndroid.PERMISSIONS.ANDROID.WRITE_EXTERNAL_STORAGE
+const READ_PERMISSION = PermissionsAndroid.PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE
+const RECORD_PERMISSION = PermissionsAndroid.PERMISSIONS.ANDROID.RECORD_AUDIO
+const PUSH_PERMISSION = PA.PERMISSIONS.POST_NOTIFICATIONS
+const PERMISSION_GRANTED = PermissionsAndroid.RESULTS.GRANTED
 
 type AnswerCard = {
   id: string,
@@ -58,11 +65,6 @@ const App = () => {
   const animatedSwipeLeft2 = React.useRef(false)
   const answer2 = React.useRef(null)
 
-  // set up analytics
-  React.useEffect(() => {
-    amplitude.init("xxxxxxxxxxxxxxxxxxxxx")
-  }, [])
-
   const loadLastQ = async () => {
     const recallableLoad = async () => {
       const lastQ = await AsyncStorage.getItem("lastQuestionAnswered")
@@ -81,7 +83,7 @@ const App = () => {
         return await recallableLoad()
       }
       catch (ee) {
-        amplitude.track('ERROR: Failed to load users last question in loadLastQ', {error: e.message});
+        analytics().logEvent('ERROR_loadLastQ', {detils: "Failed to load users last question", error: e.message});
         // we can't do anything else, move on without a loading question
         Alert.alert("Unsure if previously answered. Please contact support if this keeps happening.")
       }
@@ -95,7 +97,7 @@ const App = () => {
         await login();
       }
       catch (e) {
-        amplitude.track('ERROR: Failed to login', {error: e.message});
+        analytics().logEvent('ERROR_login', {details: "failed to login", error: e.message});
         Alert.alert("Failed to login. Please restart the app and check your internet connection.")
         return;
       }
@@ -120,23 +122,25 @@ const App = () => {
       // ask for permissions on android
       if (Platform.OS === 'android') {
         const permissionsRequest = async () => {
+          // ask for 4 permissions
           try {
             const grants = await PermissionsAndroid.requestMultiple([
-              PermissionsAndroid.PERMISSIONS.ANDROID.WRITE_EXTERNAL_STORAGE,
-              PermissionsAndroid.PERMISSIONS.ANDROID.READ_EXTERNAL_STORAGE,
-              PermissionsAndroid.PERMISSIONS.ANDROID.RECORD_AUDIO,
+              WRITE_PERMISSION,
+              READ_PERMISSION,
+              RECORD_PERMISSION,
+              PUSH_PERMISSION
             ]);
+            // check the results of the 3 necessary ones
             if (
-              grants['android.permission.WRITE_EXTERNAL_STORAGE'] ===
-                PermissionsAndroid.RESULTS.GRANTED &&
-              grants['android.permission.READ_EXTERNAL_STORAGE'] ===
-                PermissionsAndroid.RESULTS.GRANTED &&
-              grants['android.permission.RECORD_AUDIO'] ===
-                PermissionsAndroid.RESULTS.GRANTED
+              grants[WRITE_PERMISSION] === PERMISSION_GRANTED &&
+              grants[READ_PERMISSION] === PERMISSION_GRANTED &&
+              grants[RECORD_PERMISSION] === PERMISSION_GRANTED
             ) {
+              // proceed
               setGrantedPermissions(true)
             } else {
-              amplitude.track('ERROR: User refused to give permission', {error: "User error", writeExternal: grants['android.permission.WRITE_EXTERNAL_STORAGE'], readExternal: grants['android.permission.READ_EXTERNAL_STORAGE'], recordAudio: grants['android.permission.RECORD_AUDIO']});
+              // user did not give a necessary permission, ask them to retry
+              analytics().logEvent('ERROR_necessary_permissions', {details: "User refused to give necessary permissions", writeExternal: grants[WRITE_PERMISSION], readExternal: grants[READ_PERMISSION], recordAudio: grants[RECORD_PERMISSION]});
               Alert.alert(
                 "Insufficient Permissions",
                 "This app will not function without all permissions. We use these permissions to store and play audio data for your answer and others'. We do not access other files on your device.",
@@ -148,8 +152,13 @@ const App = () => {
                 ]
               )
             }
+            if (grants[PA.PERMISSIONS.POST_NOTIFICATIONS] !== PermissionsAndroid.RESULTS.GRANTED ) {
+              // the user didnt give us push notifications, but thats ok, we'll just log it and move on
+              analytics().logEvent('ERROR_push_permissions', {details: "User refused to give push permission", pushPermission: grants[PUSH_PERMISSION]});
+            }
           } catch (err) {
-            amplitude.track('ERROR: Failed to finish permissions', {error: err.message});
+            // something went wrong, let them proceed with caution
+            analytics().logEvent('ERROR_permissions', {details: "Failed to finish permissions", error: err.message});
             setGrantedPermissions(true)
             Alert.alert(
               "Permissions Error",
@@ -157,9 +166,12 @@ const App = () => {
             )
           }
         }
+        
+        // start the initial permissions request
         permissionsRequest();
       }
     }
+    // we're in a useEffect so we need to call our async function like this
     asyncFun()
   }, [])
 
@@ -197,7 +209,7 @@ const App = () => {
         }
       }
       else if (nextAppState === "background") {
-        amplitude.track('App sent to background or quit');
+        analytics().logEvent('app_state', {details: 'App sent to background or quit'});
       }
       appState.current = nextAppState;
     };
@@ -211,7 +223,7 @@ const App = () => {
 
   // error handling done in component
   const submitAnswerAndProceed = async (data:string) => {
-    amplitude.track('Submitted question recording');
+    analytics().logEvent('question_recording_submitted');
     // see recorder docs regarding rn-fetch-blob if you have trouble uploading file
     await submitAnswer({
       audio_data: data,
@@ -223,13 +235,13 @@ const App = () => {
   }
 
   const rateAnswerAndAnimate = async (card: AnswerCard, rating: number) => {
-    amplitude.track('Rated answer: ' + (rating > 0 ? "upvote" : rating < 0 ? "downvote" : "skipped"));
+    analytics().logEvent('answer_rated', {rating: (rating > 0 ? "upvote" : rating < 0 ? "downvote" : "skipped")});
     await rateAnswer(card.id, rating)
     // fail silently
   }
 
   const reportAnswerAndAnimate = async (card: AnswerCard) => {
-    amplitude.track('Reported answer');
+    analytics().logEvent('answer_reported');
     await reportAnswer(card.id)
     // fail silently
   }
@@ -276,7 +288,7 @@ const App = () => {
       return loadedQuestion
     }
     catch (e) {
-      amplitude.track('ERROR: Failed to finish loadStack', {error: e.message});
+      analytics().logEvent('ERROR_loadStack', {description: "Failed to finish loadStack", error: e.message});
       console.log(e)
       // loading is critical. if it fails, do a hard reload
       Alert.alert("Failed to load card. Please check your internet connection or contact support", undefined, [{
@@ -296,7 +308,7 @@ const App = () => {
       return question.key !== newQ.key
     }
     catch (e) {
-      amplitude.track('Failed to load question in hasNewQuestion', {error: e.message});
+      analytics().logEvent('ERROR_hasNewQuestion', {details: "Failed to load question", error: e.message});
       Alert.alert("Failed to load question. Please check your internet connection or contact support")
       return true
     }

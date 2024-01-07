@@ -1,12 +1,14 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DeviceInfo from 'react-native-device-info';
-import * as amplitude from '@amplitude/analytics-react-native';
+import analytics from '@react-native-firebase/analytics';
+import messaging from '@react-native-firebase/messaging';
 
 const baseURL = 'http://192.168.1.136:8080/api/'
 //const baseURL = 'https://hearyouout.deta.dev/
 
 let access_token = "";
 let id:string = ""; 
+let feature_flags = {};
 const deviceId = DeviceInfo.getUniqueId();
 
 const fetchWithRetry = async (url, options) => {
@@ -41,15 +43,22 @@ export const login = async (): Promise<void> => {
     if (newId) await AsyncStorage.setItem("id", newId)
     // if regristration failed, record it but continue
     else {
-      amplitude.track('Registration failed, user likely re-installed app');
+      analytics().logEvent('registration_failed', { details: "User likely reinstalled app"});
     }
   }
+
+  await messaging().registerDeviceForRemoteMessages();
+  const token = await messaging().getToken();
+  console.log(token)
 
   const result = await fetchWithRetry(`${baseURL}auth/login?device_id=${deviceId}`, {
     method: 'POST',
     headers: {
       Accept: 'application/json',
     },
+    body: {
+      feature_flags: JSON.stringify(feature_flags)
+    }
   });
   const json = await result.json()
 
@@ -58,6 +67,8 @@ export const login = async (): Promise<void> => {
   else throw new Error("No access token returned from login")
   if (json.user_id) id = json.user_id
   else throw new Error("No id returned from login")
+  if (json.feature_flags) feature_flags = json.feature_flags
+  //else throw new Error("No feature flags returned from login")
   console.log("done logging in")
 }
 

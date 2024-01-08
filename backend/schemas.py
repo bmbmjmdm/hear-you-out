@@ -231,7 +231,6 @@ class AnswerExternalUserModel(AnswerMinimalModel):
         ..., description="The question of the answer"
     )
 
-
 # Only ID and views
 class AnswerExternalViewsModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)

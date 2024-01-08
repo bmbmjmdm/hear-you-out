@@ -54,6 +54,10 @@ async def send_notification_to_user(
             "message": message_text,
         },
         token=registration_token,
+        notification=messaging.Notification(
+            title='Test',
+            body=message_text,
+        )
     )
     response = messaging.send(message)
     response = json.dumps(response)
@@ -69,6 +73,10 @@ async def send_notification_to_users(
             "message": message_text,
         },
         tokens=registration_tokens,
+        notification=messaging.Notification(
+            title='Test',
+            body=message_text,
+        )
     )
     response = messaging.send_multicast(message)
     return TestSummary(message=message_text, response=response)

@@ -10,9 +10,11 @@
     "lint": "eslint ."
   },
   "dependencies": {
-    "@amplitude/analytics-react-native": "^1.4.5",
     "@react-native-async-storage/async-storage": "^1.19.4",
     "@react-native-community/checkbox": "^0.5.8",
+    "@react-native-firebase/analytics": "18.3.1",
+    "@react-native-firebase/app": "18.3.1",
+    "@react-native-firebase/messaging": "18.3.1",
     "buffer": "^6.0.3",
     "react": "16.13.1",
     "react-native": "0.63.0",

@@ -2,11 +2,11 @@
 
 buildscript {
     ext {
-        buildToolsVersion = "31.0.0"
+        buildToolsVersion = "33.0.0"
         // Note: Below change is necessary for pause / resume audio feature. Not for Kotlin.
         minSdkVersion = 24
-        compileSdkVersion = 31
-        targetSdkVersion = 31
+        compileSdkVersion = 33
+        targetSdkVersion = 33
         kotlinVersion = '1.5.0'
         reactNativeFFmpegPackage = "audio"
     }
@@ -17,6 +17,7 @@ buildscript {
     dependencies {
         classpath("com.android.tools.build:gradle:4.1.0")
         classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlinVersion"
+        classpath "com.google.gms:google-services:4.3.14"
         // NOTE: Do not place your application dependencies here; they belong
         // in the individual module build.gradle files
     }

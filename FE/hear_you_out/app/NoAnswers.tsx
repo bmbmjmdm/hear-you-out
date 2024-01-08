@@ -9,7 +9,7 @@ import {
 import cat from './cat.png'
 import LinearGradient from 'react-native-linear-gradient';
 import { resizeCat, resizeHeaderMargin, SizeContext } from './helpers';
-import * as amplitude from '@amplitude/analytics-react-native';
+import analytics from '@react-native-firebase/analytics';
 
 type NoAnswersProps = {
   setDisableSwipes: (toDisable: boolean) => void
@@ -20,7 +20,7 @@ const NoAnswers = ({setDisableSwipes, isShown}: NoAnswersProps) => {
   const screenSize = React.useContext(SizeContext)
 
   React.useEffect(() => {
-    amplitude.track('Arrived on no more answers screen');
+    analytics().logEvent('no_answers_screen');
   }, [])
   React.useEffect(() => {
     if (isShown) setDisableSwipes(false)

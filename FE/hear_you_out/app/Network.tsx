@@ -1,10 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import DeviceInfo from 'react-native-device-info';
+import analytics from '@react-native-firebase/analytics';
+import messaging from '@react-native-firebase/messaging';
 
 const baseURL = 'http://192.168.1.136:8080/api/'
 //const baseURL = 'https://hearyouout.deta.dev/
+
 let access_token = "";
-let id:null|string = "";
+let id:string = ""; 
+let feature_flags = {};
+const deviceId = DeviceInfo.getUniqueId();
 
 const fetchWithRetry = async (url, options) => {
   try {
@@ -18,9 +23,11 @@ const fetchWithRetry = async (url, options) => {
 }
 
 export const login = async (): Promise<void> => {
-  id = await AsyncStorage.getItem("id")
+  console.log("logging in")
+  id = await AsyncStorage.getItem("id") || ""
   // check to see if we're registered yet, if not, register us with the device id
   if (!id) {
+    console.log("registering")
     const registerResult = await fetchWithRetry(`${baseURL}auth/register`, {
       method: 'POST',
       headers: {
@@ -28,26 +35,41 @@ export const login = async (): Promise<void> => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        device_id: DeviceInfo.getDeviceId(),
+        device_id: deviceId
       }),
     });
     const registerJson = await registerResult.json()
-    id = registerJson.device_id
-    if (id) await AsyncStorage.setItem("id", id)
+    const newId = registerJson.id
+    if (newId) await AsyncStorage.setItem("id", newId)
+    // if regristration failed, record it but continue
+    else {
+      analytics().logEvent('registration_failed', { details: "User likely reinstalled app"});
+    }
   }
 
-  // if regristration failed, abort
-  if (!id) throw new Error("No id returned from register")
+  await messaging().registerDeviceForRemoteMessages();
+  const token = await messaging().getToken();
+  console.log(token)
 
-  const result = await fetchWithRetry(`${baseURL}auth/login?device_id=${id}`, {
+  const result = await fetchWithRetry(`${baseURL}auth/login?device_id=${deviceId}`, {
     method: 'POST',
     headers: {
       Accept: 'application/json',
     },
+    body: {
+      feature_flags: JSON.stringify(feature_flags)
+    }
   });
   const json = await result.json()
+
+  // we need access token and user id to successfully make calls
   if (json.access_token) access_token = json.access_token
   else throw new Error("No access token returned from login")
+  if (json.user_id) id = json.user_id
+  else throw new Error("No id returned from login")
+  if (json.feature_flags) feature_flags = json.feature_flags
+  //else throw new Error("No feature flags returned from login")
+  console.log("done logging in")
 }
 
 
@@ -56,7 +78,6 @@ export type APIQuestion = {
   key: string,
   text: string
 }
-
 export const getQuestion = async (): Promise<APIQuestion> => {
   console.log("getting question")
   const result = await fetchWithRetry(`${baseURL}question`, {
@@ -70,36 +91,30 @@ export const getQuestion = async (): Promise<APIQuestion> => {
   if (json.detail) {
     throw new Error(json.detail)
   }
-  return json
+  console.log("returning question")
+  return {
+    ...json,
+    key: json.id,
+  }
 }
 
 export type APIAnswerStats = {
-  key: string,
-  num_agrees: number,
-  num_disagrees: number,
-  num_abstains: number,
-  num_serves: number
+  id: string,
+  views: number,
 }
 
 export const getAnswerStats = async(): Promise<APIAnswerStats> => {
-  // todo given the new be....
-  /*
+  console.log("getting stats")
   const oldAnswer = await AsyncStorage.getItem("oldAnswer")
-  const result = await fetchWithRetry(`${baseURL}answers/stats?answer_id=${oldAnswer}`, {
+  const result = await fetchWithRetry(`${baseURL}answers/views?ids=${oldAnswer}`, {
     method: 'GET',
     headers: {
       Accept: 'application/json',
       authorization: `Bearer ${access_token}`,
-    },
+    }
   });
-  return await result.json()*/
-  return {
-    key: "1",
-    num_agrees: 1,
-    num_disagrees: 1,
-    num_abstains: 1,
-    num_serves: 1
-  }
+  console.log("returning stats")
+  return await result.json()[0]
 }
 
 export type APIAnswer = {
@@ -112,26 +127,30 @@ export type APIAnswerId = {
 }
 
 export const submitAnswer = async (answer: APIAnswer): Promise<APIAnswerId> => {
-  tempAnswerList = []
+  console.log("submitting answer")
   // submit answer
   const result = await fetchWithRetry(`${baseURL}answer`, {
     method: 'POST',
     headers: {
       authorization: `Bearer ${access_token}`,
       "Content-Type": "application/json",
-  },
+    },
     body: JSON.stringify({
-      ...answer,
+      is_active: true,
+      question_id: answer.question_uuid,
+      views: 0,
+      audio_data: answer.audio_data,
       user_id: id,
     })
   });
   const json = await result.json()
   if (json.detail) {
-    throw new Error(json.detail)
+    throw new Error(JSON.stringify(json.detail))
   }
-  // overwrite previously seen answers since we're on a new question
-  await AsyncStorage.setItem("answerList", JSON.stringify([json.answer_id]))
-  await AsyncStorage.setItem("oldAnswer", JSON.stringify(json.answer_id))
+  
+  await AsyncStorage.setItem("answerList", JSON.stringify([json.id]))
+  await AsyncStorage.setItem("oldAnswer", JSON.stringify(json.id))
+  console.log("done submitting answer")
   return json
 }
 
@@ -149,27 +168,47 @@ export const clearTempAnswerList = () => {
 }
 
 export const getAnswer = async (questionId: string): Promise<APIOthersAnswer> => {
+  console.log("getting answer")
   // construct our previously seen answer list from our permanant list and temporary one
   let list: Array<string> = JSON.parse(await AsyncStorage.getItem("answerList")) || []
   list = list.concat(tempAnswerList)
+  // reduce the list into multiple query params
+  const seenAnswersQuery = list.reduce((acc, cur) => acc + `&seen_answers_ids=${cur}`, "")
   // fetch based on total list
-  const result = await fetchWithRetry(`${baseURL}answers?ids=${JSON.stringify(list)}`, {
+  const result = await fetchWithRetry(`${baseURL}answers?limit=1${seenAnswersQuery}`, {
     method: 'GET',
     headers: {
       'Content-Type': 'application/json',
       authorization: `Bearer ${access_token}`,
     }
   });
-  // update temporary list of seen answers
+
+  if (result.status === 204) {
+    console.log("returning -no- answer")
+    return {
+      no_answers: true
+    }
+  }
+  
   const json = await result.json()
   if (json.detail) {
     throw new Error(json.detail)
   }
-  if (json[0].answer_uuid) tempAnswerList.push(json[0].answer_uuid)
-  return json[0]
+
+  const returnedAnswer = {
+    answer_uuid: json[0].id as string,
+    audio_data: json[0].audio_data as string,
+    no_answers: false
+  }
+
+  // update temporary list of seen answers
+  tempAnswerList.push(returnedAnswer.answer_uuid)
+  console.log("returning answer")
+  return returnedAnswer
 }
 
 export const rateAnswer = async (answerId: string, rating: number): Promise<void> => {
+  console.log("rating answer")
   // update our permanant list of seen answers
   const oldPreviouslyRatedAnswers =  JSON.parse(await AsyncStorage.getItem("answerList"))
   oldPreviouslyRatedAnswers.push(answerId)
@@ -189,11 +228,12 @@ export const rateAnswer = async (answerId: string, rating: number): Promise<void
       "Content-Type": "application/json",
     }
   });
+  console.log("done rating answer")
 }
 
 export const reportAnswer = async (answerId: string): Promise<void> => {
-  const phoneId = "" // TODO decide if we want to send phoneId, which we can get from react-native-device-info
-  const result = await fetchWithRetry(`${baseURL}flagAnswer?answer_uuid=${answerId}&phone_id=${phoneId}`, {
+  console.log("reporting answer")
+  const result = await fetchWithRetry(`${baseURL}flag`, {
     method: 'POST',
     body: JSON.stringify({
       user_id: id,
@@ -205,5 +245,6 @@ export const reportAnswer = async (answerId: string): Promise<void> => {
       authorization: `Bearer ${access_token}`,
     }
   });
+  console.log("done reporting answer")
 }
 

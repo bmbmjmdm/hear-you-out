@@ -17,7 +17,9 @@ import schemas
 from database import get_db
 from config import config
 
-# 
+from CRUD import TestGroup, Test
+
+#
 ACCESS_TOKEN_EXPIRE_MINUTES = int(config.ACCESS_TOKEN_EXPIRE_MINUTES)
 SECRET_KEY = os.environ.get("SECRET_KEY")
 ALGORITHM = os.environ.get("ALGORITHM")
@@ -39,14 +41,16 @@ async def verify_password(plain_password: str, hashed_password: str) -> bool:
 async def get_user(
     db: AsyncSession, username: str
 ) -> models.User:  # This could be in CRUD
-    stmt = select(models.User).where(models.User.username == username).options(
-        selectinload(models.User.answers_viewed),
-        selectinload(models.User.answers_authored),
+    stmt = (
+        select(models.User)
+        .where(models.User.username == username)
+        .options(
+            selectinload(models.User.answers_viewed),
+            selectinload(models.User.answers_authored),
+        )
     )
-    print(f"stmt: {stmt}")
     result = await db.execute(stmt)
     user = result.scalars().first()
-    print(f"user: {user}")
     return user
 
 
@@ -70,9 +74,7 @@ async def create_access_token(
     else:
         expire = datetime.utcnow() + timedelta(minutes=15)
     to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(
-        to_encode, key=SECRET_KEY, algorithm=ALGORITHM
-    )
+    encoded_jwt = jwt.encode(to_encode, key=SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
 
@@ -122,9 +124,26 @@ async def get_current_active_admin(
 
 
 async def register_user(
-        user: schemas.UserCreateModel,
-        db: AsyncSession = Depends(get_db),
-        ) -> models.User:
+    user: schemas.UserCreateModel,
+    db: AsyncSession = Depends(get_db),
+) -> models.User:
+    
+    # Check if groups are valid
+    test_CRUD = Test.CRUDTest(db, models.Test)
+    for test_group in user.test_groups:
+        try:
+            test = await test_CRUD.get(query_dict={"name": test_group["test"]})
+            if test is None:
+                raise HTTPException(
+                    status_code=404,
+                    detail=f"Test {test_group['test']} not found",
+                )
+        except KeyError:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Test name not provided",
+            )
+
     # If there's only device_id, generate a username, email, and password
     # If there's a username, email, or password, assure they're all present
 
@@ -151,6 +170,7 @@ async def register_user(
         email=user.email,
         password=await get_password_hash(user.password),
     )
+
     db.add(db_user)
     try:
         await db.commit()
@@ -175,5 +195,23 @@ async def register_user(
             status_code=400,
             detail=f"Error registering user",
         )
-    await db.refresh(db_user)
+    created_user = await get_user(db, username=user.username)
+
+    test_CRUD = Test.CRUDTest(db, models.Test)
+    test_group_CRUD = TestGroup.CRUDTestGroup(db, models.TestGroup)
+    for test_group in user.test_groups:
+        test = await test_CRUD.get(query_dict={"name": test_group["test"]})
+        if test is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Test {test_group['test']} not found",
+            )
+        test_group = await test_group_CRUD.create(
+            schemas.TestGroupCreateModel(
+                user_id=created_user.id,
+                test_id=test.id,
+                is_active=True,
+                version=test_group["version"],
+            )
+        )
     return db_user

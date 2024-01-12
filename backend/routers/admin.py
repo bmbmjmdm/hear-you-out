@@ -25,6 +25,7 @@ from database import get_db
 import authentication
 from config import config
 from CRUD.Object import check_related_object
+from CRUD import TestGroup, Test
 
 
 class Message(BaseModel):
@@ -583,3 +584,87 @@ async def update_embeddings(
         for embedding in out_embeddings
     ]
     return out_embeddings
+
+
+@router.post("/tests", response_model=List[schemas.TestUpdateModel])
+async def submit_tests(
+    admin: Annotated[models.User, Depends(authentication.get_current_active_admin)],
+    tests: List[schemas.TestCreateModel],
+    db: AsyncSession = Depends(get_db),
+):
+    test_CRUD = Test.CRUDTest(db, models.Test)
+    tests_out = []
+    for test in tests:
+        # Create test in database
+        try:
+            db_test = await test_CRUD.create(test)
+        except Exception as e:
+            if f"Test {test.name} already exists" in str(e):
+                await db.rollback()
+                db_test = await test_CRUD.get(query_dict={"name": test.name})
+                if db_test is None:
+                    raise e
+            else:
+                raise HTTPException(
+                    status_code=status.HTTP_400_BAD_REQUEST,
+                    detail=f"Error creating test {test.name}",
+                )
+        tests_out.append(schemas.TestUpdateModel.model_validate(db_test))
+
+    return tests_out
+
+
+@router.get("/tests", response_model=List[schemas.TestUpdateModel])
+async def get_tests(
+    admin: Annotated[models.User, Depends(authentication.get_current_active_admin)],
+    db: AsyncSession = Depends(get_db),
+    ids: List[uuid.UUID] = Query(None),
+):
+    test_CRUD = Test.CRUDTest(db, models.Test)
+    kwargs = {}
+
+    if ids is not None:
+        kwargs["id"] = ids
+    tests = await test_CRUD.get_multi(**kwargs)
+    tests = [schemas.TestUpdateModel.model_validate(test) for test in tests]
+    return tests
+
+
+@router.post("/test_groups", response_model=List[schemas.TestGroupUpdateModel])
+async def submit_test_groups(
+    admin: Annotated[models.User, Depends(authentication.get_current_active_admin)],
+    test_groups: List[schemas.TestGroupCreateModel],
+    db: AsyncSession = Depends(get_db),
+):
+    test_group_CRUD = TestGroup.CRUDTestGroup(db, models.TestGroup)
+    test_groups_out = []
+    for test_group in test_groups:
+        # Create test_group in database
+        db_test_group = await test_group_CRUD.create(test_group)
+        test_groups_out.append(db_test_group)
+
+    # Convert to external model
+    test_groups_out = [
+        schemas.TestGroupUpdateModel.model_validate(test_group)
+        for test_group in test_groups_out
+    ]
+    return test_groups_out
+
+
+@router.get("/test_groups", response_model=List[schemas.TestGroupUpdateModel])
+async def get_test_groups(
+    admin: Annotated[models.User, Depends(authentication.get_current_active_admin)],
+    db: AsyncSession = Depends(get_db),
+    ids: List[uuid.UUID] = Query(None),
+):
+    test_group_CRUD = TestGroup.CRUDTestGroup(db, models.TestGroup)
+    kwargs = {}
+
+    if ids is not None:
+        kwargs["id"] = ids
+    test_groups = await test_group_CRUD.get_multi(**kwargs)
+    test_groups = [
+        schemas.TestGroupUpdateModel.model_validate(test_group)
+        for test_group in test_groups
+    ]
+    return test_groups

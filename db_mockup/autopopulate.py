@@ -22,6 +22,44 @@ response = requests.post(
 )
 
 
+# Login admin
+response = requests.post(
+    url + "/api/auth/login/username",
+    data={
+        "username": admin_data["username"],
+        "password": admin_data["password"],
+    },
+)
+admin_token = response.json()["access_token"]
+
+
+# Create tests
+tests_data = data["tests"]
+tests = []
+try:
+    response = requests.post(
+        url + "/api/admin/tests",
+        headers={"Authorization": f"Bearer {admin_token}"},
+        json=tests_data,
+    )
+    tests = response.json()
+except Exception as e:
+    if (
+        'duplicate key value violates unique constraint "tests_name_key"' in str(e)
+    ):
+        print(f"Key already exists")
+    raise e
+
+
+# Save to output file, create if it doesn't exist
+try:
+    os.makedirs(os.path.dirname("output/tests.json"))
+except FileExistsError:
+    pass
+with open("output/tests.json", "w") as f:
+    json.dump(tests, f, indent=4)
+
+
 # Create users
 users_data = data["users"]
 users = []
@@ -49,15 +87,6 @@ with open("output/users.json", "w") as f:
 questions_data = data["questions"]
 questions = []
 questions_output = []
-
-response = requests.post(
-    url + "/api/auth/login/username",
-    data={
-        "username": admin_data["username"],
-        "password": admin_data["password"],
-    },
-)
-admin_token = response.json()["access_token"]
 
 response = requests.post(
     url + "/api/admin/questions",

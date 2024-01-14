@@ -521,6 +521,7 @@ const Answer = ({
               <PointerArrow
                 beginAnimation={currentTutorialElement === "play"}
                 beganAction={playing}
+                hidePermanantly={completedTutorial}
               />
               {Object.values(circles)}
               <TouchableOpacity

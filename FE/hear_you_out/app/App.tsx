@@ -36,11 +36,12 @@ type AnswerCard = {
 
 // TODO error handling on everything
 const App = () => {
-  const {height} = useWindowDimensions()
-  let screenSize:ScreenSize = "medium"
-  if (height < 600) screenSize = "tiny"
-  else if (height < 750) screenSize = "small"
-  else if (height < 1000) screenSize = "medium"
+  const {height, scale} = useWindowDimensions()
+  const sizeRatio = height / scale
+  let screenSize:ScreenSize
+  if (sizeRatio < 125) screenSize = "tiny"
+  else if (sizeRatio < 225) screenSize = "small"
+  else if (sizeRatio < 325) screenSize = "medium"
   else screenSize = "large"
   const [disableSwipes, setDisableSwipes] = React.useState(true)
   const swiper1 = React.useRef(null)
@@ -57,7 +58,6 @@ const App = () => {
   const [completedShareTutorial, setCompletedShareTutorial ] = React.useState(false)
   const appState = React.useRef(AppState.currentState);
   const appStateListener = React.useRef<Function | null>(null);
-
   const animatedSwipeRight1 = React.useRef(false)
   const animatedSwipeLeft1 = React.useRef(false)
   const answer1 = React.useRef(null)
@@ -99,6 +99,7 @@ const App = () => {
       catch (e) {
         analytics().logEvent('ERROR_login', {details: "failed to login", error: e.message});
         Alert.alert("Failed to login. Please restart the app and check your internet connection.")
+        console.log(e)
         return;
       }
 

@@ -3,7 +3,8 @@
     "username": "admin",
     "password": "admin",
     "email": "admin@localhost",
-    "device_id": "admin"
+    "device_id": "admin",
+    "test_groups": []
   },
   "questions": [
     {
@@ -33,12 +34,61 @@
       ]
     }
   ],
-  "users":[
+  "tests": [
     {
-      "device_id": "user"},
+      "is_active": true,
+      "name": "a/b",
+      "description": "just a/b",
+      "versions": [
+        "a",
+        "b"
+      ]
+    },
     {
-      "device_id": "user2"},
+      "is_active": true,
+      "name": "Registration button",
+      "description": "Registration button",
+      "versions": [
+        "Green",
+        "Blue"
+      ]
+    }
+  ],
+  "users": [
     {
-      "device_id": "user3"}
+      "device_id": "user",
+      "test_groups": [
+        {
+          "test": "a/b",
+          "version": "a"
+        },
+        {
+          "test": "Registration button",
+          "version": "Green"
+        }
+      ]
+    },
+    {
+      "device_id": "user2",
+      "test_groups": [
+        {
+          "test": "a/b",
+          "version": "b"
+        },
+        {
+          "test": "Registration button",
+          "version": "Blue"
+        }
+      ]
+    },
+    {
+      "device_id": "user3",
+      "test_groups": [
+        {
+          "test": "a/b",
+          "version": "a"
+        }
+      ]
+    }
   ]
 }

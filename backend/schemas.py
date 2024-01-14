@@ -16,8 +16,6 @@ from datetime import datetime
 # User. Needs to handle login, registration, admin view, user own view, other user view, update user info
 # Currently user is registered and logged via device ID, except for admin making username and password optional
 
-# Mixin
-
 
 # User
 
@@ -52,6 +50,9 @@ class UserModel(UserMinimalModel):
     )
     votes: List["VoteMinimalModel"] = Field(..., description="The votes of the user")
     flags: List["FlagMinimalModel"] = Field(..., description="The flags of the user")
+    test_groups: List["TestGroupMinimalModel"] = Field(
+        ..., description="The test groups of the user"
+    )
 
 
 # Create model, for creating new users
@@ -60,6 +61,11 @@ class UserCreateModel(UserBaseModel):
     email: Optional[str] = Field(None, description="The email of the user")
     username: Optional[str] = Field(None, description="The username of the user")
     password: Optional[str] = Field(None, description="The password of the user")
+
+    # Test group dicts have to take form of {"test": test_name, "version": test_version}
+    test_groups: List[dict[str, str]] = Field(
+        None, description="The test groups of the user", example=[{"test": "colour", "version": "red"}]
+    )
 
     @validator("username")
     def username_required(cls, v, values, **kwargs):
@@ -385,6 +391,91 @@ class FlagExternalModel(FlagModel):
     pass
 
 
+# Test model, for user tests
+class TestBaseModel(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    is_active: bool = Field(True, description="Whether the model is active")
+    name: str = Field(..., description="The name of the test")
+    description: str = Field(..., description="The description of the test")
+    versions: List[str] = Field(..., description="The versions of the test")
+
+
+# Minimal model, for relations with other models
+class TestMinimalModel(TestBaseModel):
+    id: UUID4 = Field(..., description="The ID of the model")
+
+
+# Test model, with all fields
+class TestModel(TestMinimalModel):
+    created_at: datetime = Field(..., description="The time of creation of the model")
+    updated_at: datetime = Field(
+        ..., description="The time of last update of the model"
+    )
+    # relation fields
+    test_groups: List["TestGroupMinimalModel"] = Field(
+        ..., description="The test groups of the test"
+    )
+
+
+# Create model, for creating new tests
+class TestCreateModel(TestBaseModel):
+    pass
+
+
+# Update model, for updating test info
+class TestUpdateModel(TestMinimalModel):
+    name: Optional[str] = Field(None, description="The name of the test")
+    description: Optional[str] = Field(None, description="The description of the test")
+    versions: Optional[List[str]] = Field(None, description="The versions of the test")
+
+
+# TestGroup model, for user tests
+class TestGroupBaseModel(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    is_active: bool = Field(True, description="Whether the model is active")
+    test_id: UUID4 = Field(..., description="The UUID of the test of the group")
+    user_id: UUID4 = Field(..., description="The UUID of the user of the group")
+    version: str = Field(..., description="The version of the test of the group")
+
+
+# Minimal model, for relations with other models
+class TestGroupMinimalModel(TestGroupBaseModel):
+    id: UUID4 = Field(..., description="The ID of the model")
+
+
+# TestGroup model, with all fields
+class TestGroupModel(TestGroupMinimalModel):
+    created_at: datetime = Field(..., description="The time of creation of the model")
+    updated_at: datetime = Field(
+        ..., description="The time of last update of the model"
+    )
+
+    # relation fields
+    test: "TestMinimalModel" = Field(..., description="The test of the group")
+    user: "UserMinimalModel" = Field(..., description="The user of the group")
+
+
+# Create model, for creating new test groups
+class TestGroupCreateModel(TestGroupBaseModel):
+    pass
+
+
+# Update model, for updating test group info
+class TestGroupUpdateModel(TestGroupMinimalModel):
+    test_id: Optional[UUID4] = Field(
+        None, description="The UUID of the test of the group"
+    )
+    user_id: Optional[UUID4] = Field(
+        None, description="The UUID of the user of the group"
+    )
+    version: Optional[str] = Field(
+        None, description="The version of the test of the group"
+    )
+
+
+# Token
+
+
 class Token(BaseModel):
     access_token: str
     token_type: str
@@ -397,6 +488,9 @@ class TokenData(BaseModel):
 
 # Rebuild models for relations
 
+TestModel.model_rebuild()
+TestGroupModel.model_rebuild()
+TestGroupMinimalModel.model_rebuild()
 FlagModel.model_rebuild()
 FlagExternalModel.model_rebuild()
 VoteModel.model_rebuild()

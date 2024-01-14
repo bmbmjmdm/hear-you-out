@@ -13,7 +13,6 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import UUID, BYTEA, ARRAY
 from sqlalchemy.orm import relationship, mapped_column, Mapped, deferred
-import hashlib
 
 import uuid
 from datetime import datetime
@@ -27,6 +26,7 @@ from database import Base
 # User can submit an answer by recording audio and submitting it
 # Answers are currently stored on the drive
 # Answers's embeddings are stored separately to manage information about models used
+# Additionally, users are assigned into A/B testing groups. Number of tests is dynamic.
 #
 # Given the above, the database should have the following models:
 # User (id-uuid, the user ID; username-string, the user's username; password-string, the user's password)
@@ -35,10 +35,16 @@ from database import Base
 # Flag (id-uuid, the flag ID; reason-string, the reason for flagging)
 # Vote (id-uuid, the vote ID; vote-int, the vote value)
 # Embedding (id-uuid, the embedding ID; embedding-array of floats, the embedding; model-string, the model used to generate the embedding)
+# Test (id-uuid, the test ID; name-string, the test name; description-string, the test description; versions-array of strings, the test versions)
+# TestGroup (id-uuid, the test group ID; test_id-uuid, the test ID; user_id-uuid, the user ID; version-string, the version of the test;)
 # QuestionAnswer, a join table between Question and Answer (question_id-uuid, the question ID; answer_id-uuid, the answer ID)
 # AnswerVote, a join table between Answer and User (answer_id-uuid, the answer ID; user_id-uuid, the user ID; vote-int, the vote value)
 # AnswerFlag, a join table between Answer and User (answer_id-uuid, the answer ID; user_id-uuid, the user ID; flag_id-uuid, the flag ID)
 # AnswerEmbedding, a join table between Answer and Embedding (answer_id-uuid, the answer ID; embedding_id-uuid, the embedding ID)
+# UserAnswer, a join table between User and Answer (user_id-uuid, the user ID; answer_id-uuid, the answer ID)
+# UserFlag, a join table between User and Flag (user_id-uuid, the user ID; flag_id-uuid, the flag ID)
+# UserVote, a join table between User and Vote (user_id-uuid, the user ID; vote_id-uuid, the vote ID)
+#
 #
 # Currently user is registered and logged via device ID, except for admin
 
@@ -122,6 +128,11 @@ class User(BaseMixin, Base):
     )
     flags: Mapped[List["Flag"]] = relationship(
         "Flag",
+        back_populates="user",
+        lazy="selectin",
+    )
+    test_groups: Mapped[List["TestGroup"]] = relationship(
+        "TestGroup",
         back_populates="user",
         lazy="selectin",
     )
@@ -270,5 +281,54 @@ class Embedding(BaseMixin, Base):
     answer: Mapped[Answer] = relationship(
         "Answer",
         back_populates="embeddings",
+        lazy="selectin",
+    )
+
+
+class Test(BaseMixin, Base):
+    __tablename__ = "tests"
+    name: Mapped[str] = mapped_column(
+        nullable=False,
+        unique=True,
+    )
+    description: Mapped[str] = mapped_column(
+        nullable=False,
+    )
+    versions: Mapped[List[str]] = mapped_column(
+        ARRAY(String),
+        nullable=False,
+    )
+
+    # relationships
+    test_groups: Mapped[List["TestGroup"]] = relationship(
+        "TestGroup",
+        back_populates="test",
+        lazy="selectin",
+    )
+
+
+class TestGroup(BaseMixin, Base):
+    __tablename__ = "test_groups"
+    test_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("tests.id"),
+        nullable=False,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=False,
+    )
+    version: Mapped[str] = mapped_column(
+        nullable=False,
+    )
+
+    # relationships
+    test: Mapped[Test] = relationship(
+        "Test",
+        back_populates="test_groups",
+        lazy="selectin",
+    )
+    user: Mapped[User] = relationship(
+        "User",
+        back_populates="test_groups",
         lazy="selectin",
     )

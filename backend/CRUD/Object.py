@@ -60,9 +60,6 @@ class CRUDObject:
     async def get_multi(self, skip: int = 0, limit: int = 100, **kwargs) -> List[ModelType]:
         stmt = select(self.model).where(self.model.is_active == True).limit(limit).offset(skip)
         if kwargs:
-            print(f"kwargs: {kwargs}")
-            # example:
-            # kwargs: {'id': [UUID('8233d56f-162c-4d9a-aae1-fe90427bd07d')]}
             for key, value in kwargs.items():
                 if isinstance(value, list):
                     stmt = stmt.where(getattr(self.model, key).in_(value))

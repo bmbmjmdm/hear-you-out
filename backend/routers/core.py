@@ -106,6 +106,11 @@ async def get_answers(
     for answer in answers:
         response_answer = await answers_CRUD.view(answer, user, as_pydantic=True)
         response_answers.append(response_answer)
+    
+    # Currently returns answers including the user's own answers
+    # for answer in response_answers:
+    #     if answer.author.id == user.id:
+    #         response_answers.remove(answer)
 
     # Pick only limit'th answers from the front
     answers = response_answers[:limit]

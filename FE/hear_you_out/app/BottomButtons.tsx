@@ -125,7 +125,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: "space-between",
     width: "100%",
-    marginBottom: 25
+    marginBottom: 35
   },
   bigCircle: {
     borderRadius:999,

@@ -9,7 +9,6 @@ const baseURL = 'http://192.168.1.136:8080/api/'
 let access_token = "";
 let id:string = ""; 
 let feature_flags = {};
-const deviceId = DeviceInfo.getUniqueId();
 
 const fetchWithRetry = async (url, options) => {
   try {
@@ -23,6 +22,7 @@ const fetchWithRetry = async (url, options) => {
 }
 
 export const login = async (): Promise<void> => {
+  const deviceId = await DeviceInfo.getUniqueId();
   console.log("logging in")
   id = await AsyncStorage.getItem("id") || ""
   // check to see if we're registered yet, if not, register us with the device id
@@ -49,7 +49,6 @@ export const login = async (): Promise<void> => {
 
   await messaging().registerDeviceForRemoteMessages();
   const token = await messaging().getToken();
-  console.log(token)
 
   const result = await fetchWithRetry(`${baseURL}auth/login?device_id=${deviceId}`, {
     method: 'POST',
@@ -61,7 +60,6 @@ export const login = async (): Promise<void> => {
     }
   });
   const json = await result.json()
-
   // we need access token and user id to successfully make calls
   if (json.access_token) access_token = json.access_token
   else throw new Error("No access token returned from login")

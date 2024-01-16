@@ -1,14 +1,15 @@
 
 import React from 'react'
 import { useEffect, useRef, useState, useContext } from 'react';
-import { Animated, View, StyleSheet } from 'react-native';
+import { Animated, View, StyleSheet, ViewStyle } from 'react-native';
 import { resizePointerArrowOffset, getPointerArrowSize, SizeContext } from './helpers';
 import Arrow from './pointerArrow.png'
 
-export const PointerArrow = ({ beginAnimation, beganAction }) => {
+export const PointerArrow = ({ beginAnimation, beganAction, hidePermanantly }) => {
   const boxedBeganAction = useRef(true)
   boxedBeganAction.current = beganAction
   const [finishedAnimation, setFinishedAnimation] = useState(false)
+  const [noDisplay, setNoDisplay] = useState(false)
   const [arrowOpacity, setArrowOpacity] = useState(0)
   const screenSize = useContext(SizeContext)
   const offset = resizePointerArrowOffset(screenSize);
@@ -53,14 +54,20 @@ export const PointerArrow = ({ beginAnimation, beganAction }) => {
     }
   }, [finishedAnimation, beganAction])
 
-  const containerStyle = {
+  useEffect(() => {
+    if (hidePermanantly) {
+      setTimeout(() => setNoDisplay(true), 1000)
+    }
+  }, [hidePermanantly])
+
+  const containerStyle:ViewStyle = {
     ...offset,
     height: size,
-    width: size
-    ,
+    width: size,
     transform: [{
       rotateZ: '-45deg'
-    }]
+    }],
+    display: noDisplay ? 'none' : 'flex',
   }
 
 

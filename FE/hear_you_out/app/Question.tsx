@@ -275,7 +275,7 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
     }
     // user pressed first button, now they need to confirm
     setModalText("Delete recording and restart?")
-    setModalConfirm(restartRecordingConfirmed)
+    setModalConfirm(() => restartRecordingConfirmed)
     setModalVisible(true)
   }
 
@@ -328,14 +328,14 @@ const Question = ({ submitAnswerAndProceed, question, stats, isShown, completedT
     }
     if (recordTime < 15) {
       analytics().logEvent('tried_submit_recording_too_short', { seconds: recordTime });
-      setModalText("Please thoroughly answer the prompt (your answer was too short).")
+      setModalText("Please thoroughly answer the prompt; your answer was too short")
       setModalConfirm(null)
       setModalVisible(true)
       return
     }
     // user pressed first button, now they need to confirm
     setModalText("Submit your answer?")
-    setModalConfirm(submitRecordingConfirmed)
+    setModalConfirm(() => submitRecordingConfirmed)
     setModalVisible(true)
   }
 
@@ -496,6 +496,7 @@ return (
             <PointerArrow
               beginAnimation={currentTutorialElement === "record"}
               beganAction={recording}
+              hidePermanantly={completedTutorial}
             />
             {Object.values(circles)}
             <TouchableOpacity
@@ -568,9 +569,9 @@ const styles = StyleSheet.create({
   timer: {
     fontSize: 20,
     textAlign: 'center',
-    marginTop: 10,
-    marginBottom: 10,
-    color: "#F2F5DE"
+    marginTop: 20,
+    marginBottom: 20,
+    color: "#C0C3C5"
   },
 
   playbackTime: {

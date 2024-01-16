@@ -171,10 +171,22 @@ class Answer(BaseMixin, Base):
         ForeignKey("questions.id"),
         nullable=False,
     )
-    views: Mapped[int] = mapped_column(
+    views_count: Mapped[int] = mapped_column(
         nullable=False,
         default=0,
     )
+    unique_views: Mapped[int] = mapped_column(
+        nullable=False,
+        default=0,
+    )
+    votes_count: Mapped[int] = mapped_column(
+        nullable=False,
+        default=0,
+    )
+    flags_count: Mapped[int] = mapped_column(
+        nullable=False,
+        default=0,
+    )    
     # relationships
     author: Mapped[User] = relationship(
         "User",

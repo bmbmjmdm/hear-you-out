@@ -11,8 +11,35 @@ from schemas import (
 )
 import models
 from config import config
+import random
 
 from CRUD.Object import CRUDObject, check_related_object
+
+
+async def retrieve_audio_data(answer: models.Answer) -> bytes:
+    # retrieve the audio data
+    audio_data = None
+    with open(f"{config.AUDIO_FILE_PATH}{answer.audio_location}", "rb") as f:
+        audio_data = f.read()
+    return audio_data
+
+
+async def add_audio_and_check_pydantic(
+    answers: List[models.Answer], as_pydantic: bool
+) -> List[Tuple[models.Answer, bytes]] | List[AnswerExternalModel]:
+    # retrieve the audio data
+    answers_audio_data = []
+    for answer in answers:
+        audio_data = await retrieve_audio_data(answer)
+        answers_audio_data.append((answer, audio_data))
+    if as_pydantic:
+        return [
+            AnswerExternalModel.model_validate(
+                {**answer.__dict__, "audio_data": audio_data}
+            )
+            for answer, audio_data in answers_audio_data
+        ]
+    return answers_audio_data
 
 
 # Needs a custom Create to handle creation of related objects
@@ -33,10 +60,76 @@ class CRUDAnswer(CRUDObject):
             )
         return answer, audio_data
 
+    async def get_multi_top(
+        self, skip: int = 0, limit: int = 100, as_pydantic=True, **kwargs
+    ) -> List[Tuple[models.Answer, bytes]] | List[AnswerExternalModel]:
+        stmt = (
+            select(models.Answer)
+            .where(self.model.is_active == True)
+            .order_by(
+                # Sorting is the same, solved division by zero
+                (models.Answer.votes_count
+                + 1 / models.Answer.unique_views
+                + 1).desc()
+            )
+            .limit(limit)
+            .offset(skip)
+        )
+        if kwargs:
+            for key, value in kwargs.items():
+                if isinstance(value, list):
+                    stmt = stmt.where(getattr(self.model, key).in_(value))
+                else:
+                    stmt = stmt.where(getattr(self.model, key) == value)
+        result = await self.db.execute(stmt)
+        answers = result.unique().scalars().all()
+        return await add_audio_and_check_pydantic(answers, as_pydantic)
+
+    async def get_multi_least_viewed(
+        self, skip: int = 0, limit: int = 100, as_pydantic=True, **kwargs
+    ) -> List[Tuple[models.Answer, bytes]] | List[AnswerExternalModel]:
+        stmt = (
+            select(models.Answer)
+            .where(self.model.is_active == True)
+            .order_by(models.Answer.unique_views)
+            .limit(limit)
+            .offset(skip)
+        )
+        if kwargs:
+            for key, value in kwargs.items():
+                if isinstance(value, list):
+                    stmt = stmt.where(getattr(self.model, key).in_(value))
+                else:
+                    stmt = stmt.where(getattr(self.model, key) == value)
+        result = await self.db.execute(stmt)
+        answers = result.unique().scalars().all()
+        return await add_audio_and_check_pydantic(answers, as_pydantic)
+
+    async def get_multi_unset(
+        self, skip: int = 0, limit: int = 100, as_pydantic=True, **kwargs
+    ) -> List[Tuple[models.Answer, bytes]] | List[AnswerExternalModel]:
+        # Choose randomly between the two
+        if random.choice([True, False]):
+            return await self.get_multi_top(skip, limit, as_pydantic, **kwargs)
+        return await self.get_multi_least_viewed(skip, limit, as_pydantic, **kwargs)
+
     async def get_multi(
         self, skip: int = 0, limit: int = 100, as_pydantic=True, **kwargs
     ) -> List[Tuple[models.Answer, bytes]] | List[AnswerExternalModel]:
-        answers = await super().get_multi(skip, limit, **kwargs)
+        stmt = (
+            select(models.Answer)
+            .where(self.model.is_active == True)
+            .limit(limit)
+            .offset(skip)
+        )
+        if kwargs:
+            for key, value in kwargs.items():
+                if isinstance(value, list):
+                    stmt = stmt.where(getattr(self.model, key).in_(value))
+                else:
+                    stmt = stmt.where(getattr(self.model, key) == value)
+        result = await self.db.execute(stmt)
+        answers = result.unique().scalars().all()
         # retrieve the audio data
         answers_audio_data = []
         for answer in answers:
@@ -141,11 +234,10 @@ class CRUDAnswer(CRUDObject):
         # Update the answer with one view more
         answer_model = await self.get(id=answer.id, as_pydantic=False)
         answer_model = answer_model[0]
-        # answer_model = answer_model.unique().scalars().first()
-        # Update .views with +1 and viewed_by relationship with user
-        answer_model.views += 1
+        answer_model.views_count += 1
         if user not in answer_model.viewed_by:
             answer_model.viewed_by.append(user)
+            answer_model.unique_views += 1
         await self.db.commit()
         await self.db.refresh(answer_model)
         answer, audio_data = await self.get(id=answer.id, as_pydantic=False)

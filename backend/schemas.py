@@ -166,8 +166,10 @@ class AnswerBaseModel(BaseModel):
         ..., description="The UUID of the question of the answer"
     )
     user_id: UUID4 = Field(..., description="The UUID of the user of the answer")
-    views: int = Field(0, description="The number of views of the answer")
-
+    views_count: int = Field(0, description="The number of views of the answer")
+    unique_views: int = Field(0, description="The number of unique views of the answer")
+    votes_count: int = Field(0, description="The number of votes of the answer")
+    flags_count: int = Field(0, description="The number of flags of the answer")
 
 # Minimal model, for relations with other models
 class AnswerMinimalModel(AnswerBaseModel):
@@ -215,7 +217,16 @@ class AnswerUpdateModel(AnswerMinimalModel):
     question_id: Optional[UUID4] = Field(
         None, description="The UUID of the question of the answer"
     )
-    views: Optional[int] = Field(None, description="The number of views of the answer")
+    views_count: Optional[int] = Field(None, description="The number of views of the answer")
+    unique_views: Optional[int] = Field(
+        None, description="The number of unique views of the answer"
+    )
+    votes_count: Optional[int] = Field(
+        None, description="The number of votes of the answer"
+    )
+    flags_count: Optional[int] = Field(
+        None, description="The number of flags of the answer"
+    )
     # relation fields
     viewed_by: Optional[List["UserMinimalModel"]] = Field(
         None, description="The users who viewed the answer"
@@ -223,7 +234,6 @@ class AnswerUpdateModel(AnswerMinimalModel):
     author: Optional["UserMinimalModel"] = Field(
         None, description="The author of the answer"
     )
-
 
 # External model, to be returned to the frontend, possibly public
 class AnswerExternalModel(AnswerModel):
@@ -242,7 +252,7 @@ class AnswerExternalUserModel(AnswerMinimalModel):
 class AnswerExternalViewsModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     id: UUID4 = Field(..., description="The ID of the model")
-    views: int = Field(0, description="The number of views of the answer")
+    views_count: int = Field(0, description="The number of views of the answer")
 
 
 # Embedding. Needs to handle admin view, user view, other user view, update embedding info
@@ -300,7 +310,7 @@ class EmbeddingExternalModel(EmbeddingModel):
 class VoteBaseModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     is_active: bool = Field(True, description="Whether the model is active")
-    vote: int = Field(..., description="The vote of the user")
+    vote: int = Field(1, description="The vote of the user")
     user_id: UUID4 = Field(..., description="The UUID of the user of the vote")
     answer_id: UUID4 = Field(..., description="The UUID of the answer of the vote")
 

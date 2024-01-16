@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from typing import List, Optional, Union, Annotated
 from pydantic import BaseModel
 import uuid
+from enum import Enum
 
 import models, schemas
 from database import get_db
@@ -25,9 +26,15 @@ from CRUD.Object import CRUDObject
 from CRUD import Flag, Vote, Answer
 
 
+
 class Message(BaseModel):
     message: str
 
+
+class AnswerSorting(str, Enum):
+    random = "random"
+    top = "top"
+    unset = "unset"
 
 def check_list_length(list: List):
     if len(list) == 0:
@@ -73,6 +80,7 @@ async def get_answers(
     limit: int = Query(1),
     ids: List[uuid.UUID] = Query(None),
     questions_ids: List[uuid.UUID] = Query(None),
+    sorting: AnswerSorting = Query(AnswerSorting.unset),
 ):
     answers_CRUD = Answer.CRUDAnswer(db, models.Answer)
     question_CRUD = CRUDObject(db, models.Question)
@@ -93,7 +101,15 @@ async def get_answers(
         kwargs["question_id"] = questions_ids
     if ids is not None:
         kwargs["id"] = ids
-    answers = await answers_CRUD.get_multi(as_pydantic=True, limit=limit, **kwargs)
+    
+    answers = []
+    match sorting:
+        case AnswerSorting.random:
+            answers = await answers_CRUD.get_multi_least_viewed(**kwargs, as_pydantic=True)
+        case AnswerSorting.top:
+            answers = await answers_CRUD.get_multi_top(**kwargs, as_pydantic=True)
+        case AnswerSorting.unset:
+            answers = await answers_CRUD.get_multi_unset(**kwargs, as_pydantic=True)
 
     if seen_answers_ids is not None:
         answers = [
@@ -164,7 +180,6 @@ async def submit_answer_view(
         )
     # Increment the view count
     answer = await answers_CRUD.view(answer, user, as_pydantic=True)
-    print(f"answer: {answer}")
     return answer
 
 
@@ -189,6 +204,20 @@ async def submit_vote(
     db: AsyncSession = Depends(get_db),
 ):
     votes_CRUD = Vote.CRUDVote(db, models.Vote)
-    vote = await votes_CRUD.create(vote)
+    try:
+        vote = await votes_CRUD.create(vote)
+    except Exception as e:
+        if str(e) == "User has already voted on this answer":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="User has already voted on this answer",
+            )
+        elif str(e) == "User has already voted on this answer multiple times":
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="User has already voted on this answer multiple times",
+            )
+        else:
+            raise e
     vote = schemas.VoteExternalModel.model_validate(vote)
     return vote

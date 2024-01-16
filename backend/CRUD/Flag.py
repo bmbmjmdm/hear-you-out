@@ -20,6 +20,9 @@ class CRUDFlag(CRUDObject):
         flag.answer = answer
         flag.user = user
         self.db.add(flag)
+        # Add to flags_count in Answer
+        answer.flags_count += 1
+        # Commit
         await self.db.commit()
         await self.db.refresh(flag)
         return flag

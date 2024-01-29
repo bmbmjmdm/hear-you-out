@@ -108,7 +108,9 @@ class User(BaseMixin, Base):
         nullable=False,
         default=False,
     )
-
+    firebase_token: Mapped[str] = mapped_column(
+        nullable=True,
+    )
     # relationships
     answers_authored: Mapped[List["Answer"]] = relationship(
         "Answer",
@@ -133,6 +135,11 @@ class User(BaseMixin, Base):
     )
     test_groups: Mapped[List["TestGroup"]] = relationship(
         "TestGroup",
+        back_populates="user",
+        lazy="selectin",
+    )
+    topic_subscriptions: Mapped[List["TopicSubscription"]] = relationship(
+        "TopicSubscription",
         back_populates="user",
         lazy="selectin",
     )
@@ -186,7 +193,7 @@ class Answer(BaseMixin, Base):
     flags_count: Mapped[int] = mapped_column(
         nullable=False,
         default=0,
-    )    
+    )
     # relationships
     author: Mapped[User] = relationship(
         "User",
@@ -342,5 +349,27 @@ class TestGroup(BaseMixin, Base):
     user: Mapped[User] = relationship(
         "User",
         back_populates="test_groups",
+        lazy="selectin",
+    )
+
+
+class TopicSubscription(BaseMixin, Base):
+    __tablename__ = "topic_subscriptions"
+    topic: Mapped[str] = mapped_column(
+        nullable=False,
+    )
+    subscription_status: Mapped[bool] = mapped_column(
+        nullable=False,
+        default=True,
+    )
+    user_id: Mapped[uuid.UUID] = mapped_column(
+        ForeignKey("users.id"),
+        nullable=False,
+    )
+
+    # relationships
+    user: Mapped[User] = relationship(
+        "User",
+        back_populates="topic_subscriptions",
         lazy="selectin",
     )

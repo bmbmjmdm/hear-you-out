@@ -133,7 +133,6 @@ class CRUDAnswer(CRUDObject):
         # retrieve the audio data
         answers_audio_data = []
         for answer in answers:
-            print(f"answer: {answer}")
             audio_data = None
             with open(f"{config.AUDIO_FILE_PATH}{answer.audio_location}", "rb") as f:
                 audio_data = f.read()
@@ -164,7 +163,6 @@ class CRUDAnswer(CRUDObject):
             f.write(audio_data)
         # Create the answer
         obj_in_data = answer_in.model_dump()
-        print(f"obj_in_data: {obj_in_data}")
         answer = models.Answer(
             **{
                 "is_active": obj_in_data["is_active"],
@@ -173,7 +171,6 @@ class CRUDAnswer(CRUDObject):
             }
         )
         # Set the related objects
-        print(f"answer: {answer}")
         answer.audio_location = audio_location
         answer.author = user
         answer.question = question

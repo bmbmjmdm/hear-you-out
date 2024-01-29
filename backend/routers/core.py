@@ -23,8 +23,8 @@ import models, schemas
 from database import get_db
 import authentication
 from CRUD.Object import CRUDObject
-from CRUD import Flag, Vote, Answer, Question, User
-from notifications import Firebase
+from CRUD import Flag, Vote, Answer
+
 
 
 class Message(BaseModel):
@@ -56,7 +56,7 @@ router = APIRouter(
 async def get_question_of_the_day(
     db: AsyncSession = Depends(get_db),
 ):
-    question_CRUD = Question.CRUDQuestion(db, models.Question)
+    question_CRUD = CRUDObject(db, models.Question)
     question = await question_CRUD.get(query_dict={"of_the_day": True})
 
     if question is None:
@@ -149,13 +149,6 @@ async def submit_answer(
     answers_CRUD = Answer.CRUDAnswer(db, models.Answer)
     # CRUD create: return answer, audio_data
     answer = await answers_CRUD.create(answer, as_pydantic=True)
-    # Send notification to all users subscribed to new answers
-    # This could be whole layers of smarter:
-    # 1) Run only on every nth answer
-    # 2) Run only on every nth answer per user
-    firebase = Firebase()
-    firebase_report = await firebase.send_new_answers_notification()
-    print(f'Firebase report: {firebase_report}')
     return answer
 
 
@@ -228,27 +221,3 @@ async def submit_vote(
             raise e
     vote = schemas.VoteExternalModel.model_validate(vote)
     return vote
-
-
-# Change subscription status for new question notifications
-@router.post("/subscribe/new_question", response_model=schemas.UserExternalModel)
-async def subscribe_new_question(
-    user: Annotated[models.User, Depends(authentication.get_current_active_user)],
-    db: AsyncSession = Depends(get_db),
-):
-    user_CRUD = User.CRUDUser(db)
-    user = await user_CRUD.change_subscription_status(user.id, schemas.TopicSubscription(topic="new_question", subscription_status=True))
-    user = schemas.UserExternalModel.model_validate(user)
-    return user
-
-
-# Change subscription status for new answers notifications
-@router.post("/subscribe/new_answers", response_model=schemas.UserExternalModel)
-async def subscribe_new_answers(
-    user: Annotated[models.User, Depends(authentication.get_current_active_user)],
-    db: AsyncSession = Depends(get_db),
-):
-    user_CRUD = User.CRUDUser(db)
-    user = await user_CRUD.change_subscription_status(user.id, schemas.TopicSubscription(topic="new_answers", subscription_status=True))
-    user = schemas.UserExternalModel.model_validate(user)
-    return user

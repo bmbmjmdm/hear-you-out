@@ -11,7 +11,7 @@ import uuid
 import models, schemas
 
 # Type indicating Question, Answer, Flag, Vote, Embedding but not User
-ModelType = TypeVar("ModelType", models.Question, models.Answer, models.Flag, models.Vote, models.Embedding, models.TopicSubscription)
+ModelType = TypeVar("ModelType", models.Question, models.Answer, models.Flag, models.Vote, models.Embedding)
 # Type indicating QuestionCreateModel, AnswerCreateModel, FlagCreateModel, VoteCreateModel, EmbeddingCreateModel but not UserCreateModel
 CreateSchemaType = TypeVar("CreateSchemaType", schemas.QuestionCreateModel, schemas.AnswerCreateModel, schemas.FlagCreateModel, schemas.VoteCreateModel, schemas.EmbeddingCreateModel)
 # Type indicating QuestionUpdateModel, AnswerUpdateModel, FlagUpdateModel, VoteUpdateModel, EmbeddingUpdateModel but not UserUpdateModel
@@ -27,9 +27,6 @@ UpdateSchemaType = TypeVar("UpdateSchemaType", schemas.QuestionUpdateModel, sche
 #     )
 
 async def check_related_object(model, related_model, related_id_field, db: AsyncSession):
-    """
-    Checks if the related object exists, and returns it.
-    """
     related_object = await db.execute(select(related_model).where(related_model.id == getattr(model, related_id_field)))
     related_object = related_object.unique().scalars().first()
     if related_object is None:

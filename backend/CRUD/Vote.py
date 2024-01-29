@@ -30,6 +30,7 @@ class CRUDVote(CRUDObject):
                 raise e
         # Create the Vote object
         obj_in_data = vote_in.model_dump()
+        print(f"obj_in_data: {obj_in_data}")
         vote = models.Vote(**obj_in_data)
         # Set the related objects
         vote.answer = answer
@@ -38,5 +39,8 @@ class CRUDVote(CRUDObject):
         answer.votes_count += 1
         await self.db.commit()
         await self.db.refresh(vote)
+        print(f"vote: {vote}")
+        for field in vote.__dict__:
+            print(f"vote.{field}: {getattr(vote, field)}")
         return vote
     

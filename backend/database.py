@@ -12,6 +12,7 @@ from sqlalchemy.orm import declarative_base
 
 from config import config
 
+print(config.SQLALCHEMY_DATABASE_URI)
 engine = create_async_engine(config.SQLALCHEMY_DATABASE_URI,
                             #  echo=True,
                              future=True)

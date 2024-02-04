@@ -25,9 +25,13 @@ class UserBaseModel(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     is_active: bool = Field(True, description="Whether the model is active")
     device_id: str = Field(..., description="The device ID of the user")
+    is_admin: bool = Field(False, description="Whether the user is an admin")
     email: Optional[str] = Field(None, description="The email of the user")
     username: Optional[str] = Field(None, description="The username of the user")
     password: Optional[SecretStr] = Field(None, description="The password of the user")
+    firebase_token: Optional[str] = Field(
+        None, description="The firebase token of the user"
+    )
 
 
 # Minimal model, for relations with other models
@@ -53,7 +57,9 @@ class UserModel(UserMinimalModel):
     test_groups: List["TestGroupMinimalModel"] = Field(
         ..., description="The test groups of the user"
     )
-
+    topic_subscriptions: List["TopicSubscription"] = Field(
+        ..., description="The topic subscriptions of the user"
+    )
 
 # Create model, for creating new users
 class UserCreateModel(UserBaseModel):
@@ -64,7 +70,9 @@ class UserCreateModel(UserBaseModel):
 
     # Test group dicts have to take form of {"test": test_name, "version": test_version}
     test_groups: List[dict[str, str]] = Field(
-        None, description="The test groups of the user", example=[{"test": "colour", "version": "red"}]
+        None,
+        description="The test groups of the user",
+        example=[{"test": "colour", "version": "red"}],
     )
 
     @validator("username")
@@ -171,6 +179,7 @@ class AnswerBaseModel(BaseModel):
     votes_count: int = Field(0, description="The number of votes of the answer")
     flags_count: int = Field(0, description="The number of flags of the answer")
 
+
 # Minimal model, for relations with other models
 class AnswerMinimalModel(AnswerBaseModel):
     id: UUID4 = Field(..., description="The ID of the model")
@@ -217,7 +226,9 @@ class AnswerUpdateModel(AnswerMinimalModel):
     question_id: Optional[UUID4] = Field(
         None, description="The UUID of the question of the answer"
     )
-    views_count: Optional[int] = Field(None, description="The number of views of the answer")
+    views_count: Optional[int] = Field(
+        None, description="The number of views of the answer"
+    )
     unique_views: Optional[int] = Field(
         None, description="The number of unique views of the answer"
     )
@@ -234,6 +245,7 @@ class AnswerUpdateModel(AnswerMinimalModel):
     author: Optional["UserMinimalModel"] = Field(
         None, description="The author of the answer"
     )
+
 
 # External model, to be returned to the frontend, possibly public
 class AnswerExternalModel(AnswerModel):
@@ -496,11 +508,72 @@ class TokenData(BaseModel):
     username: str | None = None
 
 
+# Message
+
+
+class Title(BaseModel):
+    title: Optional[str] = Field(None, description="The title of the message")
+
+
+class Body(BaseModel):
+    body: Optional[str] = Field(None, description="The body of the message")
+
+
+class Image(BaseModel):
+    image: Optional[str] = Field(None, description="URL of the image of the message")
+
+
+class Notification(Title, Body, Image):
+    pass
+
+
+class Message(BaseModel):
+    # data: dict of arbitrary string keys and string values
+    data: Optional[dict[str, str]] = Field(None, description="The data of the message")
+    # notification: dict of keys: title, body, image
+    notification: Notification
+    # topic: string
+    topic: Optional[str] = Field(None, description="The topic of the message")
+    # condition: string
+    condition: Optional[str] = Field(
+        None,
+        description="The condition of the message, read more at https://firebase.google.com/docs/cloud-messaging/send-message#send-messages-to-topics",
+        example="'TopicA' in topics && ('TopicB' in topics || 'TopicC' in topics)",
+    )
+    # tokens: list of strings
+    tokens: Optional[List[str]] = Field(None, description="The tokens of the message")
+
+    # Require either topic or tokens
+    @validator("topic", "tokens")
+    def topic_or_tokens_required(cls, v, values, **kwargs):
+        if v is None:
+            raise ValueError("Either topic or tokens are required")
+        return v
+
+    # Require either topic, condition or tokens
+    @validator("topic", "condition", "tokens")
+    def topic_or_condition_or_tokens_required(cls, v, values, **kwargs):
+        if v is None:
+            raise ValueError("Either topic, condition or tokens are required")
+        return v
+
+
+# Subscriptions
+    
+class TopicSubscription(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    topic: str = Field(..., description="The topic of the subscription")
+    subscription_status: bool = Field(
+        ..., description="Whether the user is subscribed to the topic"
+    )
+
+
 # Rebuild models for relations
 
 TestModel.model_rebuild()
 TestGroupModel.model_rebuild()
 TestGroupMinimalModel.model_rebuild()
+TopicSubscription.model_rebuild()
 FlagModel.model_rebuild()
 FlagExternalModel.model_rebuild()
 VoteModel.model_rebuild()

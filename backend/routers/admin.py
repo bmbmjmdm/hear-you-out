@@ -25,7 +25,8 @@ from database import get_db
 import authentication
 from config import config
 from CRUD.Object import check_related_object
-from CRUD import TestGroup, Test
+from CRUD import TestGroup, Test, Question, User
+from notifications import Firebase
 
 
 class Message(BaseModel):
@@ -668,3 +669,22 @@ async def get_test_groups(
         for test_group in test_groups
     ]
     return test_groups
+
+
+@router.post("/change_question_of_the_day")
+async def change_question_of_the_day(
+    admin: Annotated[models.User, Depends(authentication.get_current_active_admin)],
+    question_id: uuid.UUID,
+    send_notification: bool = True,
+    message: Optional[schemas.Message] = None,
+    db: AsyncSession = Depends(get_db),
+):
+    question_CRUD = Question.CRUDQuestion(db, models.Question)
+    # Set the question of the day
+    await question_CRUD.set_of_the_day(question_id)
+    # Send notification
+    if send_notification:
+        firebase = Firebase()
+        await firebase.send_new_question_notification(db=db, message=message)
+
+    return {"message": "Question of the day changed"}

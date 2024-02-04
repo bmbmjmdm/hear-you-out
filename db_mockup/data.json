@@ -4,7 +4,8 @@
     "password": "admin",
     "email": "admin@localhost",
     "device_id": "admin",
-    "test_groups": []
+    "test_groups": [],
+    "firebase_token": "PUT_TOKEN_HERE"
   },
   "questions": [
     {
@@ -66,7 +67,8 @@
           "test": "Registration button",
           "version": "Green"
         }
-      ]
+      ],
+      "firebase_token": "PUT_TOKEN_HERE"
     },
     {
       "device_id": "user2",
@@ -79,7 +81,8 @@
           "test": "Registration button",
           "version": "Blue"
         }
-      ]
+      ],
+      "firebase_token": "PUT_TOKEN_HERE"
     },
     {
       "device_id": "user3",
@@ -88,7 +91,8 @@
           "test": "a/b",
           "version": "a"
         }
-      ]
+      ],
+      "firebase_token": "PUT_TOKEN_HERE"
     }
   ]
 }

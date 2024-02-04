@@ -28,6 +28,7 @@ response = requests.post(
     data={
         "username": admin_data["username"],
         "password": admin_data["password"],
+        "firebase_token": admin_data["firebase_token"],
     },
 )
 admin_token = response.json()["access_token"]
@@ -70,7 +71,8 @@ for user_data in users_data:
     )
     response = requests.post(
         url + "/api/auth/login",
-        params={"device_id": user_data["device_id"]},
+        params={"device_id": user_data["device_id"],
+                "firebase_token": user_data["firebase_token"]},
     )
     users.append(response.json())
 

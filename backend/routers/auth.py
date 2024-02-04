@@ -82,11 +82,11 @@ async def login_device(
             detail="No user found",
         )
 
-    # if user.is_admin:
-    #     raise HTTPException(
-    #         status_code=status.HTTP_401_UNAUTHORIZED,
-    #         detail="Admins must login with username and password",
-    #     )
+    if user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Admins must login with username and password",
+        )
 
     access_token_expires = timedelta(minutes=authentication.ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = await authentication.create_access_token(

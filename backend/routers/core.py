@@ -36,6 +36,7 @@ class AnswerSorting(str, Enum):
     top = "top"
     unset = "unset"
 
+
 def check_list_length(list: List):
     if len(list) == 0:
         raise HTTPException(
@@ -101,28 +102,26 @@ async def get_answers(
         kwargs["question_id"] = questions_ids
     if ids is not None:
         kwargs["id"] = ids
-    
+
     answers = []
     match sorting:
         case AnswerSorting.random:
-            answers = await answers_CRUD.get_multi_least_viewed(**kwargs, as_pydantic=True)
+            answers = await answers_CRUD.get_multi_least_viewed(
+                **kwargs, as_pydantic=True
+            )
         case AnswerSorting.top:
             answers = await answers_CRUD.get_multi_top(**kwargs, as_pydantic=True)
         case AnswerSorting.unset:
             answers = await answers_CRUD.get_multi_unset(**kwargs, as_pydantic=True)
 
     if seen_answers_ids is not None:
-        answers = [
-            answer
-            for answer in answers
-            if answer.id not in seen_answers_ids
-        ]
-    
+        answers = [answer for answer in answers if answer.id not in seen_answers_ids]
+
     response_answers = []
     for answer in answers:
         response_answer = await answers_CRUD.view(answer, user, as_pydantic=True)
         response_answers.append(response_answer)
-    
+
     # Currently returns answers including the user's own answers
     # for answer in response_answers:
     #     if answer.author.id == user.id:
@@ -134,7 +133,6 @@ async def get_answers(
     # Convert to AnswerExternalUserModel
     for answer in answers:
         answer = schemas.AnswerExternalUserModel.model_validate(answer)
-        
 
     check_list_length(answers)
     return answers
@@ -155,7 +153,7 @@ async def submit_answer(
     # 2) Run only on every nth answer per user
     firebase = Firebase()
     firebase_report = await firebase.send_new_answers_notification()
-    print(f'Firebase report: {firebase_report}')
+    print(f"Firebase report: {firebase_report}")
     return answer
 
 
@@ -237,7 +235,24 @@ async def subscribe_new_question(
     db: AsyncSession = Depends(get_db),
 ):
     user_CRUD = User.CRUDUser(db)
-    user = await user_CRUD.change_subscription_status(user.id, schemas.TopicSubscription(topic="new_question", subscription_status=True))
+    user = await user_CRUD.change_subscription_status(
+        user.id,
+        schemas.TopicSubscription(topic="new_question", subscription_status=True),
+    )
+    user = schemas.UserExternalModel.model_validate(user)
+    return user
+
+
+@router.post("/unsubscribe/new_question", response_model=schemas.UserExternalModel)
+async def unsubscribe_new_question(
+    user: Annotated[models.User, Depends(authentication.get_current_active_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    user_CRUD = User.CRUDUser(db)
+    user = await user_CRUD.change_subscription_status(
+        user.id,
+        schemas.TopicSubscription(topic="new_question", subscription_status=False),
+    )
     user = schemas.UserExternalModel.model_validate(user)
     return user
 
@@ -249,6 +264,23 @@ async def subscribe_new_answers(
     db: AsyncSession = Depends(get_db),
 ):
     user_CRUD = User.CRUDUser(db)
-    user = await user_CRUD.change_subscription_status(user.id, schemas.TopicSubscription(topic="new_answers", subscription_status=True))
+    user = await user_CRUD.change_subscription_status(
+        user.id,
+        schemas.TopicSubscription(topic="new_answers", subscription_status=True),
+    )
+    user = schemas.UserExternalModel.model_validate(user)
+    return user
+
+
+@router.post("/unsubscribe/new_answers", response_model=schemas.UserExternalModel)
+async def unsubscribe_new_answers(
+    user: Annotated[models.User, Depends(authentication.get_current_active_user)],
+    db: AsyncSession = Depends(get_db),
+):
+    user_CRUD = User.CRUDUser(db)
+    user = await user_CRUD.change_subscription_status(
+        user.id,
+        schemas.TopicSubscription(topic="new_answers", subscription_status=False),
+    )
     user = schemas.UserExternalModel.model_validate(user)
     return user

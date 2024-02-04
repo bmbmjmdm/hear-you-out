@@ -118,4 +118,5 @@ class CRUDUser:
         for key, value in user.model_dump(exclude_unset=True).items():
             setattr(db_user, key, value)
         await self.db.commit()
+        await self.db.refresh(db_user)
         return UserModel.model_validate(db_user)

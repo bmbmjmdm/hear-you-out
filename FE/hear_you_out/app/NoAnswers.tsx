@@ -10,6 +10,7 @@ import cat from './cat.png'
 import LinearGradient from 'react-native-linear-gradient';
 import { resizeCat, resizeHeaderMargin, SizeContext } from './helpers';
 import analytics from '@react-native-firebase/analytics';
+import { subscribeToNewAnswers } from './Network';
 
 type NoAnswersProps = {
   setDisableSwipes: (toDisable: boolean) => void
@@ -24,6 +25,7 @@ const NoAnswers = ({setDisableSwipes, isShown}: NoAnswersProps) => {
   }, [])
   React.useEffect(() => {
     if (isShown) setDisableSwipes(false)
+    subscribeToNewAnswers()
   }, [isShown])
   
   return (

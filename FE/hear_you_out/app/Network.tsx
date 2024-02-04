@@ -8,7 +8,6 @@ const baseURL = 'http://192.168.1.136:8080/api/'
 
 let access_token = "";
 let id:string = ""; 
-let feature_flags = {};
 
 const fetchWithRetry = async (url, options) => {
   try {
@@ -23,6 +22,8 @@ const fetchWithRetry = async (url, options) => {
 
 export const login = async (): Promise<void> => {
   const deviceId = await DeviceInfo.getUniqueId();
+  await messaging().registerDeviceForRemoteMessages();
+  const token = await messaging().getToken();
   console.log("logging in")
   id = await AsyncStorage.getItem("id") || ""
   // check to see if we're registered yet, if not, register us with the device id
@@ -35,7 +36,8 @@ export const login = async (): Promise<void> => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        device_id: deviceId
+        device_id: deviceId,
+        firebase_token: token,
       }),
     });
     const registerJson = await registerResult.json()
@@ -47,17 +49,11 @@ export const login = async (): Promise<void> => {
     }
   }
 
-  await messaging().registerDeviceForRemoteMessages();
-  const token = await messaging().getToken();
-
-  const result = await fetchWithRetry(`${baseURL}auth/login?device_id=${deviceId}`, {
+  const result = await fetchWithRetry(`${baseURL}auth/login?device_id=${deviceId}&firebase_token=${token}`, {
     method: 'POST',
     headers: {
       Accept: 'application/json',
     },
-    body: {
-      feature_flags: JSON.stringify(feature_flags)
-    }
   });
   const json = await result.json()
   // we need access token and user id to successfully make calls
@@ -65,8 +61,7 @@ export const login = async (): Promise<void> => {
   else throw new Error("No access token returned from login")
   if (json.user_id) id = json.user_id
   else throw new Error("No id returned from login")
-  if (json.feature_flags) feature_flags = json.feature_flags
-  //else throw new Error("No feature flags returned from login")
+  await unSubscribeToNewAnswers()
   console.log("done logging in")
 }
 
@@ -98,7 +93,7 @@ export const getQuestion = async (): Promise<APIQuestion> => {
 
 export type APIAnswerStats = {
   id: string,
-  views: number,
+  views_count: number,
 }
 
 export const getAnswerStats = async(): Promise<APIAnswerStats> => {
@@ -159,7 +154,7 @@ export type APIOthersAnswer = {
 }
 
 // this temporary answer list is used to store answers loaded but not rated. When we fetch new answers, we need to check both lists
-let tempAnswerList = []
+let tempAnswerList:string[] = []
 
 export const clearTempAnswerList = () => {
   tempAnswerList = []
@@ -172,6 +167,7 @@ export const getAnswer = async (questionId: string): Promise<APIOthersAnswer> =>
   list = list.concat(tempAnswerList)
   // reduce the list into multiple query params
   const seenAnswersQuery = list.reduce((acc, cur) => acc + `&seen_answers_ids=${cur}`, "")
+  // yuo can also include a "sorting" query param and set it to "random" or "top", but by default it'll 50/50 between the two, which is ok
   // fetch based on total list
   const result = await fetchWithRetry(`${baseURL}answers?limit=1${seenAnswersQuery}`, {
     method: 'GET',
@@ -246,3 +242,36 @@ export const reportAnswer = async (answerId: string): Promise<void> => {
   console.log("done reporting answer")
 }
 
+export const subscribeToNewAnswers = async (): Promise<void> => {
+  console.log("subscribing to new answers")
+  const didSubscribe = await AsyncStorage.getItem("subscribed")
+  if (didSubscribe) return;
+  const result = await fetchWithRetry(`${baseURL}subscribe/new_answers`, {
+    method: 'POST',
+    headers: {
+      "Content-Type": "application/json",
+      authorization: `Bearer ${access_token}`,
+    }
+  });
+  if (result.status === 200) {
+    await AsyncStorage.setItem("subscribed", "true")
+  }
+  console.log("done subscribing")
+}
+
+export const unSubscribeToNewAnswers = async (): Promise<void> => {
+  console.log("UNsubscribing to new answers")
+  const didSubscribe = await AsyncStorage.getItem("subscribed")
+  if (!didSubscribe) return;
+  const result = await fetchWithRetry(`${baseURL}unsubscribe/new_answers`, {
+    method: 'POST',
+    headers: {
+      "Content-Type": "application/json",
+      authorization: `Bearer ${access_token}`,
+    }
+  });
+  if (result.status === 200) {
+    await AsyncStorage.removeItem("subscribed")
+  }
+  console.log("done UNsubscribing")
+}

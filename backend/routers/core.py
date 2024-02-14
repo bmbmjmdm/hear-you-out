@@ -24,7 +24,7 @@ from database import get_db
 import authentication
 from CRUD.Object import CRUDObject
 from CRUD import Flag, Vote, Answer, Question, User
-from notifications import Firebase
+from firebase import Firebase
 
 
 class Message(BaseModel):

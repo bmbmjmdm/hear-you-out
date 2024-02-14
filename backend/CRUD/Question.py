@@ -32,9 +32,13 @@ class CRUDQuestion(CRUDObject):
         """
         # Unset previous question of the day
         previous_question = await self.get(query_dict={"of_the_day": True})
-        if previous_question is not None:
+        if previous_question is not None and previous_question.id != id:
             previous_question.of_the_day = False
             await self.db.commit()
+        # elif previous_question.id == id:
+        #     raise HTTPException(
+        #         status_code=400, detail="Question is already question of the day"
+        #     )
         question = await self.get(id, as_pydantic=False)
         question.of_the_day = True
         await self.db.commit()

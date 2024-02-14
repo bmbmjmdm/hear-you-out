@@ -9,12 +9,13 @@ from CRUD import User, Question
 from schemas import UserModel, Title, Body, Notification, Message
 import models
 
+
 class Firebase:
     def __init__(self):
         if not _apps:
             self.app = initialize_app()
         else:
-            self.app = _apps['[DEFAULT]']
+            self.app = _apps["[DEFAULT]"]
 
     async def send_message(self, message: Message) -> str:
         """
@@ -30,13 +31,18 @@ class Firebase:
                 body=message.notification.body,
                 image=message.notification.image,
             )
+        print(f"Notifying with data: {data} and notification: {notification}")
         # Can be send either to a 1) Topic/Condition, 2) Single Device, or 3) Multiple Devices
+
         match message:
             case Message(topic=str) | Message(condition=str):
                 if message.tokens is not None:
                     raise ValueError(
                         "Cannot send message to both topic/condition and specfic device(s)"
                     )
+                print(
+                    f"Sending message to topic/condition: {message.topic or message.condition}"
+                )
                 return messaging.send(
                     messaging.Message(
                         data=data,
@@ -47,6 +53,7 @@ class Firebase:
                 )
             case Message(tokens=list):
                 if len(message.tokens) == 1:
+                    print(f"Sending message to single device: {message.tokens[0]}")
                     return await messaging.send(
                         messaging.Message(
                             data=data,
@@ -55,6 +62,7 @@ class Firebase:
                         )
                     )
                 else:
+                    print(f"Sending message to multiple devices: {message.tokens}")
                     return messaging.send_multicast(
                         messaging.MulticastMessage(
                             data=data,
@@ -84,9 +92,14 @@ class Firebase:
                     body="A new question is now active! \n" + question.text,
                 ),
             )
+        message = await self.send_message(message)
+        print(f"Message sent: {message}")
+        return message
         return await self.send_message(message)
 
-    async def send_new_answers_notification(self, notification: Notification = None) -> str:
+    async def send_new_answers_notification(
+        self, notification: Notification = None
+    ) -> str:
         """
         Sends a notification to all users waiting for answers that new answers are now available.
         """
@@ -101,3 +114,17 @@ class Firebase:
                 notification=notification,
             )
         )
+
+    async def subscribe_to_topic(self, topic: str, tokens: List[str]) -> str:
+        """
+        Subscribes a list of tokens to a topic.
+        """
+        report = messaging.subscribe_to_topic(tokens, topic)
+        print(f'response.success_count: {report.success_count}, response.failure_count: {report.failure_count}')
+        return report
+    
+    async def unsubscribe_from_topic(self, topic: str, tokens: List[str]) -> str:
+        """
+        Unsubscribes a list of tokens from a topic.
+        """
+        return messaging.unsubscribe_from_topic(tokens, topic)

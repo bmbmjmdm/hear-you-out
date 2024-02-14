@@ -15,6 +15,7 @@ from schemas import (
 )
 import models
 from CRUD.Object import CRUDObject, check_related_object
+from firebase import Firebase
 
 
 # Needs a custom Create to handle creation of related objects
@@ -88,8 +89,16 @@ class CRUDUser:
         """
         Changes the subscription status of a user to a topic.
         """
+        
         user = await self._retrieve(ids=[user_id])
         user = user[0]
+        
+        print(f'topic: {topic.topic}, subscription_status: {topic.subscription_status}')
+        if topic.subscription_status:
+            await Firebase().subscribe_to_topic(topic=topic.topic, tokens=[user.firebase_token])
+        else:
+            await Firebase().unsubscribe_from_topic(topic=topic.topic, tokens=[user.firebase_token])
+        
         topic_subscription = await self.db.execute(
             select(models.TopicSubscription)
             .where(models.TopicSubscription.user_id == user_id)

@@ -26,7 +26,7 @@ import authentication
 from config import config
 from CRUD.Object import check_related_object
 from CRUD import TestGroup, Test, Question, User
-from notifications import Firebase
+from firebase import Firebase
 
 
 class Message(BaseModel):

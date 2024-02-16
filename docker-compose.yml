@@ -13,7 +13,7 @@ services:
       - db
     restart: on-failure
     env_file:
-      - .env
+      - .env-dev
   db:
     image: postgres:15-alpine
     environment:

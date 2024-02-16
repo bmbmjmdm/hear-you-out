@@ -4,10 +4,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from starlette.middleware.sessions import SessionMiddleware
 from contextlib import asynccontextmanager
+import os
 
 from database import session_manager
 from routers import core, auth, admin
-
 
 def init_app(init_db=True):
     lifespan = None
@@ -28,13 +28,7 @@ def init_app(init_db=True):
     server.include_router(admin.router)
     
     origins = [
-    "http://localhost:8000",
-    "http://localhost:8080",
-    "http://127.0.0.1:8000",
-    "http://localhost:5173",
-    "http://127.0.0.1:5173",
-    "http://localhost:3000",
-    "http://localhost:5173/"
+        '*',
     ]
 
     server.add_middleware(
@@ -45,7 +39,7 @@ def init_app(init_db=True):
         allow_headers=["*"],
     )
 
-    server.add_middleware(SessionMiddleware, secret_key="super-secret")
+    server.add_middleware(SessionMiddleware, secret_key=os.environ.get("SECRET_KEY"))
 
     return server
 

@@ -9,7 +9,7 @@ with open(os.path.join(os.path.dirname(__file__), "data.json")) as f:
     data = json.load(f)
 
 # Setup constants
-url = "http://127.0.0.1:8080"
+url = "http://127.0.0.1:80"
 admin_creation_password = "admin"
 
 

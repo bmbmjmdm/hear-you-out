@@ -4,9 +4,24 @@ require_relative '../node_modules/@react-native-community/cli-platform-ios/nativ
 platform :ios, '11.0'
 use_modular_headers!
 
+#Convert all permission pods into static libraries
+pre_install do |installer|
+  Pod::Installer::Xcode::TargetValidator.send(:define_method, :verify_no_static_framework_transitive_dependencies) {}
+
+  installer.pod_targets.each do |pod|
+    if pod.name.eql?('RNPermissions') || pod.name.start_with?('Permission-')
+      def pod.build_type;
+        Pod::BuildType.static_library # >= CocoaPods 1.9
+      end
+    end
+  end
+end
+
 target 'hear_you_out' do
   config = use_native_modules!
 
+  use_frameworks! :linkage => :static
+  $RNFirebaseAsStaticFramework = true
   use_react_native!(:path => config["reactNativePath"])
 
   # Build errors
@@ -16,7 +31,11 @@ target 'hear_you_out' do
 
   # Permission handlers (react-native-permissions)
   pod 'RNPermissions', :path => '../node_modules/react-native-permissions'
+  pod 'Permission-Notifications', :path => "../node_modules/react-native-permissions/ios/Notifications"
   pod 'Permission-Microphone', :path => "../node_modules/react-native-permissions/ios/Microphone"
+
+  # Firebase
+  pod 'RNFBApp', :path => '../node_modules/@react-native-firebase/app'
 
 
   # Enables Flipper.
@@ -27,5 +46,21 @@ target 'hear_you_out' do
   #post_install do |installer|
     #flipper_post_install(installer)
   #end
+  pod 'RNCAsyncStorage', :path => '../node_modules/@react-native-async-storage/async-storage'
+
+  pod 'react-native-safe-area-context', :path => '../node_modules/react-native-safe-area-context'
+
+  pod 'RNDeviceInfo', :path => '../node_modules/react-native-device-info'
+
+  pod 'RNFS', :path => '../node_modules/react-native-fs'
+
+  pod 'react-native-ffmpeg', :path => '../node_modules/react-native-ffmpeg'
+
+  pod 'RNShare', :path => '../node_modules/react-native-share'
+
+  pod 'RNFBAnalytics', :path => '../node_modules/@react-native-firebase/analytics'
+
+  pod 'RNFBMessaging', :path => '../node_modules/@react-native-firebase/messaging'
+
 end
 
